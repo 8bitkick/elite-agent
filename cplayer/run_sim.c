@@ -265,6 +265,7 @@ int main(int argc, char **argv) {
     { extern int g_msl_side; if (getenv("MSLSIDE")) g_msl_side = atoi(getenv("MSLSIDE")); }
     { extern int g_flee_n; if (getenv("FLEEN")) g_flee_n = atoi(getenv("FLEEN")); }
     { extern int g_ws_fight; if (getenv("WSFIGHT")) g_ws_fight = atoi(getenv("WSFIGHT")); }
+    { extern int g_dock_log; g_dock_log = getenv("DOCKLOG") != NULL; }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
     if (getenv("CP")) {     // fight parameter overrides, name=value,... (as the lab's LABP)
         char *cp = strdup(getenv("CP")), *tok, *save;

@@ -253,6 +253,7 @@ PT_THREAD(to_station(float seconds)) {
 static struct {
     CO; uint32_t end, last_log; int final, fought, have_spin, spin_mc; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
+int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 PT_THREAD(dock(float seconds)) {
     CO_BEGIN(c_dk);
     c_dk.end = deadline(seconds);
@@ -290,8 +291,9 @@ PT_THREAD(dock(float seconds)) {
             double dist = vlen(rel), off;
             int jx = jstx(), jy = jsty(), want, lined;
             keyset_t keys = {{0}, 0};
+            // lined up: on the slot's axis, out in front (tighter to start the final than to stay in it)
             if (c_dk.final) lined = along > 0 && lat < fmax(300, along * 0.4);
-            else lined = along > 1200 && lat < fmax(250, along * 0.25);
+            else lined = along > 1200 && lat < fmax(120, along * 0.08);
             if (!lined) {
                 if (along < 600) {
                     vec_t side = vnorm(fvec(st->roofv));
@@ -303,11 +305,40 @@ PT_THREAD(dock(float seconds)) {
                 }
                 double gd = vlen(goal);
                 want = gd > 4000 ? 40 : (int) fmax(6, gd / 120);
+                // turning in: near the line-up point, already in front of the slot, steer for a point on the axis
+                // nearer the station, so we come onto the axis facing it (arriving at the point itself we faced
+                // across the axis and turned 100 deg at speed 4 to face the station)
+                if (along > 1500 && gd < 1500) {
+                    goal = vadd(S, nv, fmax(1200.0, along * 0.5));
+                    want = (int) fmax(8, fmin(want, 14));
+                }
                 c_dk.final = 0;
                 off = steer(goal, jx, jy, 3, 3, &keys);
+                // flying straight at it: pitch only. Near the nose the steering's roll chased the target's angle
+                // round it, the stick swinging full one way and the other all the way in
+                if (off < 3) { ks_del(&keys, K_ROLL_LEFT); ks_del(&keys, K_ROLL_RIGHT); }
                 if (off > 60 && want > 8) want = 8;
             } else {
-                off = steer(S, jx, jy, 3, 3, &keys);
+                if (!c_dk.final && R(A_DAMP)) {
+                    // damping on for the final, as the game's own docking computer flies it: the roll stick
+                    // then eases back 2 a loop when let go, the only way to hold it at the station's spin
+                    // (alpha 16, J 66). Off (after launch, for the fights) it can only sit at 63 or 70 or
+                    // snap to the centre: the slot see-sawed 20 deg either side all the way in. (Not in a
+                    // fight: fight_if_needed has run above, nothing's about.)
+                    hold_none();
+                    CO_CALL(c_dk, set_damping(1));
+                    continue;
+                }
+                // aim along the slot's axis: at a point on it ahead of us that slides in to the slot's centre
+                // (on the station's face, 160 out from its centre), so an offset closes onto the axis
+                // rather than curving into the face. Aiming at the centre, 12 off the axis 140 out was 5 deg:
+                // the roll match gave up (off > 4) and the steering's own roll turned the slot 70 deg: bumps
+                // (and always at least 300 ahead of us: in close, through the slot's centre to the station's,
+                // which on the axis are in line. A point 160 + half the way left was beside us 170 out: the nose
+                // swung 120 deg off and pitched us into the hull)
+                double ax = fmin(160 + fmax(0.0, along - 160) * 0.5, fmax(0.0, along - 300));
+                vec_t aimp = vadd(S, nv, ax);
+                off = steer(aimp, jx, jy, 3, 3, &keys);
                 // a few seconds out and centred: roll with the station so its slot holds level
                 double psi = atan2(st->roofv[1], st->roofv[0]);
                 int mc = mcnt();
@@ -325,7 +356,9 @@ PT_THREAD(dock(float seconds)) {
                 c_dk.spin_jx = jx;
                 if (g_steer_log && c_dk.have_spin)
                     dbgf_("spin %.4f rad/it (alpha %.2f) psi %.3f jx %d dist %.0f mc %d sroll %d", c_dk.spin, c_dk.spin * 256, psi, jx - 128, dist, mc, st->roll);
-                if (dist < 5000 && off < 4) {
+                // (with the nose within 10 deg: a bigger turn first needs the roll too; and always in the last
+                // 600, where 12 off the axis is 5 deg and the steering's own roll turned the slot 70 deg)
+                if (dist < 5000 && (off < 10 || dist < 600)) {
                     // roll with it: the station spins at a fixed rate (its roll counter is always
                     // full), and in the sim its slot holds still when our roll angle per iteration
                     // (alpha) is 16 the same way, measured as dpsi*256 = -3.2 - 0.20 alpha. So hold
@@ -347,12 +380,23 @@ PT_THREAD(dock(float seconds)) {
                     else if (tx < jx - 3) { if (!ease) ks_add(&keys, K_ROLL_RIGHT); }
                     if (g_steer_log) dbgf_("rollmatch err %.1f deg alpha %.1f tx %d jx %d", err * 180 / M_PI, alpha, tx - 128, jx - 128);
                 }
-                want = dist > 1500 ? 20 : dist > 600 ? 10 : 4;
+                // steady in, slowing to a bump-safe 4 (under 5: a misaligned entry is a bump, not death) for
+                // the last 400; and holding back while the slot isn't level near it
+                double rl = fabs(fmod(atan2(st->roofv[1], st->roofv[0]) + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2) * 180 / M_PI;
+                want = dist > 2500 ? 22 : dist > 1000 ? 14 : dist > 400 ? 9 : 4;
+                if (dist < 600 && rl > 20) want = 1;
                 if (off > 8 && want > 4) want = 4;
                 c_dk.final = 1;
             }
             speed_keys(speed(), want, &keys);
             apply_flight(&keys);
+            if (g_dock_log) {     // the approach frame by frame: range, along the slot axis and off it, the angle to
+                                  // the station's centre, the slot's roll off level (deg), stick, speed, shields
+                double psi = atan2(st->roofv[1], st->roofv[0]);
+                double err = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
+                dbgf_("DK %s dist %.0f along %.0f lat %.0f off %.1f roll %.1f nvz %.2f jx %d jy %d spd %d E %d F %d A %d",
+                      c_dk.final ? "F" : "L", dist, along, lat, off, err * 180 / M_PI, nv.z, jx - 128, jy - 128, speed(), energy(), fsh(), ash());
+            }
             if (now() - c_dk.last_log > 50) {
                 c_dk.last_log = now();
                 dbgf_("%s dist %.0f along %.0f lat %.0f off %.0f spd %d", c_dk.final ? "final" : "line up", dist, along,
