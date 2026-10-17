@@ -1,0 +1,175 @@
+<div class="wrap">
+
+<section class="hero">
+  <div class="title">
+    <div class="eyebrow">Acornsoft Elite · BBC Master · played by keys</div>
+    <h1>Commander CLAUDE<br><span>Elite</span></h1>
+    <p>An agent on a Raspberry Pi watched the game's memory and pressed keys, nothing else. It started where every commander starts, docked at Lave with 100 credits and a pulse laser, and traded, fitted out, hunted pirates and flew both missions until the status screen read Elite.</p>
+    <p class="note">Played in the native build of the Presto's emulator core, about 60× real time. Game hours are measured for bounty hunting and estimated at 3.5 minutes a hop for the rest.</p>
+  </div>
+  <figure>
+    <img class="screen" id="img-elite" alt="Elite status screen: Commander CLAUDE, Rating Elite, equipment escape pod, ECM, energy unit, front military laser, rear beam laser">
+    <figcaption>F8, Status Mode: Ersodi, Galaxy 3. Tally 6,420 at this save.</figcaption>
+  </figure>
+</section>
+
+<div class="stats" id="stats"></div>
+
+<section class="panel">
+  <header>
+    <div class="eyebrow">The climb</div>
+    <h2>Combat rating against game hours</h2>
+    <p class="note">Kill points on a log scale, so every rank gets room. Harmless at 0, Elite at 6,400. Markers show the big steps: the military laser, the galactic jumps, the two mission rewards of 256 points each.</p>
+  </header>
+  <div class="scroll"><svg class="chart" id="rank" viewBox="0 0 1100 420" role="img" aria-label="Combat rating over game hours"></svg></div>
+</section>
+
+<div class="grid2">
+  <section class="panel">
+    <header>
+      <div class="eyebrow">Credits</div>
+      <h2>Cash in hand, game hour by game hour</h2>
+      <p class="note">The most it held in each game hour. Spent as fast as it came in: cargo, equipment, and a new escape pod after each ejection. Peak 7,160 Cr, then the military laser.</p>
+    </header>
+    <svg class="chart" id="cash" viewBox="0 0 540 300" role="img" aria-label="Cash over game hours"></svg>
+    <p class="mono note" id="tradeline"></p>
+  </section>
+  <section class="panel">
+    <header>
+      <div class="eyebrow">Cargo</div>
+      <h2>What it bought to sell</h2>
+      <p class="note">Units bought over the career. Food from agricultural worlds and computers from industrial ones did most of the work; gold, platinum and gem-stones travel in kilograms and grams, outside the hold's 35 tonnes.</p>
+    </header>
+    <svg class="chart" id="goods" viewBox="0 0 540 330" role="img" aria-label="Units bought by commodity"></svg>
+  </section>
+</div>
+
+<section class="panel">
+  <header>
+    <div class="eyebrow">The stars it visited</div>
+    <h2>35 systems across three galaxies</h2>
+    <p class="note">Every system of each galaxy as a faint dot; the ones it docked at in cyan, sized by visits, joined in the order it flew. Anarchies, where it hunted, are ringed in red.</p>
+  </header>
+  <div class="maps" id="maps"></div>
+</section>
+
+<div class="grid2">
+  <section class="panel">
+    <header>
+      <div class="eyebrow">Who it fought</div>
+      <h2>Targets chosen, by ship type</h2>
+      <p class="note">Each time the fight loop picked a new target. The top entry is a lesson: debris from dead pirates keeps their hostile flag, so it shot cargo canisters for 0.04 points each. Fuel scoops would have collected them instead.</p>
+    </header>
+    <svg class="chart" id="foes" viewBox="0 0 540 380" role="img" aria-label="Targets by ship type"></svg>
+  </section>
+  <section class="panel">
+    <header>
+      <div class="eyebrow">How it learned to fight</div>
+      <h2>A/B tests on 300 recorded encounters</h2>
+      <p class="note">Every fight's start was saved. Each rule change was replayed on the same 300 encounters, four game minutes each, with WiFi-like jitter on the controls.</p>
+    </header>
+    <div class="scroll"><table>
+      <thead><tr><th>Rules</th><th>pts/min</th><th>clear</th><th>damage</th><th>deaths</th><th>pods</th></tr></thead>
+      <tbody>
+        <tr><td>Before</td><td>2.33</td><td>6.1 s</td><td>37</td><td>2</td><td>29</td></tr>
+        <tr><td>Faster pitch</td><td>2.34</td><td>5.4 s</td><td>36</td><td>1</td><td>11</td></tr>
+        <tr><td>Evade + missiles when outnumbered</td><td>2.27</td><td>7.1 s</td><td>57</td><td>1</td><td>7</td></tr>
+        <tr><td>Missiles always</td><td>2.63</td><td>5.6 s</td><td>25</td><td>3</td><td>29</td></tr>
+        <tr class="won"><td>Faster pitch + evade + missiles when outnumbered</td><td>2.15</td><td>6.4 s</td><td>27</td><td>0</td><td>12</td></tr>
+        <tr><td>3D move planner (first try)</td><td>1.92</td><td>8.6 s</td><td>51</td><td>5</td><td>32</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Kept: the yellow row. Earlier, two tuning passes over the same library had already lifted the fight score from 62 to 91 (faster roll, firing only near the sights, an earlier collision look-out).</p>
+  </section>
+</div>
+
+<section class="panel">
+  <header>
+    <div class="eyebrow">Most impressive fight</div>
+    <h2>Seven ships, one of them a Thargoid</h2>
+    <p>A Thargoid and its Thargon, a Mamba, an Adder and two Cobra Mk Is arrive together in a Galaxy 2 anarchy; a pirate Python joins later. CLAUDE kills all seven in 105 game seconds and shoots down three missiles on the way. The front shield goes to zero and energy falls to 73 of 255, and it wins: +7.4 points. Replayed from the saved start of the encounter with the final rules, frame by frame; picked from the 40 most crowded encounters in the library as the hardest one it survives.</p>
+  </header>
+  <div class="shots">
+    <figure><img class="screen" id="img-c1" alt="Front view: specks ahead, six contacts on the scanner"><figcaption>0:04 · the pack: six contacts on the scanner</figcaption></figure>
+    <figure><img class="screen" id="img-c2" alt="Front view: the Thargoid's octagonal hull edge-on below the crosshairs"><figcaption>0:12 · the Thargoid passes below, 1,400 units</figcaption></figure>
+    <figure><img class="screen" id="img-c3" alt="Front view: both laser beams converging on the Thargoid, front shield nearly empty"><figcaption>0:47 · both lasers on the Thargoid, front shield nearly gone</figcaption></figure>
+    <figure><img class="screen" id="img-c4" alt="Front view: debris in the crosshairs where the Thargoid was"><figcaption>0:47 · debris where it was: +2.66 points</figcaption></figure>
+  </div>
+  <div class="fightgrid">
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="legend" id="fightlegend"></div>
+      <svg class="chart" id="fight" viewBox="0 0 540 320" role="img" aria-label="CLAUDE's energy and shields through the fight, with each kill marked"></svg>
+      <p class="note">CLAUDE's energy and shields through the fight (0 to 255), each kill marked along the top, yellow ticks along the bottom where the laser fires. Shields recharge from the energy banks between attackers.</p>
+    </div>
+    <div style="display:grid;gap:10px;min-width:0">
+      <canvas id="space" width="800" height="600" aria-label="3D tracks of the seven enemies around CLAUDE's ship"></canvas>
+      <div class="scrub"><button id="play" type="button">Play</button><input id="t" type="range" min="0" max="1000" value="1000" aria-label="Fight time"><span id="tlabel" class="mono">1:45</span></div>
+      <div class="legend" id="tracklegend"></div>
+      <p class="note">Each enemy's path in CLAUDE's own frame: CLAUDE at the centre, nose along the white line, grid squares 2,000 units. A track ends with a ring where the ship dies. Drag to turn it; the slider replays the fight.</p>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <header>
+    <div class="eyebrow">The control program</div>
+    <h2>What runs every frame</h2>
+    <p class="note">The Presto (or its native twin) runs the BBC Master; the agent only sees RAM and only sends keys. Inside the agent, a career loop picks the next job and hands it to procedures for the docked screens or to the pilot and the fighter in space. Training happens offline on the same core.</p>
+  </header>
+  <div class="scroll diagram"><svg viewBox="0 0 1120 440" role="img" aria-label="Block diagram: the BBC Master sends RAM to the agent's state; the career loop drives the planner, the docked screens, the pilot and the fighter, whose keys go back to the keyboard matrix; fight snapshots feed an offline evaluator that sets the fighter's rules">
+    <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L8,4L0,8z" fill="#8b94a8"/></marker>
+          <marker id="ak" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L8,4L0,8z" fill="#f4c84a"/></marker></defs>
+    <rect class="zone" x="10" y="20" width="220" height="270" rx="6"/><text class="zl" x="24" y="42">BBC MASTER</text>
+    <text class="sub" x="24" y="58">the Presto, or its native twin</text>
+    <rect class="box" x="26" y="80" width="188" height="56" rx="4"/><text x="40" y="104">Elite</text><text class="sub" x="40" y="122">6502 code, 32 KB of RAM</text>
+    <rect class="box" x="26" y="214" width="188" height="56" rx="4"/><text x="40" y="238">keyboard matrix</text><text class="sub" x="40" y="256">the only way in</text>
+    <path class="wire" d="M120,214 V140" marker-end="url(#ar)"/>
+
+    <rect class="zone" x="260" y="20" width="850" height="270" rx="6"/><text class="zl" x="274" y="42">THE AGENT</text>
+    <text class="sub" x="274" y="58">Python on the Raspberry Pi, every frame</text>
+    <path class="wire" d="M214,108 H286" marker-end="url(#ar)"/><text class="sub" x="236" y="100">/ws</text>
+    <rect class="box key" x="290" y="80" width="170" height="56" rx="4"/><text x="304" y="104">State</text><text class="sub" x="304" y="122">60 variables, 12 ships</text>
+    <path class="wire" d="M460,108 H496" marker-end="url(#ar)"/>
+    <rect class="box key" x="500" y="80" width="150" height="56" rx="4"/><text x="514" y="104">Career loop</text><text class="sub" x="514" y="122">picks the next job</text>
+    <rect class="box" x="700" y="72" width="200" height="46" rx="4"/><text x="714" y="92">Planner</text><text class="sub" x="714" y="108">market, routes, shopping</text>
+    <rect class="box" x="700" y="128" width="200" height="46" rx="4"/><text x="714" y="148">Docked screens</text><text class="sub" x="714" y="164">buy, sell, equip, save</text>
+    <rect class="box" x="700" y="184" width="200" height="46" rx="4"/><text x="714" y="204">Pilot</text><text class="sub" x="714" y="220">jump, approach, dock</text>
+    <rect class="box key" x="930" y="184" width="164" height="46" rx="4"/><text x="944" y="204">Fighter</text><text class="sub" x="944" y="220">aim, fire, evade, pod</text>
+    <path class="wire" d="M650,98 C675,98 675,95 696,95" marker-end="url(#ar)"/>
+    <path class="wire" d="M650,110 C676,110 674,151 696,151" marker-end="url(#ar)"/>
+    <path class="wire" d="M650,122 C672,122 672,207 696,207" marker-end="url(#ar)"/>
+    <path class="wire" d="M900,207 H926" marker-end="url(#ar)"/>
+    <text class="sub" x="912" y="176">threat</text>
+    <rect class="box" x="500" y="232" width="150" height="40" rx="4"/><text x="514" y="256">held keys, taps</text>
+    <path class="wire k" d="M700,166 H684 V252 H654" marker-end="url(#ak)"/>
+    <path class="wire k" d="M700,222 H684"/>
+    <path class="wire k" d="M1012,230 V280 H684 V256" />
+    <path class="wire k" d="M500,252 H218" marker-end="url(#ak)"/><text class="sub" x="300" y="246">only keys go back</text>
+
+    <rect class="zone" x="560" y="316" width="550" height="114" rx="6"/><text class="zl" x="574" y="338">TRAINING, OFFLINE</text>
+    <rect class="box" x="580" y="356" width="220" height="56" rx="4"/><text x="594" y="380">Encounter library</text><text class="sub" x="594" y="398">9,000 saved fight starts</text>
+    <rect class="box" x="850" y="356" width="240" height="56" rx="4"/><text x="864" y="380">A/B evaluator, tuner</text><text class="sub" x="864" y="398">same fights, every rule change</text>
+    <path class="wire t" d="M960,230 V296 H690 V352" marker-end="url(#ar)"/><text class="sub" x="700" y="310">a snapshot at each fight</text>
+    <path class="wire" d="M800,384 H846" marker-end="url(#ar)"/>
+    <path class="wire t" d="M1090,384 H1104 V207 H1098" marker-end="url(#ar)"/><text class="sub" x="944" y="346">17 numbers, 3 rules</text>
+  </svg></div>
+</section>
+
+<section class="panel">
+  <header>
+    <div class="eyebrow">Along the way</div>
+    <h2>Three screens from the career</h2>
+  </header>
+  <div class="shots">
+    <figure><img class="screen" id="img-title" alt="Title screen: rotating Cobra Mk III, Load New Commander (Y/N)?"><figcaption>Every run starts here: N, then SPACE.</figcaption></figure>
+    <figure><img class="screen" id="img-deadly" alt="Status screen: Rating Deadly, front military laser"><figcaption>Deadly, tally 3,226, after both missions.</figcaption></figure>
+    <figure><img class="screen" id="img-elite2" alt="Status screen: Rating Elite"><figcaption>Elite. Legal status Offender: some police got in the way.</figcaption></figure>
+  </div>
+</section>
+
+<footer>
+  <div>Elite © Ian Bell and David Braben, Acornsoft 1986 (BBC Master). Addresses and mechanics from <a href="https://www.bbcelite.com/" target="_blank" rel="noopener">Mark Moxon's fully documented source</a>. The emulator is <a href="https://github.com/kieranhj/esp32-beeb" target="_blank" rel="noopener">Kieran Connell's esp32-beeb</a>, ported to the Pimoroni Presto.</div>
+  <div>Data: the career journal (3,288 events) and log; the fight replayed from encounter 01076.</div>
+</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
