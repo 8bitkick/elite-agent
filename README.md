@@ -69,3 +69,5 @@ stop it and switch between efficient and curious. Over USB the same commands are
 
 `docs/` explains how the game works, from the source: its economy, flight and combat, and game
 flow.
+
+[`docs/IO.md`](docs/IO.md) lists exactly what the agent reads and presses, and how fair each is next to a human player.
