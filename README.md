@@ -6,6 +6,12 @@ option, on the machine's ADC), nothing else. It is plain C rules, and it runs st
 Pimoroni Presto (RP2350) inside the BBC Master emulator firmware. The same code runs on a native
 emulator (Pi or Mac) for development and testing.
 
+It hooks into the machine's RAM instead of reading the screen: the game already holds everything
+on the dashboard, the scanner and the market screens as bytes, so there's no need to spend cycles
+recognising pixels. But it can also see bytes the screen never shows, like an enemy's energy. Is
+that cheating? [`docs/IO.md`](docs/IO.md) goes through exactly what the agent reads and presses,
+which of it a human player could see or work out, and what a fair mode would look like.
+
 Two modes: **efficient** goes straight for Elite; **curious** explores every galaxy. Both save at
 each dock: a save takes about 4 seconds docked, so it costs well under 1% of the time to Elite,
 and a death only loses the trip since.
@@ -150,4 +156,3 @@ that commander from the disc when next docked), `!agent status` and `!agent log 
 `docs/` explains how the game works, from the source: its economy, flight and combat, and game
 flow.
 
-[`docs/IO.md`](docs/IO.md) lists exactly what the agent reads and presses, and how fair each is next to a human player.
