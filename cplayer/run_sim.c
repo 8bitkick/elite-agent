@@ -16,6 +16,7 @@
 
 typedef struct beeb_t beeb_t;
 beeb_t *beeb_new(const char *roms, const char *disc_path);
+void beeb_analogue(beeb_t *b, int channel, int value);
 const char *beeb_emu_dir(void);
 void beeb_frames(beeb_t *b, int n);
 uint8_t *beeb_ram(beeb_t *b);
@@ -113,6 +114,7 @@ static void add_name(char *list, size_t cap, const char *name) {
     size_t n = strlen(list);
     snprintf(list + n, cap - n, "%s\"%s\"", n ? ", " : "", name);
 }
+static void p_analogue(void *c, int ch, uint16_t v) { (void) c; beeb_analogue(B, ch, v); }
 static void p_log(void *ctx, int level, const char *s) {
     if (s_sess_dir && level == PLOG_STATUS && !strncmp(s, "Launched from", 13)) { sess_end("restarted", NULL); sess_begin(); }
     (void) ctx;
@@ -265,7 +267,10 @@ int main(int argc, char **argv) {
     { extern int g_msl_side; if (getenv("MSLSIDE")) g_msl_side = atoi(getenv("MSLSIDE")); }
     { extern int g_flee_n; if (getenv("FLEEN")) g_flee_n = atoi(getenv("FLEEN")); }
     { extern int g_ws_fight; if (getenv("WSFIGHT")) g_ws_fight = atoi(getenv("WSFIGHT")); }
+    { extern int g_ws_shield; if (getenv("WSSHIELD")) g_ws_shield = atoi(getenv("WSSHIELD")); }
     { extern int g_dock_log; g_dock_log = getenv("DOCKLOG") != NULL; }
+    { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
+    { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
     if (getenv("CP")) {     // fight parameter overrides, name=value,... (as the lab's LABP)
         char *cp = strdup(getenv("CP")), *tok, *save;
@@ -309,9 +314,11 @@ int main(int argc, char **argv) {
     // SKEW=n: n frames more before the player starts (the game's random numbers then differ: a different
     // career from the same start)
     if (getenv("SKEW")) beeb_frames(B, atoi(getenv("SKEW")));
+    { extern int g_no_missions; if (getenv("NOMISSION")) g_no_missions = atoi(getenv("NOMISSION")); }
+    { extern int g_no_pod; if (getenv("NOPOD")) g_no_pod = atoi(getenv("NOPOD")); }
     { extern int g_save; if (getenv("SAVE")) g_save = atoi(getenv("SAVE")); }
     io.ram = beeb_ram(B);
-    io.hold = p_hold; io.tap = p_tap; io.log = p_log; io.note = p_note;
+    io.hold = p_hold; io.tap = p_tap; io.log = p_log; io.note = p_note; io.analogue = p_analogue;
     player_init(&io);
     uint32_t end = (uint32_t) (minutes * 60 * 50);
     clock_t t0 = clock();

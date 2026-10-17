@@ -8,7 +8,7 @@
 // works as well as "agent"):
 //   player                       start or stop it (it starts by itself ELITE_AUTOSTART frames after boot)
 //   player start | stop
-//   player mode efficient|curious   how it plays: straight for Elite (no saves), or seeing the galaxy
+//   player mode efficient|curious   how it plays: straight for Elite, or seeing the galaxy
 //   player log <0|1|2>           its USB log: STATUS lines only, + PLAYER (default), + DEBUG
 //   player status                a line: rank, tally, play time, kills, deaths
 // The web page shows its panel (machine_program_json): progress to Elite, where it is, the totals.
@@ -100,6 +100,7 @@ static void p_log(void *ctx, int level, const char *s)
     }
     if (level <= s_level) printf("%s %lu %s\n", TAG[level], (unsigned long) s_io.frame, s);
 }
+static void p_analogue(void *ctx, int ch, uint16_t v) { (void) ctx; if (s_hook->analogue) s_hook->analogue(ch, v); }
 static void p_note(void *ctx, const char *s)
 {
     (void) ctx;
@@ -120,7 +121,7 @@ static void set_on(bool on)
     if (on) {
         memset(&s_io, 0, sizeof s_io);
         s_io.ram = s_hook->ram;
-        s_io.hold = p_hold, s_io.tap = p_tap, s_io.log = p_log, s_io.note = p_note;
+        s_io.hold = p_hold, s_io.tap = p_tap, s_io.log = p_log, s_io.note = p_note, s_io.analogue = p_analogue;
         keyq_reset();
         player_init(&s_io);
         s_us_max = s_us_sum = s_n = 0;

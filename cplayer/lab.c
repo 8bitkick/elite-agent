@@ -17,6 +17,7 @@
 
 typedef struct beeb_t beeb_t;
 beeb_t *beeb_new(const char *roms, const char *disc_path);
+void beeb_analogue(beeb_t *b, int channel, int value);
 const char *beeb_emu_dir(void);
 void beeb_frames(beeb_t *b, int n);
 uint8_t *beeb_ram(beeb_t *b);
@@ -150,6 +151,7 @@ static void diag_frame(diag_t *d, int *e_prev, uint8_t *dead_prev) {
     d->aimed += aimed;
     d->left = h;
 }
+static void p_analogue(void *c, int ch, uint16_t v) { (void) c; beeb_analogue(B, ch, v); }
 static void p_log(void *c, int level, const char *s) { (void) c; if (getenv("LOG") && level <= atoi(getenv("LOG"))) fprintf(stderr, "%6u %s\n", io.frame, s); }
 
 extern int combat_set_param(const char *name, double v);
@@ -179,6 +181,10 @@ int main(int argc, char **argv) {
     { extern int g_preload; if (getenv("PRELOAD")) g_preload = atoi(getenv("PRELOAD")); }
     { extern int g_coast_min; if (getenv("COASTMIN")) g_coast_min = atoi(getenv("COASTMIN")); }
     { extern double g_coast; if (getenv("COAST")) g_coast = atof(getenv("COAST")); }
+    { extern double g_roll_db; if (getenv("ROLLDB")) g_roll_db = atof(getenv("ROLLDB")); }
+    { extern double g_nose_hold; if (getenv("NOSEHOLD")) g_nose_hold = atof(getenv("NOSEHOLD")); }
+    { extern double g_up_hyst; if (getenv("UPHYST")) g_up_hyst = atof(getenv("UPHYST")); }
+    { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_lab_window; if (getenv("LABWIN")) g_lab_window = atoi(getenv("LABWIN")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
     size_t sz = beeb_state_size();
@@ -197,11 +203,12 @@ int main(int argc, char **argv) {
         // (the setting a career picks while docked, before the fight: the harness sets it in the snapshot,
         // since switching it here would pause the fight already on. Elite's CAPS toggle flips the byte)
         { extern int g_lab_undamped; if (g_lab_undamped) beeb_ram(B)[A_DAMP] = 0xFF; }
+        { extern int g_joystick; if (g_joystick) beeb_ram(B)[0x2C5C] = 0xFF; }     // (joystick mode, as a career would have it)
         if (getenv("NODJD")) beeb_ram(B)[0x2C57] = 0xFF;     // (test: no auto-recentre: the opposite key steps back)
         for (int c = 0; c < 128; c++) beeb_key(B, c, 0);
         memset(&io, 0, sizeof io);
         io.ram = beeb_ram(B);
-        io.hold = p_hold, io.tap = p_tap, io.log = p_log;
+        io.hold = p_hold, io.tap = p_tap, io.log = p_log, io.analogue = p_analogue;
         keyq_reset();
         player_lab_init(&io);
         s_aim.tgt = -1;

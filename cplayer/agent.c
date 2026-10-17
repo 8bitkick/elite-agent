@@ -1,5 +1,5 @@
 // The career: trade, fit out, hunt bounties in anarchies or farm Thargoids in witchspace, fly both
-// missions; efficient goes straight for Elite without saving, curious explores and saves at every dock.
+// missions; efficient goes straight for Elite, curious explores; both save at every dock.
 // After a death or a step that went wrong, the game is picked up again (the last save, if any).
 // player_frame() runs it one frame at a time.
 #include <stdio.h>
@@ -55,20 +55,28 @@ int g_curious = PLAYER_CURIOUS;
 
 static int m1(void) { return mission() & 3; }
 static int m2(void) { return (mission() >> 2) & 3; }
-static int m2_due(void) { return m1() == 2 && m2() == 0 && tally() >= 1280; }
+// (test) efficient without the missions: rank is the kill tally alone; the missions' galactic hyperdrive
+// meant ~4 game hours of trading in the first 15, with no farming meanwhile
+int g_no_missions;
+static int m2_due(void) { return !g_no_missions && m1() == 2 && m2() == 0 && tally() >= 1280; }
 static int explore_galaxy(void) { return g_curious && m1() == 2 && m2() == 3 && galaxy() < 7 && seen_count(galaxy()) >= EXPLORE_SEEN; }
 static int wants_hyperdrive(void) {
-    return !has_hyperdrive() && ((m1() == 1 && galaxy() == 0) || (m2_due() && galaxy() == 1) || explore_galaxy());
+    return !has_hyperdrive() && ((!g_no_missions && m1() == 1 && galaxy() == 0) || (m2_due() && galaxy() == 1) || explore_galaxy());
 }
-static int ready_for_m1(void) { return m1() == 1 && laser(0) == 0x97 && (galaxy() == 1 || has_hyperdrive()); }
+static int ready_for_m1(void) { return !g_no_missions && m1() == 1 && laser(0) == 0x97 && (galaxy() == 1 || has_hyperdrive()); }
 static const int *m2_target(void) {
-    if (galaxy() != 2) return NULL;
+    if (galaxy() != 2 || g_no_missions) return NULL;
     return m2() == 1 ? CEERDI : m2() == 2 ? BIRERA : NULL;
 }
-// (and, efficient, an escape pod: 183 of 185 lab deaths were fights without one; it turns a lost fight
-// into a new ship with the tally kept. Bounties and Thargoids wait until it's replaced)
+// the escape pod: never a gate, and bought (or replaced) only when rich. With a save at every dock a lost
+// fight costs the trip since, ~1-5 minutes; the pod cost 1000 Cr a use (often trading to afford it),
+// shopping trips, and up to 4 game hours waiting for one before farming. Rich, it costs nothing
+#define POD_RICH 200000         // tenths: 20000 Cr
+// (test) no escape pod: with a save at every dock a lost fight costs the trip since; the pod costs
+// 1000 Cr a use, shopping trips, and held witchspace farming back (there is no pod in witchspace)
+int g_no_pod;
 static int farm_ready(void) {
-    return (laser(0) == 0x8F || laser(0) == 0x97) && has_ecm() && has_energy_unit() && (g_curious || has_escape_pod());
+    return (laser(0) == 0x8F || laser(0) == 0x97) && has_ecm() && has_energy_unit();
 }
 
 static int have(int s) {
@@ -86,7 +94,7 @@ static int have(int s) {
     }
     return 1;
 }
-static int on_list(int s) { return s != S_HYPER || (wants_hyperdrive() && laser(0) == 0x97); }
+static int on_list(int s) { return (s != S_HYPER || (wants_hyperdrive() && laser(0) == 0x97)) && !(s == S_POD && (g_no_pod || cash() < POD_RICH)); }
 
 // the first thing on the list we haven't got: S_N if none, and whether we can afford it
 // (beam before the pod and the bay: in 18 careers each, dead by 4 h 15 -> 11; beam before ECM: missiles
@@ -141,12 +149,12 @@ static struct { CO; int i, s; int32_t cash0; } c_shop;
 static int g_had_pod, g_had_bomb;      // once owned, never fly without them again
 PT_THREAD(shop(void)) {
     CO_BEGIN(c_shop);
-    g_had_pod |= has_escape_pod();
+    g_had_pod |= has_escape_pod() && !g_no_pod;
     g_had_bomb |= R(A_BOMB) != 0;
     // a used escape pod or energy bomb first, before saving for anything else
     // (replacements keep money back like the rest of the list: a pod bought with our last 1000 Cr left
     // 4.5 Cr, no fuel, and every jump refused)
-    if (g_had_pod && !has_escape_pod() && EQ_ESCAPE_POD < equipment_available(R(A_tek)) && cash() >= 10000 + 2000) {
+    if (g_had_pod && !has_escape_pod() && EQ_ESCAPE_POD < equipment_available(R(A_tek)) && cash() >= POD_RICH) {
         c_shop.cash0 = cash();
         CO_CALL(c_shop, equip(EQ_ESCAPE_POD, 0));
         if (g_bought) status_("Fitted escape pod for %.1f Cr (a replacement)", (c_shop.cash0 - cash()) / 10.0);
@@ -175,15 +183,22 @@ PT_THREAD(shop(void)) {
 
 static int name_is_ours(void) { return !memcmp(IO->ram + A_NAME, NAME, strlen(NAME)); }
 
-// saving: curious saves at every dock (a death costs the trip since: the game restores the commander it
-// saved); efficient doesn't save, so a death is the career, as for a player who never saves. (-1 by
-// mode; run_sim SAVE=0/1 forces it)
-int g_save = -1;
-int saving(void) { return g_save > 0 || (g_save < 0 && g_curious); }
+// saving: both modes save at every dock. A save takes ~200 frames (4 s) docked; a trip is 10-15 minutes,
+// so it costs under 0.5% of the time, and a death costs only the trip since (back to the save). Fewer
+// saves would only trade time to Elite for the count (run_sim SAVE=0 forces none, for the fight tests)
+int g_save = 1;
+int saving(void) { return g_save > 0; }
 static struct { CO; } c_save;
+// (never a broke commander over a solvent save: an escape pod left one with 25 Cr, fuel ate the rest,
+// and every dock saved it, down to 5 Cr. A reload then put it back where it couldn't buy fuel: 115 times)
+static long s_saved_cash = -1;
 PT_THREAD(save_ours(void)) {
     CO_BEGIN(c_save);
-    if (saving()) CO_CALL(c_save, save_commander(name_is_ours() ? NULL : NAME));
+    if (saving() && cash() < 2000 && s_saved_cash >= 0 && cash() < s_saved_cash) CO_EXIT(c_save);
+    if (saving()) {
+        CO_CALL(c_save, save_commander(name_is_ours() ? NULL : NAME));
+        s_saved_cash = cash();
+    }
     CO_END(c_save);
 }
 
@@ -372,6 +387,18 @@ static void rate_add(int k, double pts, uint32_t frames) {
 // start and nothing else can be done. Below WITCH_CASH, trade or hunt bounties first)
 #define WITCH_CASH 1000      // tenths: 100 Cr
 static int witch_ready(void) { return farm_ready() && laser(0) == 0x97 && laser(1) != 0 && cash() >= WITCH_CASH && witch_hop() != NULL; }
+// (why not witchspace now: the first condition that fails, for the trip log)
+static int choose_witch(void);
+static const char *witch_why(void) {
+    if (!(laser(0) == 0x8F || laser(0) == 0x97)) return "no witch: laser";
+    if (!has_ecm()) return "no witch: ecm";
+    if (!has_energy_unit()) return "no witch: energy unit";
+    if (laser(0) != 0x97) return "no witch: military";
+    if (laser(1) == 0) return "no witch: rear laser";
+    if (cash() < WITCH_CASH) return "no witch: cash";
+    if (witch_hop() == NULL) return "no witch: hop";
+    return choose_witch() ? "witch" : "hunt chosen";
+}
 static int choose_witch(void) {
     if (!witch_ready()) return 0;
     if (g_curious) return g_rate[1].n * 2 <= g_rate[0].n;          // one session in three
@@ -397,6 +424,7 @@ PT_THREAD(trip(void)) {
             c_trip.n = bfs(has_tek, c_trip.path, 24);
             if (c_trip.n > 1) {
                 logf_("shopping trip for the %s: %s", SHOP[s].name, c_trip.path[1]->name);
+                note("{\"event\": \"trip\", \"why\": \"shop %s\"}", SHOP[s].name);
                 CO_CALL(c_trip, fly_to(c_trip.path[1], NULL));
                 CO_EXIT(c_trip);
             }
@@ -453,9 +481,11 @@ PT_THREAD(trip(void)) {
         if (sv < S_N && !aff && SHOP[sv].price >= 50000) {
             static int said = -1;
             if (said != sv) status_("Saving up for the %s: trading", SHOP[sv].name), said = sv;
+            note("{\"event\": \"trip\", \"why\": \"saving %s\"}", SHOP[sv].name);
             goto trading;
         }
     }
+    note("{\"event\": \"trip\", \"why\": \"%s\"}", witch_why());
     if (choose_witch()) {
         g_sess.t = tally(), g_sess.f = now(), g_sess.kind = 1;
         CO_CALL(c_trip, witch());

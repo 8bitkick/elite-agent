@@ -1,18 +1,20 @@
 # Elite agent
 
 A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build) that reads the
-machine's RAM and presses keys, nothing else. It is plain C rules, and it runs standalone on the
+machine's RAM and plays through the keyboard and the analogue joystick (Elite's own joystick
+option, on the machine's ADC), nothing else. It is plain C rules, and it runs standalone on the
 Pimoroni Presto (RP2350) inside the BBC Master emulator firmware. The same code runs on a native
 emulator (Pi or Mac) for development and testing.
 
-Two modes: **efficient** goes straight for Elite and never saves (a death is the end of the
-career); **curious** explores every galaxy and saves at each dock.
+Two modes: **efficient** goes straight for Elite; **curious** explores every galaxy. Both save at
+each dock: a save takes about 4 seconds docked, so it costs well under 1% of the time to Elite,
+and a death only loses the trip since.
 
 ## The player (`cplayer/`)
 
 | File | What it does |
 |---|---|
-| `player.h` | the interface: read-only RAM in, held keys and taps out, one call a frame |
+| `player.h` | the interface: read-only RAM in, held keys, taps and joystick values out, one call a frame |
 | `agent.c` | the career: shopping, trading, bounty hunting, witchspace farming, missions, recovery |
 | `combat.c` | fighting: threats, target choice, aim, speed, fire, evasion, ECM, missiles, bomb, pod |
 | `pilot.c` | steering, the run in to the station, docking (roll-matching the slot) |
@@ -20,7 +22,7 @@ career); **curious** explores every galaxy and saves at each dock.
 | `docked.c` | the docked screens: market, equipment, saving, title screens |
 | `galaxy.c` | the galaxy, markets, trade plans and loops, routes, safe jump ranges |
 | `ships.c` | the ships in the local bubble, and the crosshair test |
-| `drv.c`, `keyq.c` | coroutines over frames (`pt.h`), keys, death detection |
+| `drv.c`, `keyq.c` | coroutines over frames (`pt.h`), keys, the joystick, death detection |
 | `state.h`, `elite_ram.h` | named views onto Elite's RAM (addresses from `elite/symbols.json`) |
 
 Every helper is a protothread coroutine: it runs a little each frame and keeps its state in a

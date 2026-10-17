@@ -28,7 +28,8 @@ static inline int expired(uint32_t d) { return (int32_t)(IO->frame - d) >= 0; }
 
 // the flight keys held (and kept held through presses)
 typedef struct { uint8_t k[12]; uint8_t n; } keyset_t;
-static inline void ks_clear(keyset_t *s) { s->n = 0; }
+extern int g_want_jx, g_want_jy;     // (drv.c: where steer() wants the joystick this frame; cleared with the keys)
+static inline void ks_clear(keyset_t *s) { s->n = 0; g_want_jx = g_want_jy = -1; }
 int ks_has(const keyset_t *s, uint8_t k);
 void ks_add(keyset_t *s, uint8_t k);
 void ks_del(keyset_t *s, uint8_t k);

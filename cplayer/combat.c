@@ -9,7 +9,7 @@
 // the rules' numbers: CMA-ES in the fight lab (the tuner is in git history: tools/cma_c.py); on held-out
 // test fights, +19% points a minute on pirates, +71% on Thargoids, fewer deaths on every set
 combat_params_t g_cp = {
-    .roll_iters = 1.726f, .pitch_iters = 3.007f, .lead = 8.405f, .ram_dist = 452, .ram_iters = 5, .turn_off = 15,
+    .roll_iters = 1.726f, .pitch_iters = 3.007f, .lead = 4.5f, .ram_dist = 452, .ram_iters = 5, .turn_off = 15,
     .turn_close = 20000, .spd_turn_close = 0, .spd_turn_far = 0, .far = 4000, .spd_far = 27, .mid = 1800,
     .spd_mid = 31, .near = 1000, .spd_near = 1, .spd_close = 0, .hot = 224,
     .fire_r = 1.431f,
@@ -88,6 +88,8 @@ static double ramp_iters(double ang, int from, int step, double (*rate)(int)) {
 // 3 deg off but level with us is ~2 s of roll from a centred stick, not the 0.2 s a full-rate roll would
 // take). jx, jy: the stick as seen in this view
 static double turn_iters_from(double x, double y, double z, int jx, int jy) {
+    // (keys ramp the stick 5 / 13 a loop; a joystick is wherever we put it: no ramp)
+    int joy = IO->analogue && R(0x2C5C) != 0;
     double d = sqrt(x * x + y * y + z * z);
     if (d < 1) return 0;
     double off = acos(fmax(-1.0, fmin(1.0, z / d)));
@@ -97,11 +99,11 @@ static double turn_iters_from(double x, double y, double z, int jx, int jy) {
     double t = 0;
     if (off > 0.03) {
         int same = (jx - 128) * -roll_err > 0;
-        t += ramp_iters(fabs(roll_err), same ? abs(jx - 128) : 0, 5, roll_rate_of);
+        t += ramp_iters(fabs(roll_err), same ? abs(jx - 128) : 0, joy ? 255 : 5, roll_rate_of);
     }
     int pside = up ? -1 : 1;            // (the stick below the centre pitches towards a target above)
     int psame = (jy - 128) * pside > 0;
-    t += ramp_iters(off, psame ? abs(jy - 128) : 0, 13, pitch_rate_of);
+    t += ramp_iters(off, psame ? abs(jy - 128) : 0, joy ? 255 : 13, pitch_rate_of);
     return t;
 }
 static double turn_iters(double x, double y, double z) {
@@ -230,6 +232,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     double off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
     { extern double g_aim_tol; g_aim_tol = 0; }
     if (rear) {
+        { extern int g_want_jx, g_want_jy; if (g_want_jx >= 0) g_want_jx = 256 - g_want_jx, g_want_jy = 256 - g_want_jy; }
         keyset_t m = {{0}, 0};
         for (int i = 0; i < keys->n; i++) {
             uint8_t c = keys->k[i];
@@ -414,7 +417,13 @@ PT_THREAD(engage(float seconds)) {
                     if (th[i]->slot == c_en.target) cur = th[i], cv = v;
                     if (v > bv) bv = v, best = th[i];
                 }
-                if (!cur || bv > g_cpa->t_switch * cv) c_en.target = best->slot;
+                if (!cur || bv > g_cpa->t_switch * cv) {
+                    if (cur && best != cur && g_steer_log)
+                        dbgf_("switch: target t%d (value %.2f, turn %.0f, e %d, d %.0f) -> t%d (value %.2f, turn %.0f, e %d, d %.0f)",
+                              cur->type, cv, turn_iters(cur->x, cur->y, cur->z), cur->energy, dist_of(cur),
+                              best->type, bv, turn_iters(best->x, best->y, best->z), best->energy, dist_of(best));
+                    c_en.target = best->slot;
+                }
                 // (why the target changed, for the lab: 0 lost it (dead, out of range or no longer hostile),
                 // 1 a missile came first, 2 a better target, 3 back from a missile)
                 if (prev_target >= 0 && c_en.target != prev_target) {

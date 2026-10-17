@@ -98,7 +98,12 @@ PT_THREAD(allow_misjumps(void)) {
 // frames it takes, for the lab's clocks)
 extern int g_steer_log;
 int g_pausing;                  // (in the pause now: the lab doesn't count these frames)
-static int damping_is(int on) { return (R(A_DAMP) == 0) == on; }
+static int damping_is_(int on) { return (R(A_DAMP) == 0) == on; }
+// and joystick mode (JSTK &2C5C, K in the pause): wanted when the platform has an analogue port
+// and g_joystick says so (then the stick goes to the ADC, drv.c's hold)
+int g_joystick = 1;
+static int joystick_ok(void) { return (R(0x2C5C) != 0) == (g_joystick && IO->analogue != NULL); }
+static int damping_is(int on) { return damping_is_(on) && joystick_ok(); }
 static struct { CO; int on, tries, rep; uint32_t until; keyset_t held; } c_ud;
 PT_THREAD(set_damping(int on)) {
     CO_BEGIN(c_ud);
@@ -115,10 +120,15 @@ PT_THREAD(set_damping(int on)) {
         CO_WAIT(c_ud, g_frozen >= 8 || expired(c_ud.until));
         hold_none();
         // (CAPS LOCK until the setting flips, while paused: the second toggle of a fight wasn't taken from one press)
-        for (c_ud.rep = 0; c_ud.rep < 4 && !damping_is(c_ud.on); c_ud.rep++) {
+        for (c_ud.rep = 0; c_ud.rep < 4 && !damping_is_(c_ud.on); c_ud.rep++) {
             CO_CALL(c_ud, press(K_CAPS, 3, 3));
             c_ud.until = deadline(0.6f);
-            CO_WAIT(c_ud, damping_is(c_ud.on) || expired(c_ud.until));
+            CO_WAIT(c_ud, damping_is_(c_ud.on) || expired(c_ud.until));
+        }
+        for (c_ud.rep = 0; c_ud.rep < 4 && !joystick_ok(); c_ud.rep++) {       // (and the joystick, in the same pause)
+            CO_CALL(c_ud, press(K_K, 3, 3));
+            c_ud.until = deadline(0.6f);
+            CO_WAIT(c_ud, joystick_ok() || expired(c_ud.until));
         }
         if (g_steer_log) dbgf_("damping toggle: CAPS pressed %d times, now %s", c_ud.rep, damping_is(c_ud.on) ? "done" : "not taken");
         // (DELETE alone until the game runs again: a flight key held as it's let go reads as a key in the pause
@@ -137,7 +147,8 @@ PT_THREAD(set_damping(int on)) {
 }
 
 static struct { CO; const sys_t *dest; int x0, y0, w0, fought; uint32_t until; } c_hy;
-int g_ws_fight = 1;      // fight, don't run, through a witchspace bail-out countdown (they're faster)
+int g_ws_fight = 1;
+int g_ws_shield;        // (test)      // fight, don't run, through a witchspace bail-out countdown (they're faster)
 PT_THREAD(hyperspace(const sys_t *dest)) {
     CO_BEGIN(c_hy);
     c_hy.dest = dest;
@@ -175,7 +186,9 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
         if (here_x() != c_hy.x0 || here_y() != c_hy.y0 || witchspace() != c_hy.w0) break;
         if (expired(c_hy.until)) CO_FAIL(c_hy, "arrival");
         g_phase = 3;
-        if (witchspace() && g_bail_energy && g_ws_fight) {
+        // (test) the stronger shield towards them: a dead front shield and a full aft one (a mis-jump straight
+        // out of a fight) means run, showing them the aft, rather than joust on the bare front
+        if (witchspace() && g_bail_energy && g_ws_fight && !(g_ws_shield && fsh() * 2 < ash())) {
             g_phase = 4;
             CO_CALL(c_hy, engage(3));       // (fighting through the countdown: they fly faster than we can run)
         } else if (witchspace() && g_bail_energy) {
@@ -226,7 +239,7 @@ PT_THREAD(hyperspace_fighting(const sys_t *dest)) {
     CO_END(c_hf);
 }
 
-static struct { CO; const sys_t *dest; uint32_t until; uint8_t key; } c_cur;
+static struct { CO; const sys_t *dest; uint32_t until; uint8_t key; int x0, y0; } c_cur;
 PT_THREAD(select_by_cursor(const sys_t *dest)) {
     CO_BEGIN(c_cur);
     c_cur.dest = dest;
@@ -246,10 +259,30 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
             c_cur.key = abs(dx) >= abs(dy) ? (dx > 0 ? K_RIGHT : K_LEFT) : (dy > 0 ? K_DOWN : K_UP);
         }
         dbgf_("cursor: target %d,%d -> %s at %d,%d key %02x view %d", target_x(), target_y(), c_cur.dest->name, c_cur.dest->x, c_cur.dest->y, c_cur.key, view());
-        {
+        if (IO->analogue && R(0x2C5C)) {
+            // joystick mode: the chart's cursor follows the stick, not the cursor keys. Lean it towards the
+            // system, less as it nears; which way the stick moves it is learnt from how it moves (a push
+            // that takes it further away flips that axis)
+            static int sx = -1, sy = -1;      // (measured: the stick right moves the cursor left)
+            int dx = c_cur.dest->x - target_x(), dy = c_cur.dest->y - target_y();
+            int px = dx ? (dx > 0 ? 1 : -1) * (abs(dx) > 8 ? 90 : 40) : 0, py = dy ? (dy > 0 ? 1 : -1) * (abs(dy) > 8 ? 90 : 40) : 0;
+            c_cur.x0 = target_x(), c_cur.y0 = target_y();
+            {
+                keyset_t none = {{0}, 0};
+                g_want_jx = 128 + sx * px, g_want_jy = 128 + sy * py;
+                hold(&none);
+            }
+            CO_CALL(c_cur, idle(4));
+            {
+                int ndx = c_cur.dest->x - target_x(), ndy = c_cur.dest->y - target_y();
+                if (px && abs(ndx) > abs(dx) && target_x() != c_cur.x0) sx = -sx;
+                if (py && abs(ndy) > abs(dy) && target_y() != c_cur.y0) sy = -sy;
+            }
+        } else {
             CO_CALL(c_cur, press(c_cur.key, 2, 1));
         }
     }
+    if (IO->analogue && R(0x2C5C)) { keyset_t none = {{0}, 0}; g_want_jx = g_want_jy = 128; hold(&none); }     // (the stick back to the middle)
     CO_CALL(c_cur, press(K_D, 3, 4));
     CO_CALL(c_cur, idle(10));
     CO_END(c_cur);

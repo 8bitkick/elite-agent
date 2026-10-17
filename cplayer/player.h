@@ -2,8 +2,8 @@
 // at the machine's RAM and pressing keys. Nothing else: the platform gives it read-only RAM and a
 // keyboard, and calls player_frame() once per emulated frame, between frames.
 //
-// Platforms: cplayer/run_sim.c (the native emulator on the Pi, for development) and the Presto
-// firmware (presto/presto_player.c).
+// Platforms: cplayer/run_sim.c and lab.c (the native emulator, for development) and the Presto
+// firmware (presto/elite_presto.c).
 #pragma once
 #include <stdint.h>
 
@@ -24,6 +24,9 @@ typedef struct {
     // both optional
     void (*log)(void *ctx, int level, const char *line);
     void (*note)(void *ctx, const char *json);
+    // the joystick: the analogue port's channel 0-3 at 0..0xFFFF (0x8000 centred), held there from
+    // its next conversion (optional: NULL where the platform has none)
+    void (*analogue)(void *ctx, int channel, uint16_t value);
     void *ctx;
 } player_io_t;
 

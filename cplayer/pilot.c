@@ -40,6 +40,9 @@ int g_steer_log;
 double g_aim_tol;            // the target's hit radius as an angle (rad), for steer; 0 outside fights
 int g_preload;
 double g_coast = 1.5;
+double g_up_hyst = 0.35;     // radians of hysteresis in the above/below choice (joystick aiming bench: time on target 11.8 -> 12.3%)
+double g_nose_hold = 0;      // (test)
+double g_roll_db = 0;        // (test)        // (test: radians of hysteresis in the above/below choice)
 int g_coast_min = 112;      // (only slewing, the stick near full: tracking a mover needs the easing)
 
 double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyset_t *keys) {
@@ -47,12 +50,33 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     double off = atan2(r, v.z);
     double clock = atan2(v.x, v.y);
     int up = fabs(clock) <= M_PI / 2;
+    // (which of above and below to roll the target into: kept until it's well across, not flipped at
+    // 90 deg: near the nose the target wanders round the clock, and with a joystick every flip swung
+    // the roll stick end to end and lost the lock)
+    if (g_up_hyst > 0) {
+        static int last_up = -1;
+        static uint32_t last_at;
+        extern uint32_t now(void);
+        if (last_up >= 0 && now() - last_at < 25 && up != last_up && fabs(fabs(clock) - M_PI / 2) < g_up_hyst) up = last_up;
+        last_up = up, last_at = now();
+    }
     double roll_err = up ? clock : clock - copysign(M_PI, clock);
+    // (within g_nose_hold hit radii of the nose, no roll: the target's clock angle is noise there, and
+    // pitch alone brings it in; test)
+    { extern double g_aim_tol; if (g_nose_hold > 0 && g_aim_tol > 0 && off < g_nose_hold * g_aim_tol) roll_err = 0; }
+    // (or roll only as far as the hit needs: the sideways miss, off * sin(roll_err), inside g_roll_db hit
+    // radii; test)
+    { extern double g_aim_tol;
+      if (g_roll_db > 0 && g_aim_tol > 0 && off > 1e-6) {
+          double allow = asin(fmin(1.0, g_roll_db * g_aim_tol / off));
+          roll_err = fabs(roll_err) <= allow ? 0 : roll_err - copysign(allow, roll_err);
+      } }
     double roll_w = fmin(1.0, fmin(off / 0.06, (M_PI - off) / 0.5));
     double alpha = -roll_err * 256 / roll_iters * roll_w;
     double pw = fmax(0.0, cos(roll_err));
     double beta = off * 256 / pitch_iters * pw * pw * pw * (up ? 1 : -1);
     int tx = jstx_for(alpha), ty = jsty_for(beta);
+    { extern int g_want_jx, g_want_jy; g_want_jx = tx, g_want_jy = ty; }     // (the joystick goes straight there)
     // preload (test): with the pitch error too small for a rate (the stick inside the dead zone, |J| <= 28),
     // park the stick at the dead zone's edge on the error's side: still no turn, but the next correction is
     // one press (14) away, not three (and not a snap through the centre from the wrong side)
@@ -254,6 +278,7 @@ static struct {
     CO; uint32_t end, last_log; int final, fought, have_spin, spin_mc; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
+int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
 PT_THREAD(dock(float seconds)) {
     CO_BEGIN(c_dk);
     c_dk.end = deadline(seconds);
@@ -319,7 +344,8 @@ PT_THREAD(dock(float seconds)) {
                 if (off < 3) { ks_del(&keys, K_ROLL_LEFT); ks_del(&keys, K_ROLL_RIGHT); }
                 if (off > 60 && want > 8) want = 8;
             } else {
-                if (!c_dk.final && R(A_DAMP)) {
+                // (with the joystick none of this: the stick sits where it's put, damping or not)
+                if (!c_dk.final && R(A_DAMP) && !(IO->analogue && R(0x2C5C))) {
                     // damping on for the final, as the game's own docking computer flies it: the roll stick
                     // then eases back 2 a loop when let go, the only way to hold it at the station's spin
                     // (alpha 16, J 66). Off (after launch, for the fights) it can only sit at 63 or 70 or
@@ -338,6 +364,9 @@ PT_THREAD(dock(float seconds)) {
                 // swung 120 deg off and pitched us into the hull)
                 double ax = fmin(160 + fmax(0.0, along - 160) * 0.5, fmax(0.0, along - 300));
                 vec_t aimp = vadd(S, nv, ax);
+                // the nose on the slot's centre itself, where it's drawn: on the station's face, 160 out;
+                // in close (under 460) through it to the station's centre, in line with it on the axis
+                if (g_dock_centre) aimp = along > 460 ? vadd(S, nv, 160) : S;
                 off = steer(aimp, jx, jy, 3, 3, &keys);
                 // a few seconds out and centred: roll with the station so its slot holds level
                 double psi = atan2(st->roofv[1], st->roofv[0]);
@@ -373,11 +402,24 @@ PT_THREAD(dock(float seconds)) {
                     int tx = 128 + (alpha < 0 ? -jt : jt);
                     ks_del(&keys, K_ROLL_LEFT);
                     ks_del(&keys, K_ROLL_RIGHT);
+                    if (g_dock_centre) {
+                        // pitch on the aim's height in the view, whatever its side: rolling with the station
+                        // the view turns 3.6 deg a loop, so a sideways error comes round to the vertical within
+                        // 25 loops. (The steering's pitch, scaled by cos^3 of the error's angle round the nose,
+                        // barely pitched for one off to the side: the slot sat 3-6 deg off the sights)
+                        double ay = atan2(aimp.y, aimp.z);
+                        int ty = jsty_for(ay * 256 / 3);
+                        ks_del(&keys, K_DIVE);
+                        ks_del(&keys, K_CLIMB);
+                        if (ty > jy + 6) ks_add(&keys, K_DIVE);
+                        else if (ty < jy - 6) ks_add(&keys, K_CLIMB);
+                    }
                     // (easing off, same side: let go and it drifts back, 2 an iteration. The other key
                     // would snap the roll to nothing and lose the station's spin: the old judder)
                     int ease = (tx - 128) * (jx - 128) > 0 && abs(jx - tx) < 24 && abs(jx - 128) > abs(tx - 128);
                     if (tx > jx + 3) { if (!ease) ks_add(&keys, K_ROLL_LEFT); }
                     else if (tx < jx - 3) { if (!ease) ks_add(&keys, K_ROLL_RIGHT); }
+                    { extern int g_want_jx; if (g_want_jx >= 0) g_want_jx = tx; }      // (a joystick: exactly the spin)
                     if (g_steer_log) dbgf_("rollmatch err %.1f deg alpha %.1f tx %d jx %d", err * 180 / M_PI, alpha, tx - 128, jx - 128);
                 }
                 // steady in, slowing to a bump-safe 4 (under 5: a misaligned entry is a bump, not death) for
@@ -394,8 +436,9 @@ PT_THREAD(dock(float seconds)) {
                                   // the station's centre, the slot's roll off level (deg), stick, speed, shields
                 double psi = atan2(st->roofv[1], st->roofv[0]);
                 double err = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
-                dbgf_("DK %s dist %.0f along %.0f lat %.0f off %.1f roll %.1f nvz %.2f jx %d jy %d spd %d E %d F %d A %d",
-                      c_dk.final ? "F" : "L", dist, along, lat, off, err * 180 / M_PI, nv.z, jx - 128, jy - 128, speed(), energy(), fsh(), ash());
+                vec_t sc = vadd(S, nv, 160);      // the slot's centre: where it's drawn, deg right and up of the sights
+                dbgf_("DK %s fr %u S %.0f %.0f %.0f mc %d slot %.2f %.2f dist %.0f along %.0f lat %.0f off %.1f roll %.1f nvz %.2f jx %d jy %d spd %d E %d F %d A %d",
+                      c_dk.final ? "F" : "L", now(), S.x, S.y, S.z, mcnt(), atan2(sc.x, sc.z) * 180 / M_PI, atan2(sc.y, sc.z) * 180 / M_PI, dist, along, lat, off, err * 180 / M_PI, nv.z, jx - 128, jy - 128, speed(), energy(), fsh(), ash());
             }
             if (now() - c_dk.last_log > 50) {
                 c_dk.last_log = now();

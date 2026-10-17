@@ -443,6 +443,9 @@ int route(int galaxy, int x, int y, int to_x, int to_y, float risk_weight, const
         for (int b = 0; b < 256; b++) {
             int d = distance_qq8(a->x, a->y, sys[b].x, sys[b].y);
             if (!(d > 0 && d <= 70)) continue;
+            // (one the chart cursor can't select, losing its spot to a neighbour, as in in_range: a hop
+            // through Razari, a unit from Alace in galaxy 3, landed at Alace each time, for 30 game hours)
+            if (nearest_system(galaxy, sys[b].x, sys[b].y) != &sys[b]) continue;
             if (b != goal->num && jump_trap(galaxy, b)) continue;
             // a hop a random mis-jump could strand us on (see jump_max): only where there's no other way,
             // as 25 hops' worth (Lave has no safe way out to the Leoned - Ceesxe loop; without the move

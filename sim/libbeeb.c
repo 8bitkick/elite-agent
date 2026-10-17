@@ -206,3 +206,6 @@ int beeb_disc_dump(beeb_t *b, const char *path)
     fclose(f);
     return bad;
 }
+
+// the joystick: an analogue channel's value (0..0xFFFF, 0x8000 centred)
+void beeb_analogue(beeb_t *b, int channel, int value) { machine_set_analogue(&b->m, channel, (uint16_t) value); }
