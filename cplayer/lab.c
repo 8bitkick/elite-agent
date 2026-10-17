@@ -55,57 +55,64 @@ static void key(int code, int down) {
 }
 
 // aiming: for the target the player has chosen, frames from choosing it to the game's hit test (acquire),
-// then the share of frames it stays there (hold), the nose's angle off it meanwhile, and the stick at a stop
+// then the share of frames it stays there (hold), the nose's angle off it meanwhile, and the stick at a stop.
+// The target is followed as a ship (type and place), not a slot: Elite moves ships down a slot when one dies,
+// and for a frame the slot can hold another ship; a change of target counts once it holds for 3 frames. Short
+// breaks in the fight code (a view key, a missile key: up to 25 frames) don't end the episode: the stick flies
+// on through them. (Ending it there, as this did until 2026-10-17, counted 45% of targets "switched before
+// aimed" and restarted their acquire clocks)
 extern int combat_target(void);
-static struct { int tgt, type; uint32_t since; int acquired, locked_frames, in_frames, stop_frames; double off_sum; long acq_sum; int acq_n, acq_fail;
+static struct { int open, type, acquired, acq_frames, pend, locked_frames, in_frames, stop_frames; uint32_t last_fight; double off_sum; long acq_sum; int acq_n, acq_fail;
                 int was_in, episodes, gone, sw_unacq, sw_acq, lock_losses; double lx, ly, lz; } s_aim;
+static const ship_t *same_ship(const ship_t *sh, int n, int type, double x, double y, double z) {
+    const ship_t *b = NULL;
+    double bd = 2500;
+    for (int i = 0; i < n; i++) {
+        if (sh[i].type != type || ship_dead(&sh[i]) || !ship_in_space(&sh[i])) continue;
+        double dx = sh[i].x - x, dy = sh[i].y - y, dz = sh[i].z - z, d = sqrt(dx * dx + dy * dy + dz * dz);
+        if (d < bd) bd = d, b = &sh[i];
+    }
+    return b;
+}
+static void aim_end(int alive) {
+    s_aim.episodes++;
+    if (!alive) s_aim.gone++; else if (s_aim.acquired) s_aim.sw_acq++; else s_aim.sw_unacq++;
+    if (!s_aim.acquired) s_aim.acq_fail++;
+    s_aim.open = 0;
+}
+static void aim_open(const ship_t *tg) {
+    s_aim.open = 1, s_aim.type = tg->type, s_aim.acquired = 0, s_aim.acq_frames = 0, s_aim.pend = 0, s_aim.was_in = 0;
+    s_aim.lx = tg->x, s_aim.ly = tg->y, s_aim.lz = tg->z;
+}
 static void aim_frame(void) {
     static ship_t sh[NOSH];
     int n = ships_read(io.ram, sh), t = combat_target();
     const ship_t *tg = NULL;
     for (int i = 0; i < n; i++) if (sh[i].slot == t && !ship_dead(&sh[i]) && ship_in_space(&sh[i])) tg = &sh[i];
-    if (!tg || R(0x87) || g_phase != 1) {
-        if (s_aim.tgt >= 0) {        // the episode ends here too: the target died (usually), or the fight paused
-            int alive = 0;
-            for (int i = 0; i < n; i++) {
-                if (sh[i].type != s_aim.type || ship_dead(&sh[i])) continue;
-                double dx = sh[i].x - s_aim.lx, dy = sh[i].y - s_aim.ly, dz = sh[i].z - s_aim.lz;
-                if (sqrt(dx * dx + dy * dy + dz * dz) < 2500) alive = 1;
-            }
-            s_aim.episodes++;
-            if (!alive) s_aim.gone++; else if (s_aim.acquired) s_aim.sw_acq++; else s_aim.sw_unacq++;
-            if (!s_aim.acquired) s_aim.acq_fail++;
-        }
-        s_aim.tgt = -1;
-        return;
+    int fighting = g_phase == 1 && !R(0x87);
+    if (fighting) s_aim.last_fight = io.frame;
+    const ship_t *cur = s_aim.open ? same_ship(sh, n, s_aim.type, s_aim.lx, s_aim.ly, s_aim.lz) : NULL;
+    if (s_aim.open && (R(0x87) || io.frame - s_aim.last_fight > 25)) { aim_end(cur != NULL); return; }   // the fight's over or paused
+    if (fighting) {
+        if (!tg) { if (s_aim.open) aim_end(cur != NULL); return; }
+        if (!s_aim.open) aim_open(tg), cur = tg;
+        else if (tg->type != s_aim.type || !cur || cur != tg) {
+            if (cur && ++s_aim.pend < 3) ;                  // (a slot shift, or a switch: wait for it to hold)
+            else { aim_end(cur != NULL); aim_open(tg); cur = tg; }
+        } else s_aim.pend = 0;
     }
-    // the same ship as last frame? By type and position (Elite moves ships down a slot when one dies, so
-    // the slot alone can't tell)
-    int same = s_aim.tgt >= 0 && tg->type == s_aim.type &&
-               sqrt((tg->x - s_aim.lx) * (tg->x - s_aim.lx) + (tg->y - s_aim.ly) * (tg->y - s_aim.ly) + (tg->z - s_aim.lz) * (tg->z - s_aim.lz)) < 2500;
-    if (!same) {
-        if (s_aim.tgt >= 0) {        // how did the last one end: still alive (we switched) or gone
-            int alive = 0;
-            for (int i = 0; i < n; i++) {
-                if (sh[i].type != s_aim.type || ship_dead(&sh[i])) continue;
-                double dx = sh[i].x - s_aim.lx, dy = sh[i].y - s_aim.ly, dz = sh[i].z - s_aim.lz;
-                if (sqrt(dx * dx + dy * dy + dz * dz) < 2500) alive = 1;
-            }
-            s_aim.episodes++;
-            if (!alive) s_aim.gone++; else if (s_aim.acquired) s_aim.sw_acq++; else s_aim.sw_unacq++;
-        }
-        if (s_aim.tgt >= 0 && !s_aim.acquired) s_aim.acq_fail++;
-        s_aim.tgt = tg->slot, s_aim.type = tg->type, s_aim.since = io.frame, s_aim.acquired = 0;
-    }
-    s_aim.tgt = tg->slot, s_aim.lx = tg->x, s_aim.ly = tg->y, s_aim.lz = tg->z;
+    if (!s_aim.open) return;
+    if (!cur) { aim_end(0); return; }
+    s_aim.lx = cur->x, s_aim.ly = cur->y, s_aim.lz = cur->z;
     int view = R(A_VIEW) == 1;
-    int in = in_crosshairs(tg, view);
+    int in = in_crosshairs(cur, view);
     if (!s_aim.acquired) {
-        if (in) s_aim.acquired = 1, s_aim.acq_sum += io.frame - s_aim.since, s_aim.acq_n++;
+        s_aim.acq_frames++;
+        if (in) s_aim.acquired = 1, s_aim.acq_sum += s_aim.acq_frames, s_aim.acq_n++;
         else return;
     }
-    double d = sqrt((double) tg->x * tg->x + (double) tg->y * tg->y + (double) tg->z * tg->z);
-    double z = view ? -tg->z : tg->z;
+    double d = sqrt((double) cur->x * cur->x + (double) cur->y * cur->y + (double) cur->z * cur->z);
+    double z = view ? -cur->z : cur->z;
     s_aim.off_sum += acos(fmax(-1.0, fmin(1.0, z / (d + 1)))) * 180 / M_PI;
     s_aim.locked_frames++;
     s_aim.in_frames += in;
@@ -125,12 +132,19 @@ static void diag_frame(diag_t *d, int *e_prev, uint8_t *dead_prev) {
     int n = ships_read(io.ram, sh), h = 0, insight = 0, aimed = 0;
     int e_now[NOSH * 64]; uint8_t dead_now[NOSH * 64];
     memset(e_now, -1, sizeof e_now); memset(dead_now, 0, sizeof dead_now);
+    {
+        // kills: rises in the number of exploding ships of each type (a slot key counted an exploding ship
+        // again when Elite moved it down a slot: 38 "kills" for a fight of 22)
+        static int dying_prev[64];
+        int dying[64] = {0};
+        for (int i = 0; i < n; i++) if (hostile(&sh[i]) && ship_dead(&sh[i])) dying[sh[i].type & 63]++;
+        for (int t = 0; t < 64; t++) { if (t != 1 && dying[t] > dying_prev[t]) d->kills += dying[t] - dying_prev[t]; dying_prev[t] = dying[t]; }     // (missiles are no kill)
+    }
     for (int i = 0; i < n; i++) {
         const ship_t *q = &sh[i];
         if (!hostile(q)) continue;
         int k = q->slot * 64 + (q->type & 63);
         dead_now[k] = ship_dead(q);
-        if (dead_now[k] && !dead_prev[k]) d->kills++;
         if (ship_dead(q)) continue;
         h++;
         e_now[k] = q->energy;
@@ -186,6 +200,7 @@ int main(int argc, char **argv) {
     { extern double g_up_hyst; if (getenv("UPHYST")) g_up_hyst = atof(getenv("UPHYST")); }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_lab_window; if (getenv("LABWIN")) g_lab_window = atoi(getenv("LABWIN")); }
+    { extern int g_plan; if (getenv("PLAN")) g_plan = atoi(getenv("PLAN")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
     size_t sz = beeb_state_size();
     uint8_t *st = malloc(sz);
@@ -204,6 +219,7 @@ int main(int argc, char **argv) {
         // since switching it here would pause the fight already on. Elite's CAPS toggle flips the byte)
         { extern int g_lab_undamped; if (g_lab_undamped) beeb_ram(B)[A_DAMP] = 0xFF; }
         { extern int g_joystick; if (g_joystick) beeb_ram(B)[0x2C5C] = 0xFF; }     // (joystick mode, as a career would have it)
+        if (getenv("REARMIL") && beeb_ram(B)[A_LASER + 1]) beeb_ram(B)[A_LASER + 1] = 0x97;     // (test: a military laser at the rear in place of what is there)
         if (getenv("NODJD")) beeb_ram(B)[0x2C57] = 0xFF;     // (test: no auto-recentre: the opposite key steps back)
         for (int c = 0; c < 128; c++) beeb_key(B, c, 0);
         memset(&io, 0, sizeof io);
@@ -211,7 +227,7 @@ int main(int argc, char **argv) {
         io.hold = p_hold, io.tap = p_tap, io.log = p_log, io.analogue = p_analogue;
         keyq_reset();
         player_lab_init(&io);
-        s_aim.tgt = -1;
+        s_aim.open = 0;
         {   // the scenario, for grouping results: where, how many, what, how strong we are, where they are
             static ship_t sh[NOSH];
             int n = ships_read(io.ram, sh), nh = 0, behind = 0, maxe = 0, tsum = 0;
@@ -244,16 +260,19 @@ int main(int argc, char **argv) {
             if (player_lab_frame()) { died = g_fail && !strcmp(g_fail, "died"); break; }
             if (getenv("FIRSTEP")) {   // the aiming bench: the first target only, from an identical start: frames to its
                                       // end (killed, or dropped), to the first frame in the sights, in the sights
-                static int ft, f0, f_in, n_in, nfr;
-                if (fr == 0) ft = -1, f0 = -1, f_in = -1, n_in = 0, nfr = 0;
+                // (the target followed as a ship, by type and place, through slot shifts; dropped once the player's
+                // target has been another ship for 3 frames)
+                static int ft, f0, f_in, n_in, nfr, ftype, pend;
+                static double fx, fy, fz;
+                if (fr == 0) ft = -1, f0 = -1, f_in = -1, n_in = 0, nfr = 0, pend = 0;
                 int tg = combat_target();
                 static double a_off, a_clock, a_d, a_fac;
                 extern int g_phase;
                 if (ft < 0 && tg >= 0 && g_phase == 1) {     // (engaged: before that the target number is stale)
-                    ft = tg, f0 = (int) io.frame;
                     static ship_t s0[NOSH];
                     int n0 = ships_read(io.ram, s0);
-                    for (int i = 0; i < n0; i++) if (s0[i].slot == ft) {
+                    for (int i = 0; i < n0; i++) if (s0[i].slot == tg && ship_in_space(&s0[i]) && !ship_dead(&s0[i])) {
+                        ft = tg, f0 = (int) io.frame, ftype = s0[i].type, fx = s0[i].x, fy = s0[i].y, fz = s0[i].z;
                         int rv = R(A_VIEW) == 1;
                         double x = rv ? -s0[i].x : s0[i].x, y = s0[i].y, z = rv ? -s0[i].z : s0[i].z;
                         a_d = sqrt(x * x + y * y + z * z) + 1;
@@ -264,23 +283,25 @@ int main(int argc, char **argv) {
                 }
                 if (ft >= 0) {
                     static ship_t sh[NOSH];
-                    int n = ships_read(io.ram, sh), alive = 0;
-                    for (int i = 0; i < n; i++) if (sh[i].slot == ft && ship_in_space(&sh[i])) {
-                        alive = !ship_dead(&sh[i]);
-                        if (alive && in_crosshairs(&sh[i], R(A_VIEW) == 1)) { n_in++; if (f_in < 0) f_in = (int) io.frame - f0; }
+                    int n = ships_read(io.ram, sh);
+                    const ship_t *me = same_ship(sh, n, ftype, fx, fy, fz);
+                    int alive = me != NULL;
+                    if (me) {
+                        fx = me->x, fy = me->y, fz = me->z;
+                        if (in_crosshairs(me, R(A_VIEW) == 1)) { n_in++; if (f_in < 0) f_in = (int) io.frame - f0; }
                     }
+                    int other = g_phase == 1 && (tg < 0 || !me || tg != me->slot);
+                    pend = other ? pend + 1 : 0;
                     nfr++;
-                    if (getenv("SLEWLOG")) {     // every frame of the first target: where it is (deg: off the nose, clock 0 = up
-                                                  // the screen, 90 right), the stick, our speed, its range and whether it faces us
-                        for (int i = 0; i < n; i++) if (sh[i].slot == ft) {
-                            int rv = R(A_VIEW) == 1;
-                            double x = rv ? -sh[i].x : sh[i].x, y = sh[i].y, z = rv ? -sh[i].z : sh[i].z, d = sqrt(x * x + y * y + z * z) + 1;
-                            fprintf(stderr, "SL %4d off %6.2f clock %5.0f | jx %4d jy %4d | spd %2d d %5.0f in %d\n", nfr, acos(fmax(-1.0, fmin(1.0, z / d))) * 180 / M_PI,
-                                    atan2(x, y) * 180 / M_PI, (int) R(0xC1) - 128, (int) R(0xC2) - 128, R(A_DELTA), d, in_crosshairs(&sh[i], rv));
-                        }
+                    if (getenv("SLEWLOG") && me) {     // every frame of the first target: where it is (deg: off the nose, clock 0 = up
+                                                       // the screen, 90 right), the stick, our speed, its range and whether it faces us
+                        int rv = R(A_VIEW) == 1;
+                        double x = rv ? -me->x : me->x, y = me->y, z = rv ? -me->z : me->z, d = sqrt(x * x + y * y + z * z) + 1;
+                        fprintf(stderr, "SL %4d off %6.2f clock %5.0f | jx %4d jy %4d | spd %2d d %5.0f mc %3d in %d\n", nfr, acos(fmax(-1.0, fmin(1.0, z / d))) * 180 / M_PI,
+                                atan2(x, y) * 180 / M_PI, (int) R(0xC1) - 128, (int) R(0xC2) - 128, R(A_DELTA), d, R(A_MCNT), in_crosshairs(me, rv));
                     }
-                    if (!alive || tg != ft || nfr > 1500) {
-                        fprintf(stderr, "FE %s %s frames %d first_in %d in %d off %.0f clock %.0f d %.0f fac %.2f\n", path, !alive ? "killed" : tg != ft ? "dropped" : "timeout", nfr, f_in, n_in, a_off, a_clock, a_d, a_fac);
+                    if (!alive || pend >= 3 || nfr > 1500) {
+                        fprintf(stderr, "FE %s %s frames %d first_in %d in %d off %.0f clock %.0f d %.0f fac %.2f\n", path, !alive ? "killed" : pend >= 3 ? "dropped" : "timeout", nfr, f_in, n_in, a_off, a_clock, a_d, a_fac);
                         break;
                     }
                 }

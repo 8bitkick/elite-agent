@@ -15,6 +15,8 @@ extern int g_bought;
 
 PT_THREAD(from_title(void));                  // title 1 -> N -> title 2 -> SPACE -> docked
 PT_THREAD(save_commander(const char *name)); // @ 2 [name] RETURN 0
+PT_THREAD(load_commander(const char *name)); // @ 1 name RETURN 0
+extern char g_load_name[8];                   // a commander to load when next docked
 PT_THREAD(reload(void));                      // pause, ESCAPE (to the title), then from_title
 PT_THREAD(after_death(void));
 PT_THREAD(settle_docked(void));               // through any briefing to a steady Status screen

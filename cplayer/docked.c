@@ -217,6 +217,39 @@ PT_THREAD(save_commander(const char *name)) {
     CO_END(c_save);
 }
 
+// loading a commander from the disc: @ 1 name RETURN 0, as the save (g_load_name, once, when next docked:
+// a career put on the Presto's save disc, "agent load <name>", or run_sim LOAD=name)
+char g_load_name[8];
+static struct { CO; } c_load;
+PT_THREAD(load_commander(const char *name)) {
+    CO_BEGIN(c_load);
+    CO_CALL(c_load, hold_until(K_AT, is_menu, 3, "disc menu"));
+    CO_CALL(c_load, settle(is_menu, 8, 8, "disc menu"));
+    CO_CALL(c_load, press(K_1, 3, 4));
+    CO_CALL(c_load, idle(12));                       // (GTNMEW waits 8 vsyncs before it reads)
+    CO_CALL(c_load, type_text(name));
+    CO_CALL(c_load, press(K_RETURN, 3, 4));
+    CO_CALL(c_load, idle(6));
+    CO_CALL(c_load, press(K_0, 3, 4));              // WHICH DRIVE?
+    {
+        static uint32_t until;
+        until = deadline(6);
+        CO_WAIT(c_load, !memcmp(IO->ram + A_NAME, name, strlen(name)) || expired(until));
+    }
+    // (loaded: the commander's name is the one asked for; the screen is the Status page, though the game's
+    // view byte doesn't say so yet. Not found: the menu waits for a key; out of it)
+    if (memcmp(IO->ram + A_NAME, name, strlen(name))) {
+        CO_CALL(c_load, press(K_SPACE, 3, 4));
+        CO_CALL(c_load, idle(20));
+        CO_CALL(c_load, settle(is_menu, 8, 8, "disc menu again"));
+        CO_CALL(c_load, press(K_6, 3, 4));
+        CO_CALL(c_load, wait_for(is_status, 10, "out of the disc menu"));
+    }
+    logf_("loaded commander %s: tally %.2f cash %.1f", name, tally(), cash() / 10.0);
+    note("{\"event\": \"loaded\", \"name\": \"%s\", \"tally\": %.2f, \"cash\": %.1f}", name, tally(), cash() / 10.0);
+    CO_END(c_load);
+}
+
 static struct { CO; } c_rl;
 static int is_t1(void) { return title() == 1; }
 PT_THREAD(reload(void)) {
@@ -262,7 +295,16 @@ PT_THREAD(settle_docked(void)) {
             CO_YIELD(c_sd);
             c_sd.n = is_docked_status() ? c_sd.n + 1 : 0;
         }
-        if (c_sd.n >= 25) CO_EXIT(c_sd);
+        if (c_sd.n >= 25) {
+            if (!g_load_name[0]) CO_EXIT(c_sd);
+            {
+                static char name[8];
+                memcpy(name, g_load_name, sizeof name);
+                g_load_name[0] = 0;          // (once: a failed load isn't retried)
+                CO_CALL(c_sd, load_commander(name));
+            }
+            continue;
+        }
         if ((is_docked() && view() != V_STATUS) || briefing()) {
             CO_CALL(c_sd, press(K_SPACE, 3, 4));        // through a mission briefing's pages
         } else if (title()) {

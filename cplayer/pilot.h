@@ -5,6 +5,9 @@
 
 typedef struct { double x, y, z; } vec_t;
 double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyset_t *keys);   // returns degrees off
+double plan_stick(vec_t pos, vec_t vel, double spd, double radius, int jx, int jy, int *want_jx, int *want_jy);   // the acquisition planner
+extern int g_plan;
+extern double g_plan_hand;
 void speed_keys(int delta, int want, keyset_t *keys);
 void apply_flight(keyset_t *keys);          // hold them (through the planet guard)
 const ship_t *find_planet(const ship_t *s, int n);

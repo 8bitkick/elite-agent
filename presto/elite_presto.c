@@ -8,6 +8,7 @@
 // works as well as "agent"):
 //   player                       start or stop it (it starts by itself ELITE_AUTOSTART frames after boot)
 //   player start | stop
+//   player load <name>               a commander from the disc, when next docked
 //   player mode efficient|curious   how it plays: straight for Elite, or seeing the galaxy
 //   player log <0|1|2>           its USB log: STATUS lines only, + PLAYER (default), + DEBUG
 //   player status                a line: rank, tally, play time, kills, deaths
@@ -24,6 +25,7 @@
 #include "drv.h"
 #include "state.h"
 #include "galaxy.h"
+#include "docked.h"
 
 #ifndef ELITE_AUTOSTART
 #define ELITE_AUTOSTART 2500        // frames: 50 s, Elite booted from the disc and at its title
@@ -212,6 +214,10 @@ bool machine_command_hook(const char *cmd, char *reply, uint32_t reply_size)
         set_on(*a ? !strcmp(a, "start") : !s_on);
         s_boot_frames = ELITE_AUTOSTART;       // (asked for: no autostart after this)
         snprintf(reply, reply_size, "AGENT %s", s_on ? "on" : "off");
+    } else if (!strncmp(a, "load ", 5)) {         // a commander from the disc, when next docked (@ 1 name)
+        strncpy(g_load_name, a + 5, 7);
+        g_load_name[7] = 0;
+        snprintf(reply, reply_size, "AGENT loading %s when docked", g_load_name);
     } else if (!strncmp(a, "mode ", 5)) {
         if (!strcmp(a + 5, "curious")) g_curious = 1;
         else if (!strcmp(a + 5, "efficient")) g_curious = 0;

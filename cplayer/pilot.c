@@ -106,6 +106,101 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     return off * 180 / M_PI;
 }
 
+// ---- Acquisition planner (test, PLAN=1; joystick only). Each game loop, forward-simulate Elite's own rotation of
+// the target's position (MVEIT: K2 = y - a x; z += b K2; y = K2 - b z; x += a y, a = ALPHA/256, b = BETA/256), its
+// own motion along its nose and ours along z, for every combined roll+pitch rate (ALPHA, BETA) the stick can give
+// held for the next loop, then the base steering law (roll it above or below, pitch flat out, stopping on it);
+// take the first step of the plan that brings it into the hit cylinder soonest (and keeps it there), re-plan
+// next loop. The first loop flies on the stick as it is (the lag)
+int g_plan;
+double g_plan_hand = 0.5;       // (deg: inside max(this, 3 hit radii) the tracking law takes over; 2: acquire 143 -> 144 frames)
+static const int PL_A[] = {0, 1, -1, 2, -2, 3, -3, 8, -8, 12, -12, 16, -16, 20, -20, 24, -24, 28, -28, 31, -31};
+static const int PL_B[] = {0, 1, -1, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8};
+static int pl_alpha_q(double a) {        // nearest rate the stick can give: 0..3, 8..31
+    int m = (int) lround(fabs(a));
+    if (m > 31) m = 31;
+    if (m > 3 && m < 8) m = m < 6 ? 3 : 8;
+    return a < 0 ? -m : m;
+}
+static int pl_beta_q(double b) {         // 0, 1, 3..8
+    int m = (int) lround(fabs(b));
+    if (m > 8) m = 8;
+    if (m == 2) m = fabs(b) < 2 ? 1 : 3;
+    return b < 0 ? -m : m;
+}
+typedef struct { double x, y, z, vx, vy, vz; } pl_t;
+static void pl_step(pl_t *p, int al, int be, double spd) {
+    double a = al / 256.0, b = be / 256.0, K2;
+    K2 = p->y - a * p->x; p->z = p->z + b * K2; p->y = K2 - b * p->z; p->x = p->x + a * p->y;
+    K2 = p->vy - a * p->vx; p->vz = p->vz + b * K2; p->vy = K2 - b * p->vz; p->vx = p->vx + a * p->vy;
+    p->x += p->vx, p->y += p->vy, p->z += p->vz - spd;
+}
+static void pl_policy(const pl_t *p, int *al, int *be) {
+    double r = hypot(p->x, p->y), off = atan2(r, p->z), clock = atan2(p->x, p->y);
+    int up = fabs(clock) <= M_PI / 2;
+    double roll_err = up ? clock : clock - copysign(M_PI, clock);
+    double roll_w = fmin(1.0, fmin(off / 0.06, (M_PI - off) / 0.5));
+    *al = pl_alpha_q(-roll_err * 256 / 1.726 * roll_w);
+    double pw = fmax(0.0, cos(roll_err));
+    *be = pl_beta_q(fmin(8.0, off * 256 * pw * pw * pw) * (up ? 1 : -1));     // (flat out, then stop on it)
+}
+static int pl_in(const pl_t *p, double r2) { return p->z > 0 && p->x * p->x + p->y * p->y <= r2; }
+// x, y, z: the target in the view; v: its own motion per loop (view frame); r2: the hit cylinder's radius squared;
+// a0, b0: the rates the stick gives now. Out: the rates to ask for. Returns the predicted loops to the sights
+// one rollout: (al, be) held for `hold` loops (al = 99: the base law throughout), then the base law
+static double pl_roll(pl_t p, int a0, int b0, int al0, int be0, int hold, double spd, double r2) {
+    enum { H = 50 };
+    pl_step(&p, a0, b0, spd);                       // (the loop already under way: the stick as it is)
+    double cost = 0;
+    for (int k = 1; k < H; k++) {
+        if (pl_in(&p, r2)) {                         // arrived: and does it stay (the base law tracking)?
+            int stay = 0;
+            pl_t q = p;
+            for (int m = 0; m < 4; m++) { int al, be; pl_policy(&q, &al, &be); pl_step(&q, al, be, spd); stay += pl_in(&q, r2); }
+            return k + 0.5 * (4 - stay) + 1e-4 * cost;
+        }
+        cost += atan2(hypot(p.x, p.y), p.z) * 180 / M_PI;      // (progress between whole loops)
+        int al, be;
+        if (al0 != 99 && k <= hold) al = al0, be = be0; else pl_policy(&p, &al, &be);
+        pl_step(&p, al, be, spd);
+    }
+    return H + atan2(hypot(p.x, p.y), p.z) * 180 / M_PI + 1e-4 * cost;
+}
+// x, y, z: the target in the view; v: its own motion per loop (view frame); r2: the hit cylinder's radius squared;
+// a0, b0: the rates the stick gives now. Out: the rates to ask for. Returns the predicted loops to the sights
+static double plan_rates(double x, double y, double z, double vx, double vy, double vz, double spd, double r2, int a0, int b0, int *aout, int *bout) {
+    pl_t p0 = {x, y, z, vx, vy, vz};
+    { pl_t q = p0; pl_step(&q, a0, b0, spd); pl_policy(&q, aout, bout); }      // the base law's command
+    double best = pl_roll(p0, a0, b0, 99, 0, 0, spd, r2);
+    int na = sizeof PL_A / sizeof *PL_A, nb = sizeof PL_B / sizeof *PL_B;
+    for (int i = 0; i < na; i++) for (int j = 0; j < nb; j++) {
+        double sc = pl_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, spd, r2);
+        if (sc < best) best = sc, *aout = PL_A[i], *bout = PL_B[j];
+    }
+    return best;
+}
+static int jx_for_alpha(int a) {     // a stick position giving exactly this ALPHA
+    int m = abs(a), d = m == 0 ? 0 : m <= 3 ? m * 8 + 4 : m * 4 + 2;
+    if (d > 127) d = 127;
+    return 128 + (a >= 0 ? d : -d);
+}
+static int jy_for_beta(int b) {      // ... and BETA (opposite sign to the stick)
+    int m = abs(b), e = m == 0 ? 0 : m <= 2 ? 36 : m * 16 + 6;
+    if (e > 127) e = 127;
+    return 128 + (b > 0 ? -e : e);
+}
+
+// The planner as one call (shared: fights, and anything else turning onto a point): pos, the target in the
+// view (x right, y up, z ahead); vel, its own motion per game loop in the same frame; spd, our speed (game units
+// a loop along z; negate it in the rear view); radius, how close to the line of fire counts as on it; jx, jy, the
+// stick as it is. Sets *want_jx, *want_jy (joystick positions) and returns the predicted loops to get there
+double plan_stick(vec_t pos, vec_t vel, double spd, double radius, int jx, int jy, int *want_jx, int *want_jy) {
+    int a, b;
+    double t = plan_rates(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, spd, radius * radius, alpha_from_jstx(jx), beta_from_jsty(jy), &a, &b);
+    *want_jx = jx_for_alpha(a), *want_jy = jy_for_beta(b);
+    return t;
+}
+
 void speed_keys(int delta, int want, keyset_t *keys) {
     if (delta < want) ks_add(keys, K_SPACE);
     else if (delta > want) ks_add(keys, K_SLOW);

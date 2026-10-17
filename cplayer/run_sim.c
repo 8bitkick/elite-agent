@@ -314,8 +314,10 @@ int main(int argc, char **argv) {
     // SKEW=n: n frames more before the player starts (the game's random numbers then differ: a different
     // career from the same start)
     if (getenv("SKEW")) beeb_frames(B, atoi(getenv("SKEW")));
+    { extern int g_plan; if (getenv("PLAN")) g_plan = atoi(getenv("PLAN")); }
     { extern int g_no_missions; if (getenv("NOMISSION")) g_no_missions = atoi(getenv("NOMISSION")); }
     { extern int g_no_pod; if (getenv("NOPOD")) g_no_pod = atoi(getenv("NOPOD")); }
+    if (getenv("LOAD")) { extern char g_load_name[8]; strncpy(g_load_name, getenv("LOAD"), 7); }
     { extern int g_save; if (getenv("SAVE")) g_save = atoi(getenv("SAVE")); }
     io.ram = beeb_ram(B);
     io.hold = p_hold; io.tap = p_tap; io.log = p_log; io.note = p_note; io.analogue = p_analogue;

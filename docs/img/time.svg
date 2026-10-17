@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 210" width="820" height="210" font-family="Helvetica,Arial,sans-serif" font-size="12">
+<rect width="820" height="210" fill="#ffffff"/>
+<text x="100" y="39" text-anchor="end" fill="#333" font-weight="bold">Game time</text>
+<rect x="110.0" y="20" width="380.9" height="28" fill="#6a46d6"/>
+<text x="300.9" y="38" text-anchor="middle" fill="#fff">55%</text>
+<rect x="491.9" y="20" width="98.3" height="28" fill="#178a8a"/>
+<text x="541.5" y="38" text-anchor="middle" fill="#fff">14%</text>
+<rect x="591.2" y="20" width="92.2" height="28" fill="#d07a22"/>
+<text x="637.8" y="38" text-anchor="middle" fill="#fff">14%</text>
+<rect x="684.4" y="20" width="59.0" height="28" fill="#8b8f9b"/>
+<text x="714.4" y="38" text-anchor="middle" fill="#fff">9%</text>
+<rect x="744.4" y="20" width="46.2" height="28" fill="#c23b6e"/>
+<text x="768.0" y="38" text-anchor="middle" fill="#fff">7%</text>
+<rect x="791.6" y="20" width="7.4" height="28" fill="#b9bcc5"/>
+<text x="100" y="89" text-anchor="end" fill="#333" font-weight="bold">Points</text>
+<rect x="110.0" y="70" width="554.6" height="28" fill="#6a46d6"/>
+<text x="387.8" y="88" text-anchor="middle" fill="#fff">81%</text>
+<rect x="665.6" y="70" width="35.3" height="28" fill="#178a8a"/>
+<rect x="701.8" y="70" width="74.6" height="28" fill="#d07a22"/>
+<text x="739.7" y="88" text-anchor="middle" fill="#fff">11%</text>
+<rect x="777.5" y="70" width="18.6" height="28" fill="#8b8f9b"/>
+<rect x="797.1" y="70" width="0.7" height="28" fill="#c23b6e"/>
+<rect x="798.8" y="70" width="0.2" height="28" fill="#b9bcc5"/>
+<rect x="110" y="130" width="12" height="12" fill="#6a46d6"/><text x="128" y="140" fill="#333">Witchspace farming: 4.85 pts/min</text>
+<rect x="345" y="130" width="12" height="12" fill="#178a8a"/><text x="363" y="140" fill="#333">Bounty hunting: 1.22 pts/min</text>
+<rect x="580" y="130" width="12" height="12" fill="#d07a22"/><text x="598" y="140" fill="#333">Missions: 2.71 pts/min</text>
+<rect x="110" y="154" width="12" height="12" fill="#8b8f9b"/><text x="128" y="164" fill="#333">Travel: 1.09 pts/min</text>
+<rect x="345" y="154" width="12" height="12" fill="#c23b6e"/><text x="363" y="164" fill="#333">Trading: 0.12 pts/min</text>
+<rect x="580" y="154" width="12" height="12" fill="#b9bcc5"/><text x="598" y="164" fill="#333">Shopping trips: 0.46 pts/min</text>
+</svg>

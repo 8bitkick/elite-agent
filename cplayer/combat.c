@@ -6,6 +6,11 @@
 #include "keyq.h"
 #include "flight.h"
 
+// (lead: aim this many game loops ahead of the target: the pitch gain's time constant (pitch_iters, 3) plus
+// the keys' lag (~1.5 loops), so the aim point's lead feeds the target's sightline rate forward exactly once.
+// CMA-ES had 8.4, tuned with damping on; undamped, 8.4 fed it forward 2.8 times over and the nose sat ~1 deg
+// ahead of the target while tracking. All 9327 fights: keys hold 53 -> 63%, pts/min +5.1%, deaths 101 -> 99;
+// joystick hold 37 -> 82%, pts/min +40%, deaths 55 -> 39)
 // the rules' numbers: CMA-ES in the fight lab (the tuner is in git history: tools/cma_c.py); on held-out
 // test fights, +19% points a minute on pirates, +71% on Thargoids, fewer deaths on every set
 combat_params_t g_cp = {
@@ -204,6 +209,7 @@ static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *m
     return worst;
 }
 
+
 // one frame of attacking sh: the keys, the angle off (degrees), and the view to fight in (0 front,
 // 1 rear: with a rear laser, a target behind is fought from the rear view, where our turns look
 // mirrored: the rolls swap, and so do climb and dive)
@@ -230,6 +236,29 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     if (rear) jx_ = 256 - jx_, jy_ = 256 - jy_;
     { extern double g_aim_tol; const shiptype_t *tt = ship_type(sh->type); g_aim_tol = atan2(tt && tt->area ? sqrt((double) tt->area) : 80, dist + 1); }
     double off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
+    { extern int g_want_jx, g_want_jy;
+      if (g_plan && g_want_jx >= 0 && IO->analogue && R(0x2C5C)) {
+          const shiptype_t *tt = ship_type(sh->type);
+          double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
+          double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
+          // (acquiring only: until it's first in the sights, or after it's got 10 deg away; holding it is the
+          // tracking law's, with its lead)
+          static int got, gtype, gslot;
+          if (sh->type != gtype || sh->slot != gslot) got = 0, gtype = sh->type, gslot = sh->slot;
+          if (in_crosshairs(sh, rear)) got = 1;
+          if (offa > 10) got = 0;
+          if (!got && offa > fmax(g_plan_hand, 3 * atan2(r, d) * 180 / M_PI)) {
+              static int last_mc = -1, pa, pb;
+              if (mcnt() != last_mc) {          // (once a game loop)
+                  last_mc = mcnt();
+                  double tvx = sh->nosev[0] * sp, tvy = sh->nosev[1] * sp, tvz = sh->nosev[2] * sp;
+                  if (rear) tvx = -tvx, tvz = -tvz;
+                  vec_t tp = {v.x, v.y, v.z}, tv = {tvx, tvy, tvz};
+                  plan_stick(tp, tv, rear ? -speed() : speed(), r, jx_, jy_, &pa, &pb);
+              }
+              g_want_jx = pa, g_want_jy = pb;
+          }
+      } }
     { extern double g_aim_tol; g_aim_tol = 0; }
     if (rear) {
         { extern int g_want_jx, g_want_jy; if (g_want_jx >= 0) g_want_jx = 256 - g_want_jx, g_want_jy = 256 - g_want_jy; }

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 215" width="820" height="215" font-family="Helvetica,Arial,sans-serif" font-size="12">
+<rect width="820" height="215" fill="#ffffff"/>
+<text x="21.0" y="20" fill="#333" font-weight="bold">Points per fight minute</text>
+<text x="21.0" y="46" fill="#333">Keys</text><rect x="21.0" y="51" width="129.4" height="14" fill="#b9bcc5"/><text x="156.4" y="63" fill="#333">8.91</text>
+<text x="21.0" y="90" fill="#333">Keys + lead</text><rect x="21.0" y="95" width="136.1" height="14" fill="#b9bcc5"/><text x="163.1" y="107" fill="#333">9.37</text>
+<text x="21.0" y="134" fill="#333">Joystick</text><rect x="21.0" y="139" width="127.7" height="14" fill="#b9bcc5"/><text x="154.7" y="151" fill="#333">8.79</text>
+<text x="21.0" y="178" fill="#333">Joystick + lead</text><rect x="21.0" y="183" width="178.2" height="14" fill="#6a46d6"/><text x="205.2" y="195" fill="#333">12.27</text>
+<text x="284.3333333333333" y="20" fill="#333" font-weight="bold">Deaths in 9,327 fights</text>
+<text x="284.3333333333333" y="46" fill="#333">Keys</text><rect x="284.3333333333333" y="51" width="186.7" height="14" fill="#b9bcc5"/><text x="477.0" y="63" fill="#333">101</text>
+<text x="284.3333333333333" y="90" fill="#333">Keys + lead</text><rect x="284.3333333333333" y="95" width="183.0" height="14" fill="#b9bcc5"/><text x="473.3" y="107" fill="#333">99</text>
+<text x="284.3333333333333" y="134" fill="#333">Joystick</text><rect x="284.3333333333333" y="139" width="101.7" height="14" fill="#b9bcc5"/><text x="392.0" y="151" fill="#333">55</text>
+<text x="284.3333333333333" y="178" fill="#333">Joystick + lead</text><rect x="284.3333333333333" y="183" width="72.1" height="14" fill="#6a46d6"/><text x="362.4" y="195" fill="#333">39</text>
+<text x="547.6666666666666" y="20" fill="#333" font-weight="bold">Time held in the sights</text>
+<text x="547.6666666666666" y="46" fill="#333">Keys</text><rect x="547.6666666666666" y="51" width="108.0" height="14" fill="#b9bcc5"/><text x="661.6" y="63" fill="#333">53%</text>
+<text x="547.6666666666666" y="90" fill="#333">Keys + lead</text><rect x="547.6666666666666" y="95" width="128.9" height="14" fill="#b9bcc5"/><text x="682.6" y="107" fill="#333">63%</text>
+<text x="547.6666666666666" y="134" fill="#333">Joystick</text><rect x="547.6666666666666" y="139" width="75.6" height="14" fill="#b9bcc5"/><text x="629.3" y="151" fill="#333">37%</text>
+<text x="547.6666666666666" y="178" fill="#333">Joystick + lead</text><rect x="547.6666666666666" y="183" width="166.3" height="14" fill="#6a46d6"/><text x="720.0" y="195" fill="#333">82%</text>
+</svg>
