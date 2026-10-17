@@ -36,6 +36,9 @@ static struct. A helper that can't do its job sets `g_fail`; the career loop rec
   targeting measures and death causes; `tools/compare.py` compares two runs fight by fight.
 - `tools/career_summary.py` — one line per career: ranks, deaths, systems, missions.
 
+The lab and the suite work on fights recorded from careers (`run_sim` with `FIGHTS=dir`), kept
+outside the repository (`tools/suite.py` looks in `~/work/corpus` and `~/work/sets`).
+
 ## Building
 
 The emulator is a git submodule, [rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro)
@@ -43,8 +46,9 @@ The emulator is a git submodule, [rp2350-bbc-micro](https://github.com/8bitkick/
 the Elite disc aren't in either repository: `rp2350-bbc-micro/scripts/setup.sh` fetches them (and,
 for the Presto, the Pico SDK and the Arm toolchain).
 
-- **Development** (any Linux or Mac): `cplayer/build.sh` builds `run_sim`, `cplayer/buildlab.sh` the
-  lab, against the submodule's core. They find the ROMs and disc in the submodule (or `$ELITE_EMU`).
+- **Development** (Linux; elsewhere set `ELITE_EMU` to the submodule's path): `cplayer/build.sh`
+  builds `run_sim`, `cplayer/buildlab.sh` the lab, against the submodule's core. They find the ROMs
+  and disc in the submodule (or `$ELITE_EMU`).
 - **Presto**: `presto/build.sh` (`--curious` for curious mode) builds the submodule's firmware with
   the player in it through its `core/machine_hook.h` interface: `presto/build/presto_master.uf2`.
   Hold BOOT, tap RESET, and copy it to the RP2350 drive.
