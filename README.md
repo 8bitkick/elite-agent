@@ -95,11 +95,11 @@ struct; one that fails sets `g_fail` and the career loop recovers.
 ## Running it headless
 
 The emulator is a git submodule ([rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro),
-`bbc-master` branch). The ROMs and the Elite disc are in neither repository; `setup.sh` fetches them.
+`main`, building its BBC Master target). The ROMs and the Elite disc are in neither repository; `setup.sh` fetches them.
 
 ```sh
 git clone --recursive https://github.com/8bitkick/elite-agent.git && cd elite-agent
-rp2350-bbc-micro/scripts/setup.sh --no-build   # ROMs and disc (and the Presto toolchain)
+rp2350-bbc-micro/scripts/setup.sh --master --no-build   # Master ROMs and disc (and the Presto toolchain)
 cplayer/build.sh                               # run_sim: a career (elsewhere than Linux: ELITE_EMU=submodule path)
 cplayer/buildlab.sh                            # lab: the fight lab
 cplayer/run_sim 2400 "" journal.jsonl          # a career, up to 2,400 game minutes; Elite in ~26 h
