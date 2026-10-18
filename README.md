@@ -15,8 +15,8 @@ and on a native build of the same emulator (Pi or Mac) for development.
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.9 game hours** (26.2-27.7 on five careers, 4 deaths in all) |
-| **Fair** (a switch, with either mode) | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | 34.5 hours, efficient + fair (32.7-38.5 on five careers) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | 117.8 hours (two careers), show fighting in development |
+| **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **34.5 game hours**, efficient + fair (32.7-38.5 on five careers) |
+| **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **117.8 game hours** (two careers), show fighting in development |
 
 All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
