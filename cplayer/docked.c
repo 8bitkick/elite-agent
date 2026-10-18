@@ -4,6 +4,15 @@
 #include "galaxy.h"
 
 int g_bought;
+extern int g_curious;
+
+// curious mode lingers on the screens it goes through, so someone watching can read them
+static struct { CO; } c_lg;
+static PT_THREAD(linger(float seconds)) {
+    CO_BEGIN(c_lg);
+    if (g_curious) CO_CALL(c_lg, idle((int) (seconds * 50)));
+    CO_END(c_lg);
+}
 
 static int qq29(void) { return R(A_QQ29); }
 static int qq25(void) { return R(A_QQ25); }
@@ -62,6 +71,7 @@ PT_THREAD(buy(const uint8_t want[17])) {
         CO_CALL(c_buy, wait_for(is_next_item, 5, "next item"));
     }
     CO_CALL(c_buy, settle(is_any, 10, 8, "buy screen settles"));
+    if (view() == V_BUY) CO_CALL(c_buy, linger(3));
     if (view() == V_BUY) {
         CO_CALL(c_buy, press(K_B, 3, 3));
         CO_CALL(c_buy, wait_for(is_status, 5, "inventory"));
@@ -114,6 +124,7 @@ PT_THREAD(equip(int item, int lview)) {
     g_bought = 0;
     CO_CALL(c_eq, hold_until(K_F3, is_equip, 3, "equip screen"));
     CO_CALL(c_eq, settle(is_equip, 8, 8, "equip prompt"));
+    if (c_eq.item != EQ_FUEL) CO_CALL(c_eq, linger(2.5));
     if (c_eq.item + 1 > qq25()) {
         logf_("equip: item %d not sold here", c_eq.item);
         CO_CALL(c_eq, press(K_RETURN, 3, 4));
@@ -162,7 +173,21 @@ PT_THREAD(select_system(const char *name)) {
     CO_CALL(c_sel, type_text(c_sel.name));
     CO_CALL(c_sel, press(K_RETURN, 3, 4));
     CO_CALL(c_sel, idle(20));
+    CO_CALL(c_sel, linger(1));
     CO_END(c_sel);
+}
+
+// ---- f6 Data on System for the selected system (economy, government, species, the description), held
+// for a while in curious mode. It runs TT111 on the crosshair first, which is on the selection already.
+static struct { CO; float s; } c_dat;
+static int is_data(void) { return view() == V_DATA; }
+PT_THREAD(show_system_data(float seconds)) {
+    CO_BEGIN(c_dat);
+    c_dat.s = seconds;
+    if (!g_curious) CO_EXIT(c_dat);
+    CO_CALL(c_dat, hold_until(K_F6, is_data, 3, "data on system"));
+    CO_CALL(c_dat, linger(c_dat.s));
+    CO_END(c_dat);
 }
 
 // ---- titles, saving, reloading

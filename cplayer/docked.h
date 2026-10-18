@@ -10,7 +10,8 @@ PT_THREAD(buy(const uint8_t want[17]));
 PT_THREAD(sell_all(void));
 PT_THREAD(equip(int item, int view));        // sets g_bought
 PT_THREAD(refuel(void));
-PT_THREAD(select_system(const char *name));  // F on the long-range chart, the name, RETURN
+PT_THREAD(select_system(const char *name));
+PT_THREAD(show_system_data(float seconds));  // f6, held (curious mode only)  // F on the long-range chart, the name, RETURN
 extern int g_bought;
 
 PT_THREAD(from_title(void));                  // title 1 -> N -> title 2 -> SPACE -> docked

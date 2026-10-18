@@ -226,6 +226,7 @@ PT_THREAD(fly_to(const sys_t *dest, const sys_t *then)) {
     CO_CALL(c_fly, save_ours());
     note("{\"event\": \"depart\", \"to\": \"%s\", \"cash\": %.1f, \"tally\": %.2f}", c_fly.dest->name, cash() / 10.0, tally());
     CO_CALL(c_fly, select_system(c_fly.dest->name));
+    CO_CALL(c_fly, show_system_data(is_seen(galaxy(), c_fly.dest->num) ? 6 : 10));
     CO_CALL(c_fly, launch());
     CO_CALL(c_fly, hyperspace(c_fly.dest));
     if (witchspace()) {
@@ -362,6 +363,7 @@ PT_THREAD(witch(void)) {
     CO_CALL(c_ws, allow_misjumps());         // (pause, X, unpause: it works docked too)
     status_("Into witchspace for Thargoids (a forced mis-jump towards %s)", c_ws.dest->name);
     CO_CALL(c_ws, select_system(c_ws.dest->name));
+    CO_CALL(c_ws, show_system_data(is_seen(galaxy(), c_ws.dest->num) ? 6 : 10));
     CO_CALL(c_ws, launch());
     CO_CALL(c_ws, hold_until(K_F0, is_front_view, 3, "front view"));
     g_misjump = 1;
