@@ -191,30 +191,30 @@ comes a little later, when it closes. Cyan dots out of the safe zone are now tak
 **Careers to Elite** (efficient + fair; run_sim on the native emulator at the real machine's speed, seeds as
 `SKEW`, the same five as the efficient record; macbox `~/work/fair/car/`):
 
-| Seed | efficient record | fair, information only (`FAIR=1`) | fair + hands (`FAIRMASK=27`, the build before the master merge) |
+| Seed | efficient record | fair, information only (`FAIR=1`, the audited build) | fair + hands (`FAIRMASK=27`, the build before the master merge) |
 |---|---|---|---|
-| 13 | 27.0 h, 2 deaths, 1,860 fights | 34.0 h, 3 deaths, 3,347 fights | 33.6 h, 5 deaths |
-| 101 | 27.5 h, 0, 1,789 | 29.9 h, 2, 2,420 | 32.7 h, 4 |
-| 37 | 26.2 h, 0, 2,162 | 29.7 h, 4, 2,657 | 38.5 h, 8 |
-| 71 | 27.7 h, 1, 1,706 | 27.7 h, 4, 2,139 | 34.8 h, 4 |
-| 149 | 26.6 h, 1, 1,851 | 29.5 h, 5, 3,108 | 32.8 h, 7 |
-| mean | **26.9 h**, 0.8 deaths | **30.2 h** (+12%), 3.6 deaths | 34.5 h (record then 27.4 h) |
+| 13 | 27.0 h, 2 deaths, 1,860 fights | 30.6 h, 3 deaths, 2,525 fights | 33.6 h, 5 deaths |
+| 101 | 27.5 h, 0, 1,789 | 30.8 h, 6, 2,984 | 32.7 h, 4 |
+| 37 | 26.2 h, 0, 2,162 | 29.3 h, 0, 2,313 | 38.5 h, 8 |
+| 71 | 27.7 h, 1, 1,706 | 30.2 h, 1, 2,542 | 34.8 h, 4 |
+| 149 | 26.6 h, 1, 1,851 | 30.0 h, 6, 2,929 | 32.8 h, 7 |
+| mean | **26.9 h**, 0.8 deaths | **30.2 h** (+12%), 3.2 deaths | 34.5 h (record then 27.4 h) |
 
 (Hours: run_sim's ELITE line, the first whole game minute docked at a tally of 6,400 or more, as for the record.
-Journals: macbox `~/work/fair/car/v6info/s_<seed>/journal.jsonl` for fair, `~/work/eff/car/brkrear/u_<seed>/` for
+Journals: macbox `~/work/fair/car/v8info/s_<seed>/journal.jsonl` for fair (the build after the leak audit, §6;
+the build before it, `v6info`, also averaged 30.2 h: 34.0, 29.9, 29.7, 27.7, 29.5), `~/work/eff/car/brkrear/u_<seed>/` for
 the record, `~/work/fair/car/v5fair/s_<seed>/` for fair + hands.)
 
-All ten fair careers reach Elite; information-only on the merged build is 30.2 hours against 26.9, and one seed
-(71) ties the record. **Where the gap comes from** (from the journals, the five information-only careers against
-the record's five): witchspace farming makes slightly more points (5,488 a career against 5,244) in 16.5 hours
-instead of 14.4 (5.55 points a minute against 6.08). Per witchspace session (seed 13), the farming itself is no
+Every fair career reaches Elite; information-only is 30.2 hours against 26.9 (29.3-30.8 on five seeds). **Where the gap comes from** (from the journals, the five information-only careers against
+the record's five): witchspace farming makes slightly more points (5,451 a career against 5,244) in 16.3 hours
+instead of 14.4 (5.58 points a minute against 6.08). Per witchspace session (seed 13), the farming itself is no
 slower (0.97 minutes against 1.10: it chains as often), but the trip home to dock takes 3.60 minutes against 3.09:
 travel fights against ships it has to identify before it engages, and a few seconds lost to each dot that turns
-out a trader. Bounty hunting makes a fifth less (1.04 points a minute against 1.30): lone pirates parked as dots
-far out, and pirate Cobras and Pythons that look like traders until they fire. Deaths 2-5 a career against 0-2;
+out a trader. Bounty hunting makes a fifth less (1.2 points a minute against 1.3): lone pirates parked as dots
+far out, and pirate Cobras and Pythons that look like traders until they fire. Deaths 0-6 a career against 0-2;
 each costs only the trip since the last save.
 
-**Fights, splits.** The fair careers log more fights for the same kills (2,734 a career against 1,874). They're
+**Fights, splits.** The fair careers log more fights for the same kills (2,659 a career against 1,874). They're
 splits more than extra fighting: a "fight" that starts and ends within a second and scores nothing, a dot taken
 for a pirate that a closer look shows is a trader, or a dot's estimated range wandering across the edge of reach.
 The first fair careers had 2,074 of them in seed 13 (220 in the record), and then ignored everything about for 3
@@ -243,3 +243,57 @@ most of a career's points: 20.96 -> 18.94 and 21.06 -> 19.09 pts/min with the in
 * A ship is followed from frame to frame by the game's own slot (an eye's continuity); after an explosion or
   a ship leaving, the game's slot shift is followed too.
 * Thinking is free: the acquisition planner simulates 315 stick plans 50 game loops ahead each game loop.
+
+## 6. Leak audit: is it really information-fair?
+
+Asked after the first results ("sounds too good"): three checks, then the leaks they found, fixed, and the
+careers measured again.
+
+**1. Every read, by address and call site.** Built with `-DREAD_AUDIT`, `R()` and `R16()` (every read through
+`state.h`, which is all the player's reads but three) record the address and the source line, while the player
+is playing (`cplayer/audit.h`; `AUDIT` lines at the end of run_sim or the lab). Over the 300-fight set and a
+10-hour fair career (seed 101), the player read 92 addresses. None is a ship's block (K% &0400-&05BB): those are
+read only by `ships_read()` inside the perception layer. The rest, grouped:
+
+| Read | Where | Verdict |
+|---|---|---|
+| QQ11, QQ12, VIEW, MJ, SSPR, ECMA, MSAR, the hyperspace count, QQ9/QQ10 (the chart cursor), XC/YC (the text cursor), distaway | screens and indicators | on the screen |
+| MCNT, LASCT | the game loop's pace; the death sequence | the screen redrawing; the death on the screen |
+| JSTX, JSTY, DELTA, the option bytes (DAMP, PATG, JSTK, the axis flags) | our own controls and settings | our own |
+| ENERGY, FSH, ASH, GNTMP, ALTIT | through `energy()` etc.: the bars as drawn. Raw in three places: the perception layer quantises them itself (hits on our shields, as bars); `briefing()` tests all three at 255 (the screen after a dock, not a decision in flight); `full_strength()` in flight.c read FSH/ASH exactly | the last one a **leak** (fine detail): fixed |
+| FRIN (slot 0's type only) | `briefing()`: is the planet in slot 0 | the planet on the screen |
+| MSTG | only whether it's &FF (the indicator); on what it locked, from our own sights | on the dashboard |
+| TALLY, TALLYL | the high byte (RIGHT ON COMMANDER); the low byte and fraction only for the log, the journal, the rank in status lines, and the tally estimate's starting value (the commander's record when the career starts) | not used by any decision: proven below (scrambled, play unchanged) |
+| FIST | Fugitive or not (50+), and the log | on the Status screen |
+| cash, fuel, cargo, equipment, lasers, missiles, the mission bits, the market (AVL, QQ26, QQ28, tek, QQ25, QQ29) | docked decisions | on the docked screens (QQ26 from the prices it sets) |
+
+Reads straight from `IO->ram` instead of `R()`: the commander's name and the saved copy (docked screens),
+`ships_read()` in the perception layer, and the lab's check against the truth (only with `FAIRCHK`).
+
+**2. Precision.** In the perception layer (`perceive_update()` and `measure()` in fair.c) a ship's raw block is
+used for: its position, turned into what the screen shows (its pixel, its drawn size rounded to a pixel, or the
+scanner's dot and stick from the high bytes) and only that goes into the track filter; the frame-to-frame
+continuity (which track is which ship, and whether it has moved yet this game loop); its type and its axes only
+while it's drawn as a wireframe; byte 31's on-scanner, drawn-firing and exploding bits. The rules (aim, the lead,
+the acquisition planner, target choice, collisions) get only the filtered estimate. Two places used the truth
+for the estimate's own uncertainty or memory, now fixed: the range-from-size error was computed from the true
+range (now from the estimated one), and a remembered ship out of sight showed the game's killed/exploding bits
+(now as it was last seen; a first fix that showed it alive instead made dead ships out of sight count as threats
+and split fights into ~16,000 a career, caught by the fight count and fixed). The station's block went through with its energy, AI and flags; now only its
+position and axes.
+
+**3. Scrambled bytes, the same play.** `SCRAMBLE=1` hands the player a copy of RAM each frame with every ship's
+AI byte, energy, NEWB (but the scooped bit), speed, acceleration and roll and pitch counters replaced by random
+numbers; `SCRAMBLE=2` also the tally's low byte and fraction. Fair off, that wrecks it (200 fights: 10.89 pts/min,
+1 death -> 0.57 pts/min, 39 deaths). Fair on, nothing changes: the same output line for line on the 200 fights
+(scramble 2) and the same 10-hour career journal (6,801 lines, scramble 1).
+
+**4. Why the gap is small.** Most of the career is witchspace farming (95% of a fair career's points: 5,451 of
+5,770 on average), where fair mode loses least. In witchspace every ship is a Thargoid or a Thargon, so hostility
+is certain without the NEWB byte; a Thargoid is drawn as a wireframe out to z_hi 55 (14,080 units), so its type,
+heading and speed along its nose are known for most of a fight; and the chaining, the way out and the docking
+don't depend on what a ship is. The lab's witchspace scenario loses 10% of its points a minute, single pirates
+up to 20%. Fighting is also only part of the time: 3.3 of 26.9 hours in the record (13%); a fight that's 10%
+slower costs about 1% of the career. What the careers lose instead is the travel: the trip home after witchspace
+(3.6 minutes a session against 3.1), and hunting (a fifth fewer points a minute), where pirates have to be seen
+before they're fought.

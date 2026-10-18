@@ -14,6 +14,7 @@
 #include "keys.h"
 #include "drv.h"
 #include <math.h>
+#include "audit.h"
 
 typedef struct beeb_t beeb_t;
 beeb_t *beeb_new(const char *roms, const char *disc_path);
@@ -291,7 +292,17 @@ int main(int argc, char **argv) {
         s_pod0 = has_escape_pod();
         extern int g_lab_window;
         for (int fr = 0; fr < (g_lab_window + 20) * 50; fr++) {
-            if (player_lab_frame()) { died = g_fail && !strcmp(g_fail, "died"); break; }
+            {
+                static int lev = -1;
+                if (lev < 0) lev = getenv("SCRAMBLE") ? atoi(getenv("SCRAMBLE")) : 0;
+                const uint8_t *real = io.ram;
+                io.ram = scramble(real, lev);
+                g_audit_on = 1;
+                int fin = player_lab_frame();
+                g_audit_on = 0;
+                io.ram = real;
+                if (fin) { died = g_fail && !strcmp(g_fail, "died"); break; }
+            }
             if (getenv("FIRSTEP")) {   // the aiming bench: the first target only, from an identical start: frames to its
                                       // end (killed, or dropped), to the first frame in the sights, in the sights
                 // (the target followed as a ship, by type and place, through slot shifts; dropped once the player's
@@ -608,5 +619,6 @@ int main(int argc, char **argv) {
             s_aim.acq_n ? s_aim.acq_sum / 50.0 / s_aim.acq_n : 0, s_aim.acq_n, s_aim.acq_fail,
             s_aim.locked_frames ? 100.0 * s_aim.in_frames / s_aim.locked_frames : 0, s_aim.locked_frames,
             s_aim.locked_frames ? s_aim.off_sum / s_aim.locked_frames : 0, s_aim.locked_frames ? 100.0 * s_aim.stop_frames / s_aim.locked_frames : 0);
+    audit_dump();
     return 0;
 }

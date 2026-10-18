@@ -13,6 +13,7 @@
 #include "keyq.h"
 #include "galaxy.h"
 #include "elite_ram.h"
+#include "audit.h"
 
 typedef struct beeb_t beeb_t;
 beeb_t *beeb_new(const char *roms, const char *disc_path);
@@ -368,7 +369,16 @@ int main(int argc, char **argv) {
                     }
             }
         }
-        player_frame();
+        {   // (SCRAMBLE: the player plays on a copy of RAM with the hidden bytes scrambled; the audit counts its reads)
+            static int lev = -1;
+            if (lev < 0) lev = getenv("SCRAMBLE") ? atoi(getenv("SCRAMBLE")) : 0;
+            const uint8_t *real = io.ram;
+            io.ram = scramble(real, lev);
+            g_audit_on = 1;
+            player_frame();
+            g_audit_on = 0;
+            io.ram = real;
+        }
         step();
         bb_record();
         if (getenv("WATCH")) {       // every 10 frames between two frames: the ships about
@@ -428,6 +438,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "disc written to %s (%d sectors unreadable)\n", getenv("DISCDUMP"), bad);
     }
     if (getenv("AVLCHECK")) fprintf(stderr, "markets checked %d, items wrong %d\n", checks, bad);
+    audit_dump();
     double s = (double) (clock() - t0) / CLOCKS_PER_SEC;
     fprintf(stderr, "%u frames in %.1f s (%.0fx real time)\n", io.frame, s, io.frame / 50.0 / s);
     return 0;

@@ -59,6 +59,7 @@ typedef struct {
     int wire, onscr;            // drawn as a wireframe (type and heading show) / on the screen at all, this frame
     float nose[3], roof[3], side[3];
     int cue, cue_fire, ours, face_n, prov;
+    uint8_t f31;                // byte 31 as last seen (killed, exploding)
     double dealt, regen;
     uint32_t dealt_at;
     int dead_seen;
@@ -173,7 +174,7 @@ static void measure(const ship_t *s, meas_t *o) {
         if (o->wire) {
             double q = floor(spx + 0.5);
             if (q < 1) q = 1;
-            z = r * 256 / q, sig = w[2] / (2 * spx) + 10;
+            z = r * 256 / q, sig = z / (2 * q) + 10;     // (half a pixel of its size, as a range: from what is seen, not the truth)
         } else z = 24000, sig = 9000;               // a dot: only that it's far
         if (o->scan) {                              // (and the scanner, when it says more)
             double ds = len3(sm) / sqrt(1 + tx * tx + ty * ty);
@@ -380,7 +381,7 @@ static void perceive_update(void) {
     if (dn || s_qf < 0) s_qf = qf, s_qa = qa, s_qe = qe;
 
     // our laser this loop: what our hands held then (the keys land KEYQ_DELAY frames after), the laser not too hot
-    int fired = space && s_ofire[(IO->frame - 2) & 63] && R(A_GNTMP) < 242 && R(A_LASER + view);
+    int fired = space && s_ofire[(IO->frame - 2) & 63] && laser_temp() < 242 && R(A_LASER + view);
     int lpow = R(A_LASER + view) & 0x7F;
     double per_loop = (R(A_LASER + view) & 0x80) ? lpow : lpow / 5.0;     // (a pulse laser fires one loop in five)
 
@@ -428,6 +429,7 @@ static void perceive_update(void) {
                 }
             }
             t->last_meas = IO->frame;
+            t->f31 = s->flags31;
             if (m.scr) memcpy(t->u, m.u, sizeof t->u);
             if (m.wire) {
                 if (!t->ident) t->ident = 1, t->type = same_look(s->type);
@@ -479,7 +481,7 @@ static void perceive_update(void) {
                     IO->frame, k, s->type, d, len3((double[3]){s->x, s->y, s->z}), t->cls, t->ident, t->type, t->wire, t->onscr, t->prov, t->cue, t->face_n, rr,
                     t->v[0], t->v[1], t->v[2], s->nosev[0] * 1.5 * s->speed, s->nosev[1] * 1.5 * s->speed, s->nosev[2] * 1.5 * s->speed, s->newb);
         // a kill we saw (it blew up with our hits on it): its points
-        if (ship_dead(s) && !t->dead_seen) {
+        if (ship_dead(s) && !t->dead_seen && t->last_meas == IO->frame) {
             t->dead_seen = 1;
             if (t->dealt > 0 && IO->frame - t->dealt_at < 200) s_tally_est += pts_of(t->type);
         }
@@ -511,6 +513,8 @@ static void perceive_update(void) {
     for (int i = 0; i < n && s_nout < NOSH; i++) {
         if (!ship_in_space(&raw[i])) {
             ship_t o = raw[i];
+            // (the station: only where it is and how it lies; its energy, AI and flags aren't shown)
+            if (o.type == SHIP_SST) o.energy = 240, o.ai = 0, o.newb = 0;
             o.vis = VIS_TYPE | VIS_HEAD | VIS_SCREEN | VIS_NOW;
             s_out[s_nout++] = o;
         }
@@ -565,7 +569,8 @@ static void perceive_update(void) {
                                             t->v[0], t->v[1], t->v[2], vt[0], vt[1], vt[2], t->P[0][0], t->P[3][3]);
             g_fair_chk[row][0]++, g_fair_chk[row][1] += (long) (10 * sqrt(e2)), g_fair_chk[row][2] += (long) (10 * sqrt(t2));
         }
-        o.flags31 = s->flags31;
+        // (killed or exploding: seen on the screen, or as the scanner dot going; not for a ship out of sight)
+        o.flags31 = t->last_meas == IO->frame ? s->flags31 : t->f31;     // (out of sight: as it was last seen)
         const shiptype_t *ty = ship_type(t->type);
         double e = (ty ? ty->max_energy : 100) - t->dealt + t->regen;
         if (ty && e > ty->max_energy) e = ty->max_energy;

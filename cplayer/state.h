@@ -7,8 +7,15 @@
 extern player_io_t *IO;
 extern int g_fair;                  // (fair.h: FAIR_DASH 2 the dashboard as drawn; any bit: our own stick from our hand)
 extern int g_own_jx, g_own_jy;
+#ifdef READ_AUDIT          // (the fair-mode leak audit: every read the player makes, by address and call site)
+void read_audit(uint16_t a, const char *file, int line);
+static inline uint8_t R_(uint16_t a, const char *f, int l) { read_audit(a, f, l); return IO->ram[a]; }
+#define R(a) R_((uint16_t) (a), __FILE__, __LINE__)
+#define R16(a) ((uint16_t) (R(a) | R((a) + 1) << 8))
+#else
 static inline uint8_t R(uint16_t a) { return IO->ram[a]; }
 static inline uint16_t R16(uint16_t a) { return (uint16_t)(IO->ram[a] | IO->ram[a + 1] << 8); }
+#endif
 
 static inline int view(void) { return R(A_QQ11); }              // 0 space; screens otherwise
 static inline int space_view(void) { return R(A_VIEW); }

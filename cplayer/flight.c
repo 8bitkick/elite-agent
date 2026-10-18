@@ -274,7 +274,7 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
                 hold(&none);
             }
             CO_CALL(c_cur, idle(4));
-            if (g_fair) CO_CALL(c_cur, idle(4));     // (a hand: the stick takes a few frames to get there)
+            if (g_fair & FAIR_STICK) CO_CALL(c_cur, idle(4));     // (a hand: the stick takes a few frames to get there)
             {
                 int ndx = c_cur.dest->x - target_x(), ndy = c_cur.dest->y - target_y();
                 if (px && abs(ndx) > abs(dx) && target_x() != c_cur.x0) sx = -sx;
@@ -342,7 +342,7 @@ static int danger_near(void) {
 }
 // chain when this strong again (the energy unit refills on the way in, 15-20 s before the Thargoids close)
 int g_chain_energy = 248, g_chain_shield = 200;
-static int full_strength(void) { return energy() >= g_chain_energy && R(A_FSH) >= g_chain_shield && R(A_ASH) >= g_chain_shield; }
+static int full_strength(void) { return energy() >= g_chain_energy && fsh() >= g_chain_shield && ash() >= g_chain_shield; }
 static struct { CO; const sys_t *dest; uint32_t until; int chained; } c_lw;
 PT_THREAD(leave_witchspace(void)) {
     CO_BEGIN(c_lw);
