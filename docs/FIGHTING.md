@@ -27,25 +27,37 @@ worse beyond its noise.
 
 ## 2. Curious mode: battles worth watching
 
-**Goal:** once the ship is outfitted for superiority, fights are a show. Enemies are kept in the front
-view, close and in numbers. The fights use varied and unusual techniques and weapons, and the ship plays
-with the enemy while staying safe. Fights should not drag on or repeat themselves. Before the ship is
-outfitted, it fights as in efficient mode.
+**Curious mode's mission:** explore new star systems and their species (each system's inhabitants, on the
+Data on System screen), meet every ship type and the rare ones (Thargoids and Thargons, the Cougar,
+the missions' Constrictor), find the anomalies (witchspace mis-jumps), have cool battles,
+and keep progressing (rank, ship, credits, missions) on the way to Elite. Progress matters, but the
+career's hours aren't optimised the way efficient mode's are.
+
+**Goal:** whenever the ship has the upper hand, fights are a show. Enemies are kept on screen, close
+and in numbers, in a variety of views: mostly the front, with side glances as ships pass and the
+occasional rear laser. The fights use varied and unusual techniques and weapons, and the ship plays
+with the enemy. Fights end within a time limit and should not repeat themselves. Without the upper hand,
+it fights as in efficient mode.
 
 | Metric | What it is | Why |
 |---|---|---|
 | **Show score** (primary) | a weighted mix of the measures below, per fight | one number to tune |
-| Screen presence | % of fight frames with ≥1 enemy drawn in the front view; mean ships on screen | the viewer sees the fight |
+| Screen presence | % of fight frames with ≥1 enemy drawn in the view on screen (front, rear, left or right); mean ships on screen | the viewer sees the fight |
 | Closeness | mean distance of on-screen enemies; frames with one big on screen (near) | close is exciting |
-| Technique variety | distinct techniques a fight (front/rear laser, missile, ECM, energy bomb, flyby, loop, roll-under, bait), entropy across fights | not one trick every time |
-| Superiority | damage taken, near misses vs hits, shield never below a floor | skill, not luck |
-| Pacing | fight length within a band; kill spacing; no dead air (no enemy on screen) | not tedious |
+| Technique variety | distinct techniques a fight (front/rear laser, missile, ECM, energy bomb, flyby, loop, roll-under, bait, a side glance at a pass), views used, entropy across fights | not one trick every time |
+| Superiority | damage taken, near misses vs hits | skill, not luck |
+| Novelty | first meeting with a ship type, rare types (Cougar, Constrictor), Thargoids, mis-jumps | the mission: new things to see |
+| Pacing | fight length within a band, and a show-time limit per fight (a base plus some per enemy, then finish efficiently); kill spacing; no dead air (no enemy on screen) | not tedious |
 | Repetition | similarity of technique sequences between consecutive fights | not repetitive |
-| Our deaths | rare: an occasional loss is an acceptable risk for a better show; budget: no more than the efficient baseline's rate on the same fights (enemy deaths are the point) | losing the ship ends the show and costs a reload |
-| Career cost | game hours to Elite in curious mode | must stay reasonable |
+| Our deaths | an acceptable risk for an exciting fight: budget up to ~5% of showcase fights (enemy deaths are the point) | losing the ship ends the show and costs a reload; the career cost is measured separately |
+| Career progress | one confirmation career: reaches Elite; tally per game hour | checked, not tuned against |
 
-**Readiness gate (when to show off):** fitted for superiority (military laser or better, ECM, missiles,
-energy unit, energy bomb when available) and healthy. Below the gate it fights as in efficient mode.
+**When to show off (dynamic):** a superiority margin checked throughout the fight: our weapons (laser,
+missiles, energy bomb, ECM) and our current energy and shields against the threat (how many, what types,
+their weapons, how many are behind or closing, Thargoids). It shows off while the margin is high and
+drops to efficient as soon as it falls (low shields, more ships, a missile coming), with hysteresis so it
+doesn't flap. A beam laser can show off against a lone Sidewinder; a military laser on low shields
+facing a pack can't.
 
 ## Setup
 
@@ -58,3 +70,4 @@ energy unit, energy bomb when available) and healthy. Below the gate it fights a
 | Date | Mode | Change | Result | Status |
 |---|---|---|---|---|
 | 2026-10-18 | both | goals and metrics set; baseline = PLAN=1 default | see above | started |
+| 2026-10-18 | efficient | travel fights at the engage range (not 9000), no regen before leaving witchspace without a chain | careers 31.5 -> 27.4 h (5 of 5 faster), deaths 9 -> 3; lab witchspace pts/min +9% | in |
