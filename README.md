@@ -11,12 +11,8 @@ and how much of it a player could see; **fair mode** below plays with only that.
 
 | | | |
 |---|---|---|
-| ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The rear laser on a pursuer](docs/img/shots/rear-laser.png) | ![A knife-edge pass at a Cobra](docs/img/shots/close-pass.png) |
-| A flyby, watched from the side | Shooting back on the rear laser | A knife-edge pass |
-| ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![The witchspace tunnel](docs/img/shots/witchspace.png) | ![Data on Leesti: Human Colonials](docs/img/shots/data-on-system.png) |
-| Lasers on a Thargoid in witchspace | A forced mis-jump into witchspace | Curious mode reads up on each system |
-| ![Status: rating Elite](docs/img/elite-rank.png) | ![Status: rating Deadly](docs/img/deadly.png) | |
-| Elite | Deadly, on the way | |
+| ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
+| A flyby, watched from the side | Lasers on a Thargoid in witchspace | Elite |
 
 ## Modes
 
