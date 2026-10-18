@@ -1,12 +1,13 @@
-// Fair mode: the player limited to what a human could see and do (docs/FAIR.md). A switch, apart from
-// efficient and curious: g_fair = 0 is the player as it always was, to the byte.
+// Fair mode: information-fair (docs/FAIR.md). The player knows only what a human could see on the screen, the
+// scanner and the dashboard, the game's fixed rules and its own notes; no hidden RAM. It's still a machine, with a
+// machine's reflexes and thinking. A switch, apart from efficient and curious: g_fair = 0 is the player as it
+// always was, to the byte. (The hand limits, FAIR_STICK and FAIR_KEYS, are an optional extra.)
 //
 // Information: the ships as the screen and the scanner show them (perceive(): direction exact in the
 // view, distance from the drawing's size or the scanner, type only once drawn close enough, heading
 // only while drawn, motion estimated; hostility from behaviour, energy from our own hits); the
-// dashboard bars as drawn; the kill tally from the kills we see. Inputs: everything seen 200 ms late,
-// the stick moved at a hand's speed with a hand's precision, at most four keys down, each key at
-// most ~6 times a second.
+// dashboard bars as drawn; the kill tally from the kills we see. The optional hand limits: the stick moved
+// at a hand's speed with a hand's precision, at most four keys down, each key at most ~6 times a second.
 #pragma once
 #include <stdint.h>
 #include "ships.h"
@@ -17,7 +18,8 @@ enum {
     // (4 was a 200 ms perception delay: dropped, docs/FAIR.md)
     FAIR_STICK = 8,     // the stick at a hand's speed and precision
     FAIR_KEYS = 16,     // at most g_fair_key_cap keys down, each changing at most every g_fair_key_gap frames
-    FAIR_ALL = 27
+    FAIR_INFO = 3,      // fair mode: the information limits
+    FAIR_HANDS = 24     // (optional, apart: the hand limits)
 };
 extern int g_fair;              // FAIR_* bits (0: off)
 extern int g_fair_misjump;      // the forced mis-jump (author credits + CTRL) allowed in fair mode

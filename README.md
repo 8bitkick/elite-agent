@@ -15,7 +15,7 @@ and on a native build of the same emulator (Pi or Mac) for development.
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.9 game hours** (26.2-27.7 on five careers, 4 deaths in all) |
-| **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **34.5 game hours**, efficient + fair (32.7-38.5 on five careers) |
+| **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **34.5 game hours**, efficient + fair (32.7-38.5 on five careers, run with the optional hand limits too) |
 | **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **117.8 game hours** (two careers), show fighting in development |
 
 All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
@@ -38,6 +38,9 @@ hours on the native emulator at the real machine's speed.
 | Deaths (reloaded) | 1 | 6 | 50 |
 | Escape pods used | 0 | 0 | 11 |
 | Most credits held | 36,357 Cr | 19,783 Cr | 25,152 Cr |
+
+Fair's fight count is inflated: those careers split a fight in two whenever a dot at the edge of
+range turned out to be a trader (about 2,000 sub-second non-fights a career, since fixed).
 
 Curious mode's fights are for the camera: over 600 recorded fights an enemy is drawn 20 pixels or
 bigger for 3.8 seconds a fight, against 1.0 in efficient mode, which kills from as far out as it can.
@@ -105,7 +108,7 @@ line per event (docks, fights, sessions, deaths, ranks) to the journal. Options,
 |---|---|
 | `SKEW=n` | start n frames late: a different career |
 | `CURIOUS=1` | curious mode |
-| `FAIR=1` | fair mode |
+| `FAIR=1` | fair mode (`FAIRHANDS=1` adds limits on the stick and keys) |
 | `STOPFAIL=1` | stop at the first death or restart |
 | `SAVE=0` | never save (a death ends the career) |
 | `FIGHTS=dir` | record each fight's starting snapshot, for the lab |
@@ -135,7 +138,7 @@ it to the RP2350 drive. The agent starts a little after boot.
 The web panel (http://beeb.local/) shows the rank and progress, credits, where it is and what it's
 doing, play time, kills, deaths and pods, its latest status lines, and buttons to start or stop it
 and switch modes. Over USB: `!agent start|stop`, `!agent mode efficient|curious`, `!agent fair
-on|off`, `!agent name <NAME>`, `!agent load <NAME>` (when next docked), `!agent status`, `!agent log
+on|off|hands`, `!agent name <NAME>`, `!agent load <NAME>` (when next docked), `!agent status`, `!agent log
 0|1|2`. Saves survive a power-off (the firmware keeps a save disc in flash).
 
 `presto/elite_presto.c` is the Presto side, `presto/elite_splash.c` the loading screen

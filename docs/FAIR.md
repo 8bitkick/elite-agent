@@ -1,23 +1,27 @@
-# Fair mode: playing as a human could
+# Fair mode: information-fair
 
 The player normally reads Elite's RAM: every ship in the bubble, exactly, every frame, with bytes no screen
-shows (a ship's energy, whether it's hostile), and it puts the joystick anywhere in one frame. [IO.md](IO.md)
-sorts every read into visible, static, derivable and hidden. **Fair mode** keeps only what a human player
-could see or work out, and only what a human hand could do, and still has to get to Elite.
+shows (a ship's energy, whether it's hostile). [IO.md](IO.md) sorts every read into visible, static, derivable
+and hidden. **Fair mode is fair in terms of information**: the player knows only what a human could see on the
+screen, the scanner and the dashboard, plus the game's fixed rules and its own notes. No hidden RAM. It's still
+plainly a machine, with a machine's reflexes, attention and arithmetic: it reacts within the frame, watches
+every ship on the scanner at once and plans its turns by simulating Elite's own maths. Fair mode doesn't claim
+otherwise. It reaches Elite on every career tried: 32.7-38.5 game hours (with the optional hand limits, an
+earlier build), against 26.9 with the hidden bytes (§4).
 
 It's a switch, apart from the two career modes: efficient + fair, curious + fair. Off (the default) the player
 is the same program it always was, to the byte (checked on fights and careers, §4).
 
 | Where | How |
 |---|---|
-| run_sim, lab | `FAIR=1` (all of it); `FAIRMASK=n` for parts; `FAIRP=name=value,...` for its numbers |
-| Presto | `agent fair on|off` over USB; a **Fair** button on the web panel beside Efficient and Curious |
-| code | `g_fair` (`cplayer/fair.h`): bits `FAIR_SEE` 1, `FAIR_DASH` 2, `FAIR_STICK` 8, `FAIR_KEYS` 16 (`FAIR=1` is 27) |
+| run_sim, lab | `FAIR=1`; `FAIRHANDS=1` adds the optional hand limits (§1); `FAIRMASK=n` for single parts; `FAIRP=name=value,...` for its numbers |
+| Presto | `agent fair on|off` over USB (`agent fair hands` with the hand limits); a **Fair** button on the web panel beside Efficient and Curious |
+| code | `g_fair` (`cplayer/fair.h`): bits `FAIR_SEE` 1 and `FAIR_DASH` 2 (`FAIR=1`: 3); optional `FAIR_STICK` 8, `FAIR_KEYS` 16 |
 
-## 1. What "fair" means
+## 1. What it may know
 
-A human at a BBC Master with a joystick, who knows the game well (the manual, the source's rules, the galaxy
-charts, the ship blueprints) and keeps careful notes, but has a human's eyes and hands. Precisely:
+A player at a BBC Master who knows the game well (the manual, the source's rules, the galaxy charts, the ship
+blueprints) and keeps careful notes, watching the screen. Precisely:
 
 **Information.** The player may use:
 
@@ -57,24 +61,16 @@ What it still reads from RAM, and why that's fair:
 | TALLY+1 (the high byte only) | the RIGHT ON COMMANDER message, printed each time it counts up |
 | bytes 0-8 and 31 of a ship (position; killed/exploding), and its type | **only through the screen and scanner model above** (and to follow a ship from one frame to the next: the eye's continuity) |
 
-**Inputs (human-fair).** The numbers, and where they come from:
+**Hands: an optional extra (`FAIRHANDS=1`).** Not part of fair mode: they limit the machine's hands rather than
+what it knows. The stick moves at most 32 units a frame (lock to lock in 160 ms) and misses where it's put by
+Gaussian noise of sd 1 + 4% of the deflection (motor noise grows with the command: Harris & Wolpert 1998); at
+most 4 keys are down at once (3 while another is tapped); each key changes at most every 80 ms; taps last at
+least 4 frames down and 3 up. They cost about 10% of the points a fight minute in the lab and nothing visible
+in careers (§3, §4).
 
-| Limit | Value | Why |
-|---|---|---|
-| Stick speed | at most 32 units a frame: lock to lock (254) in 8 frames, 160 ms | fast aimed wrist movements of a joystick's travel take ~100-250 ms (Fitts' law; ballistic flicks at the short end) |
-| Stick precision | where it's put, off by Gaussian noise of sd 1 + 4% of the deflection, wandering over ~10 frames | motor noise grows with the size of the command (signal-dependent noise: Harris & Wolpert 1998); endpoint errors of a few percent of the movement |
-| Keys down at once | at most **4** (3 while tapping another) | one hand on the stick (with its fire button), the other on the keyboard |
-| Key rate | each key changes at most once every 4 frames (80 ms): ~6 presses a second per key; taps at least 4 frames down and 3 up (~7 a second, a fast typist's 85 words a minute) | finger tapping tops out at ~5-7 Hz per finger |
-| Thinking | not limited | the rules can plan and compute as much as they like between frames: fair mode limits what they see and what their hands can do, not how well they think |
-| Reaction time | **none added** (keys still land 2 frames after they're asked for, as always) | see below |
-
-**No reaction delay (the user's call).** The first version saw everything 200 ms late (8 frames of
-perception delay plus the 2 every key already takes; simple visual reaction time is ~190-250 ms), and carried
-what it saw forward over the delay with its own stick (a Smith predictor). The user asked for the artificial lag
-to be removed: fair mode limits what the player can know and what its hands can do, not when it sees it. The
-code is gone (bit 4 of `g_fair` is unused). For the record, on the 300-fight screen it cost about a fifth of
-the points a fight minute on top of the information limits (12.93 -> 10.22 pts/min), mostly in aim: the
-prediction over the delay put the target 0.9 deg off on average where the screen alone gives 0.13.
+**No reaction delay.** An earlier version saw everything 200 ms late and predicted over the delay with its own
+stick. The user dropped it: fair mode is about what the player knows, not when. It's gone from the code (bit 4
+of `g_fair` is unused). On the 300-fight screen it had cost about a fifth of the points a fight minute.
 
 **Game options a human would play with.**
 
@@ -192,7 +188,47 @@ comes a little later, when it closes. Cyan dots out of the safe zone are now tak
 
 ## 4. Numbers
 
-(careers to Elite: efficient + fair against the 27.4 h record; below)
+**Careers to Elite** (efficient + fair; run_sim on the native emulator at the real machine's speed, seeds as
+`SKEW`, the same five as the efficient record; macbox `~/work/fair/car/`):
+
+| Seed | efficient record (26.9 h) | fair, information only (`FAIR=1`) | fair + hands (`FAIRMASK=27`, the build before the master merge) |
+|---|---|---|---|
+| 13 | 27.0 h | running | 33.6 h, 5 deaths |
+| 101 | 27.5 h | running | 32.7 h, 4 deaths |
+| 37 | 26.2 h | running | 38.5 h, 8 deaths |
+| 71 | 27.7 h | running | 34.8 h, 4 deaths |
+| 149 | 26.6 h | running | 32.8 h, 7 deaths |
+| mean | 26.9 h | | 34.5 h (record then 27.4 h) |
+
+All five fair careers reach Elite. **Where the gap comes from** (seed 13, fair + hands against the record, from
+the journals): witchspace farming makes about the same points (5,250 against 5,213) but in 18.8 hours instead of
+14.3 (4.6 points a minute against 6.1). Per witchspace session, the farming itself takes 1.32 minutes against
+1.14 (fights last longer: aiming at what it can't see as well), and the trip home to dock 4.0 against 3.2
+(travel fights against pirates it has to identify first). Bounty hunting is a little slower (1.1 points a
+minute against 1.4). Deaths 4-8 a career against 1-3: each costs only the trip since the last save.
+
+**Fights, splits.** Those fair careers logged ~4,000 fights each against ~1,800 for the same kills. They were
+mostly splits, not more fighting: 2,074 of seed 13's "fights" lasted under a second and scored nothing (220 in
+the record). A dot taken for a pirate was seen close up as a trader and the fight ended at once (and then the
+old rule ignored everything about for 3 minutes, 232 times); and a dot's estimated range wandering across the
+edge of reach started and stopped fights. Fixed since: in a fight it takes 3,000 more range to end it than to
+start it, and a fight over within 10 s doesn't start the 3-minute ignore. A 6-hour career on the fixed build:
+86 sub-second fights against 2,074 in the old one's 33 hours (still more than the record's rate, from traders
+looked at and let go).
+
+**The fight lab** (pts per fight minute, deaths; every fight from its recorded start, its own process):
+
+| | eff300 (300 fights) | mid (889 fights) |
+|---|---|---|
+| fair off (master) | 16.71, 2 deaths | 15.34, 0 |
+| fair, information only (`FAIR=1`) | 14.88 (-11%), 1 | 13.71 (-11%), 0 |
+| fair + hands (`FAIR=1 FAIRHANDS=1`) | 13.97 (-16%), 2 | 13.08 (-15%), 0 |
+
+(eff300: stratified from career fights, none from mid; mid: a tenth of the 9,327-fight corpus, stratified. Witchspace,
+most of a career's points: 20.96 -> 18.94 and 21.06 -> 19.09 pts/min with the information limits.)
+
+**Fair off is the same program.** Built from this branch with fair off and from master: the same lab output on
+200 recorded fights (every line), and the same 5- and 10-hour careers (journal and log identical).
 
 ## 5. Simplifications still in it
 

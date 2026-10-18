@@ -280,9 +280,10 @@ int main(int argc, char **argv) {
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
-    {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 all of it; FAIRMASK=bits for a part (1 see, 2 dashboard, 8 stick, 16 keys)
+    {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 the information limits; FAIRHANDS=1 the hand limits too; FAIRMASK=bits (1 see, 2 dashboard, 8 stick, 16 keys)
         extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
-        if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 27;
+        if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 3;           // (the information limits)
+        if (getenv("FAIRHANDS") && atoi(getenv("FAIRHANDS"))) g_fair |= 24;     // (and, apart, the hand limits)
         if (getenv("FAIRMASK")) g_fair = atoi(getenv("FAIRMASK"));
         if (getenv("FAIRMJ")) g_fair_misjump = atoi(getenv("FAIRMJ"));
         if (getenv("FAIRSTICK")) g_fair_stick_rate = atoi(getenv("FAIRSTICK"));

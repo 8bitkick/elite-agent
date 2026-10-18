@@ -10,7 +10,7 @@
 //   player start | stop
 //   player load <name>               a commander from the disc, when next docked
 //   player mode efficient|curious   how it plays: straight for Elite, or seeing the galaxy
-//   player fair on|off           fair mode, with either: only what a human could see, at a human's speed (docs/FAIR.md)
+//   player fair on|off|hands     fair mode, with either: only what a human could see (hands: and a hand's limits) (docs/FAIR.md)
 //   player log <0|1|2>           its USB log: STATUS lines only, + PLAYER (default), + DEBUG
 //   player status                a line: rank, tally, play time, kills, deaths
 // The web page shows its panel (machine_program_json): progress to Elite, where it is, the totals.
@@ -227,11 +227,12 @@ bool machine_command_hook(const char *cmd, char *reply, uint32_t reply_size)
         snprintf(reply, reply_size, "AGENT mode %s (from its next decision)", g_curious ? "curious" : "efficient");
     } else if (!strncmp(a, "fair", 4) && (!a[4] || a[4] == ' ')) {
         const char *v = a[4] ? a + 5 : "";
-        if (!strcmp(v, "on")) g_fair = 27;
+        if (!strcmp(v, "on")) g_fair = 3;
         else if (!strcmp(v, "off")) g_fair = 0;
-        else if (!*v) g_fair = g_fair ? 0 : 27;
-        else { snprintf(reply, reply_size, "AGENT fair on|off"); return true; }
-        snprintf(reply, reply_size, "AGENT fair %s (from the next frame)", g_fair ? "on" : "off");
+        else if (!strcmp(v, "hands")) g_fair = 27;       // (and the hand limits: the stick's speed and noise, four keys)
+        else if (!*v) g_fair = g_fair ? 0 : 3;
+        else { snprintf(reply, reply_size, "AGENT fair on|off|hands"); return true; }
+        snprintf(reply, reply_size, "AGENT fair %s (from the next frame)", g_fair == 27 ? "on, with the hand limits" : g_fair ? "on" : "off");
     } else if (!strncmp(a, "log ", 4)) {
         int l = atoi(a + 4);
         s_level = l < 0 ? 0 : l > PLOG_DEBUG ? PLOG_DEBUG : l;
@@ -257,7 +258,7 @@ bool machine_command_hook(const char *cmd, char *reply, uint32_t reply_size)
                  s_tot.name, s_on ? "on" : "off", g_curious ? "curious" : "efficient", g_fair ? " fair" : "", rank_of(ty), ty, t,
                  (unsigned long) s_tot.car.kills, (unsigned long) s_tot.car.deaths, (unsigned long) s_tot.car.pods);
     } else {
-        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, fair on|off, name <NAME>, log 0|1|2, status, save");
+        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, fair on|off|hands, name <NAME>, log 0|1|2, status, save");
     }
     return true;
 }
