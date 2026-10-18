@@ -127,7 +127,7 @@ static void aim_frame(void) {
 }
 
 // per-fight diagnostics, from RAM each frame (the game's own hit test, HITCH, for "in the sights")
-typedef struct { int present, sights, fire_on, fire_off, hot, aimed, kills, dealt, left, start_n, ph[5]; } diag_t;
+typedef struct { int present, sights, fire_on, fire_off, hot, aimed, kills, dealt, left, start_n, ph[5]; int ktype[64]; } diag_t;
 static int hostile(const ship_t *s) {
     return ship_in_space(s) && s->type > 0 && s->type < 128 && s->type != 2 && !(s->type >= 3 && s->type <= 8) && (s->newb & NEWB_HOSTILE);
 }
@@ -142,7 +142,7 @@ static void diag_frame(diag_t *d, int *e_prev, uint8_t *dead_prev) {
         static int dying_prev[64];
         int dying[64] = {0};
         for (int i = 0; i < n; i++) if (hostile(&sh[i]) && ship_dead(&sh[i])) dying[sh[i].type & 63]++;
-        for (int t = 0; t < 64; t++) { if (t != 1 && dying[t] > dying_prev[t]) d->kills += dying[t] - dying_prev[t]; dying_prev[t] = dying[t]; }     // (missiles are no kill)
+        for (int t = 0; t < 64; t++) { if (t != 1 && dying[t] > dying_prev[t]) for (int k = dying[t] - dying_prev[t]; k > 0; k--) { if (d->kills < 64) d->ktype[d->kills] = t; d->kills++; } dying_prev[t] = dying[t]; }     // (missiles are no kill)
     }
     for (int i = 0; i < n; i++) {
         const ship_t *q = &sh[i];
@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
     { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
     { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
+    { extern int g_brk_rear; if (getenv("BRKREAR")) g_brk_rear = atoi(getenv("BRKREAR")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
     size_t sz = beeb_state_size();
@@ -547,6 +548,8 @@ int main(int argc, char **argv) {
             for (int i = 0; i < FX_N; i++) fprintf(stderr, " %ld", s_fx[i]);
             fprintf(stderr, " kt%s arr", kt);
             for (int i = 0; i < s_fx_na; i++) fprintf(stderr, " %ld", s_fx_arr[i]);     // (frame * 2 + 1 if into witchspace)
+            fprintf(stderr, " ktt");          // (the type of each kill)
+            for (int i = 0; i < s_fx_nk && i < 64; i++) fprintf(stderr, " %d", dg.ktype[i]);
             fprintf(stderr, "\n");
         }
         fprintf(stderr, "TTK %ld %ld %ld %ld\n", s_ttk[0], s_ttk[1], s_ttk[2], s_ttk[3]);

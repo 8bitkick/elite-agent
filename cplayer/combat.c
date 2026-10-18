@@ -243,6 +243,13 @@ static int opportunity(const ship_t *s, int n, int view) {
     return 0;
 }
 
+// breaking off on the rear laser: running from them puts them astern, so fly the run as a rear-view attack on the
+// nearest, at full speed: the same tail-to-them course, shooting back. All 9327 fights: pts/min +7.4% [+6.6, +8.4],
+// time to clear -6.7%, damage -8%, deaths 27 -> 20 (2-3 small packs: clear -19%, deaths 8 -> 4); careers to Elite
+// 27.35 -> 26.92 h (3 of 5 faster). Both modes (fewer deaths and faster); BRKREAR=0 for the old run
+int g_brk_rear = 1;
+static int s_force_rear;
+
 // one frame of attacking sh: the keys, the angle off (degrees), and the view to fight in (0 front,
 // 1 rear: with a rear laser, a target behind is fought from the rear view, where our turns look
 // mirrored: the rolls swap, and so do climb and dive)
@@ -256,7 +263,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     vec_t aim = {sh->x + vel.x * k, sh->y + vel.y * k, sh->z + vel.z * k};
     vec_t v = {sh->x, sh->y, sh->z};
     // (the rear laser means facing away: further than rear_max, it's a chase we never close)
-    int rear = laser_power(1, sh->type) > 0 && sh->z < 0 && atan2(hypot(sh->x, sh->y), -(double) sh->z) * 180 / M_PI < P->rear_cone &&
+    int rear = s_force_rear || laser_power(1, sh->type) > 0 && sh->z < 0 && atan2(hypot(sh->x, sh->y), -(double) sh->z) * 180 / M_PI < P->rear_cone &&
                (!P->rear_max || dist < P->rear_max);
     if (rear) {
         v = (vec_t){-v.x, v.y, -v.z};
@@ -318,6 +325,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     else if (dist > P->mid) want = P->spd_mid;
     else if (dist > P->near) want = P->spd_near;
     else want = P->spd_close;
+    if (s_force_rear && !rc) want = 40;
     // evade: shields down and another enemy's nose on us within range: jink out of its line. In
     // bursts (0.8 s, then 2.5 s of fighting: attacked from behind someone's always facing us, and
     // jinking for ever meant never shooting back), and not when our own shot's nearly lined up
@@ -533,6 +541,18 @@ PT_THREAD(engage(float seconds)) {
                     }
                 }
                 if (c_en.breaking && (energy() >= g_cpa->brk_until || ash() < fsh() + 20 || (g_cpa->brk_stop && nearest < g_cpa->brk_stop))) c_en.breaking = 0;
+                if (c_en.breaking && g_brk_rear) {
+                    const ship_t *nb = NULL;
+                    double nd = 1e18;
+                    for (int i = 0; i < nt; i++) if (th[i]->type != 1 && laser_power(1, th[i]->type) > 0 && dist_of(th[i]) < nd) nd = dist_of(th[i]), nb = th[i];
+                    if (nb) {
+                        s_force_rear = 1;
+                        off = combat_keys(sh, n, nb, &keys, &view);
+                        s_force_rear = 0;
+                        g_en_mode = 1;
+                        goto flown;
+                    }
+                }
                 if (c_en.breaking) {
                     double cx = 0, cy = 0, cz = 0;
                     for (int i = 0; i < nt; i++) {

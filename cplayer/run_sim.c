@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
     { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
     { extern int g_chase; if (getenv("CHASE")) g_chase = atoi(getenv("CHASE")); }
+    { extern int g_brk_rear; if (getenv("BRKREAR")) g_brk_rear = atoi(getenv("BRKREAR")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_jump_log; g_jump_log = getenv("JLOG") != NULL; }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }

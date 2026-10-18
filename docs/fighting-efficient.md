@@ -90,10 +90,25 @@ big/small, 60 witchspace) to screen; **all** = the 9327 to confirm; **careers** 
 | **No regeneration before leaving witchspace when no chain is to come** (WSNOREGEN; it waited ~6 s for full strength on the last mis-jump of every session, then left anyway) | 300: witchspace pts/min +7.6% [+5.4, +10.6]; all: witchspace +9.0% [+8.4, +9.7], nothing else changed, deaths 27 -> 27 | **in** (efficient) |
 | Fire at any enemy in the sights, not only the target (OPPFIRE: Elite's laser hits every ship in the crosshairs) | all: pts/min +0.2% [-0.4, +0.7], clear -0.2%, deaths 27 -> 30: the target's firing cylinder (1.43 hit radii) already covers what crosses the sights | rejected |
 | Target worth counts the ships near it in our view (CLUDEG: within 5/10/20 deg, by closeness) | all: clear +1.1 / +2.0 / +1.6% (worse), packs 4+ pts/min +2.1 / +2.2 / +4.0%, witchspace pts/min -1.0 / -0.5 / -1.5%, deaths 27 -> 29 / 32 / 30. Pirates only (CLUWS=0), 300: -0.1%; weight 2: -2.1% | rejected |
+| **Break off on the rear laser** (BRKREAR: the run from a pack, tail to them, flown as a rear-view attack on the nearest at full speed, instead of a blind run; the rear laser was idle while they sat astern) | all: pts/min +7.4% [+6.6, +8.4] (2-3 small +28.5%, 4+ small +18.1%, 2-3 big +12.9%, witchspace 0), clear -6.7% (2-3 small -19.4%), per kill -10.7%, damage -8%, deaths 27 -> 20 (only A 9, only B 2); careers (on the travel-reach build): 27.35 -> **26.92 h** (13: 26.89, 101: 27.34, 37: 26.15, 71: 27.68, 149: 26.52; 3 of 5 faster), deaths 3 -> 4 | **in** (both modes) |
+| With it, when to break (300): brk_clear 4000 / 0 (break with them closer), brk_n 1 (also from one), sooner (energy 250, shield 150), brk_until 255 | pts/min -2.9 / -5.4 / +0.2 / -0.5 / 0.0% | rejected (the old thresholds stand) |
+| Go after hostiles beyond reach that keep J refused on the way to the station (CHASE=40000: steer at the nearest at full speed until it's in reach; give up on one that opens for 10 s or after a minute) | careers: 27.35 -> 27.16 h (3 of 5 faster, -0.88 to +0.14 h), deaths 3 -> 3; cruising with J refused (planet far ahead) 0.41 -> 0.38 h a career: little left to win | rejected (noise; off) |
+| Witchspace: what a visit spends (bw, 200 fights, 368 visits) | the last Thargoid dies at 12.0 s; then 4.2 s on 2.2 Thargons (0.28 pts, 3% of the visit's points); 7.5 s more to the next arrival (regen, chart, mis-jump toggle, countdown). Leaving the Thargons for the countdown would trade ~18% of visit time for 3% of points and their fire on the chart: about even | not pursued |
+| The CMA-ES fight parameters (tuned before the joystick and the planner) one at a time on the current build, 300: hit_rate 0.3/0.8, t_floor 0/0.5, w_threat 0.7/2.8, lead 4/5, pitch_iters 2.5/3.5, roll_iters 1.4/2.1, spd_far 22/32, spd_mid 25, spd_near 8, far 3000/6000, turn_off 10/25, evade_shield 0/30, ram_dist 300/600 | all within -6% .. +0.6% overall: the aim's (lead, pitch_iters, roll_iters, turn_off) lose 2-6%; the rest flat. Hints only: t_floor 0 pirates +3.0% [+0.2, +6.3], evade_shield 0 pirates +1.1%; on mid (889, pirates only): -0.2% and -0.1% | the parameters stand |
 | No break-off (brk_energy=0) | 300: pts/min +6.8%, clear -8.7%, deaths 1 -> 2; all: clear -9.3% (2-3 small -25%), pirates pts/min +8.5%, but deaths 27 -> 80 (only A 5, only B 58) | rejected (the break-off still saves lives) |
 | Fight-parameter screens on 300: spd_turn 10 (move while turning), hot 240, fire_r 2, t_switch 1.2, witchspace rear laser at any range | pts/min -3.2 / +1.6 / -1.0 / +1.3 / +1.1%, all within noise (intervals span 0) | rejected (no signal) |
 
 ## Current best
 
-Baseline: careers 31.4 h (30.83, 31.29, 30.59, 30.75, 33.84 for seeds 13, 101, 37, 71, 149); all fights as
-above.
+| | baseline (c36b082) | now |
+|---|---|---|
+| careers to Elite, mean of 5 | 31.46 h (30.83, 31.29, 30.59, 30.75, 33.84) | **26.92 h** (26.89, 27.34, 26.15, 27.68, 26.52) |
+| career deaths, 5 seeds | 9 | 4 |
+| all fights: pts/min | 13.09 | 15.14 (witchspace 18.31 -> 21.09, pirates up 2-29%) |
+| all fights: clear | 7.7 s | 7.2 s |
+| all fights: per kill | 2.9 s | 2.5 s |
+| all fights: damage taken | 114 | 99 |
+| all fights: deaths | 27 | 20 |
+
+(Seeds 13, 101, 37, 71, 149, in that order. The fight numbers are the lab's; the travel reach doesn't show
+there.)

@@ -167,10 +167,10 @@ def run(setname, name, kv):
                     m = re.search(r'off (\d+) side (\d+)', line)
                     epi.append((v[1] == 'hit', int(v[2]), int(m.group(1)) if m else 0, int(m.group(2)) if m else 0))
                 elif line.startswith('FX '):       # the efficiency split (lab.c): n0, clear, frames, far, cat[11], kill frames
-                    m = re.match(r'FX (.*) n0 (-?\d+) clear (-?\d+) frames (\d+) far (\d+) cat ((?:\d+ ?){11}) kt([\d ]*)(?: arr([\d ]*))?', line)
+                    m = re.match(r'FX (.*) n0 (-?\d+) clear (-?\d+) frames (\d+) far (\d+) cat ((?:\d+ ?){11}) kt([\d ]*?)(?: arr([\d ]*?))?(?: ktt([\d ]*?))?\s*$', line)
                     if m:
                         fx[m.group(1)] = {'n0': int(m.group(2)), 'clear': int(m.group(3)), 'frames': int(m.group(4)), 'far': int(m.group(5)),
-                                          'cat': [int(x) for x in m.group(6).split()], 'kt': [int(x) for x in m.group(7).split()], 'arr': [int(x) for x in (m.group(8) or '').split()]}
+                                          'cat': [int(x) for x in m.group(6).split()], 'kt': [int(x) for x in m.group(7).split()], 'arr': [int(x) for x in (m.group(8) or '').split()], 'ktt': [int(x) for x in (m.group(9) or '').split()]}
                 elif line.startswith('TTK '):
                     ttk.append([int(x) for x in line.split()[1:]])
                 elif line.startswith('EXPO '):
