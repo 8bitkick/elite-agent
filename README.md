@@ -4,7 +4,7 @@ A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build), writ
 the machine's RAM and plays only through the keyboard and the analogue joystick (Elite's own joystick
 option). It's self-contained: no OS, no heap, no network, no model, just rules, about 100 KB of code
 and 60 KB of RAM compiled for the RP2350's Cortex-M33. It runs on that microcontroller, a Pimoroni
-Presto, beside the BBC Master emulator, taking under 1% of each frame; the same code runs on a native
+Presto, beside the BBC Master emulator, averaging about 2.4 ms of each 20 ms frame; the same code runs on a native
 build of the emulator (Pi or Mac) for development.
 
 | | | |
