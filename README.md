@@ -18,11 +18,12 @@ and a death only loses the trip since.
 
 ## How fast it gets to Elite
 
-From a fresh Commander Jameson (100 Cr, a pulse laser) to the rank of **Elite in about 32 game
-hours**: 32.1, 32.4 and 32.0 hours on three different careers (seeds), one death each, in efficient
-mode on the native emulator at the real machine's speed.
+From a fresh Commander Jameson (100 Cr, a pulse laser) to the rank of **Elite in about 27 game
+hours**: 26.5 to 28.5 hours on five of five careers (seeds), average 27.4, with 3 deaths across
+all five, in efficient mode on the native emulator at the real machine's speed. The build before
+took 31.4 hours on the same seeds.
 
-![Kill tally against game hours: three careers on the current defaults reach Elite at 32.0 to 32.4 hours; without the missions 36.8 hours; with keyboard aim 57.3 hours](docs/img/climb.svg)
+![Kill tally against game hours: five careers on the current defaults reach Elite at 26.5 to 28.5 hours; the build before 30.8 hours on seed 13; without the missions 36.8 hours; with keyboard aim 57.3 hours](docs/img/climb.svg)
 
 The early ranks pass in the first three hours. From Deadly (2,560) to Elite (6,400) takes about
 14 hours of almost pure witchspace farming.
@@ -37,13 +38,19 @@ without them the career is ahead until about 30 hours, then reaches Elite 4.7 ho
 **Why it is this fast:**
 
 - **Aim.** It flies with the analogue joystick and aims 4.5 game loops ahead of its target, with
-  steering the joystick's stick to an exact position each frame. Replayed over 9,327 fights recorded from careers, that scores
+  steering the joystick's stick to an exact position each frame, and turns onto a new target in one
+  planned motion: roll and pitch together, simulated ahead each game loop from Elite's own rotation
+  maths. Replayed over 9,327 fights recorded from careers, that scores
   38% more per fight minute than the keyboard, with 39 deaths instead of 101, and holds the target
   in the sights 82% of the time.
 - **Thargoids.** Witchspace fights score about 30 points a fight minute, against about 12 in
   normal space.
 - **Cheap deaths.** With a save at every dock, a lost fight costs only the trip since (the whole
   career above lost 2 game minutes to it), so the career can take risks a no-save player can't.
+- **No waiting about.** On the way to the station it fights pirates as far out as it engages in a
+  hunt: ones hanging back at 9,000-17,000 units used to block the in-system jump for most of an hour
+  a career. And after the last witchspace fight of a session it leaves at once instead of
+  recharging first. Together: 31.4 to 27.4 hours, all five careers faster, deaths 9 to 3.
 - **No wasted trips.** Routes avoid the systems the chart cursor can't select; the escape pod is
   bought only when rich and never holds up farming.
 
@@ -84,7 +91,7 @@ cplayer/buildlab.sh                            # lab: the fight lab
 A career from a fresh Commander Jameson, efficient mode, until Elite or the time runs out:
 
 ```sh
-cplayer/run_sim 2400 "" journal.jsonl          # up to 2,400 game minutes (40 h); Elite in ~32 h
+cplayer/run_sim 2400 "" journal.jsonl          # up to 2,400 game minutes (40 h); Elite in ~27 h
 ```
 
 It prints the agent's log as it plays (minutes, then what it's doing) and writes one JSON line
