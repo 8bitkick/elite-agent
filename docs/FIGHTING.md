@@ -41,7 +41,7 @@ outfitted, it fights as in efficient mode.
 | Superiority | damage taken, near misses vs hits, shield never below a floor | skill, not luck |
 | Pacing | fight length within a band; kill spacing; no dead air (no enemy on screen) | not tedious |
 | Repetition | similarity of technique sequences between consecutive fights | not repetitive |
-| Our deaths | zero, hard limit (enemy deaths are the point) | losing the ship is never entertaining here |
+| Our deaths | rare: an occasional loss is an acceptable risk for a better show; budget: no more than the efficient baseline's rate on the same fights (enemy deaths are the point) | losing the ship ends the show and costs a reload |
 | Career cost | game hours to Elite in curious mode | must stay reasonable |
 
 **Readiness gate (when to show off):** fitted for superiority (military laser or better, ECM, missiles,
