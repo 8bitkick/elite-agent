@@ -36,7 +36,7 @@ career's hours aren't optimised the way efficient mode's are.
 **Goal:** whenever the ship has the upper hand, fights are a show. Enemies are kept on screen, close
 and in numbers, in a variety of views: mostly the front, with side glances as ships pass and the
 occasional rear laser. The fights use varied and unusual techniques and weapons, and the ship plays
-with the enemy. Fights end within a time limit and should not repeat themselves. Without the upper hand,
+with the enemy. Fights run as long as they stay interesting and end only when they turn repetitive. Without the upper hand,
 it fights as in efficient mode.
 
 | Metric | What it is | Why |
@@ -48,9 +48,9 @@ it fights as in efficient mode.
 | Technique variety | distinct techniques a fight (front/rear laser, missile, ECM, energy bomb, flyby, loop, roll-under, bait, a side glance at a pass), views used, entropy across fights | not one trick every time |
 | Superiority | damage taken, near misses vs hits | skill, not luck |
 | Novelty | first meeting with a ship type, rare types (Cougar, Constrictor), Thargoids, mis-jumps | the mission: new things to see |
-| Pacing | fight length within a band, and a show-time limit per fight (a base plus some per enemy, then finish efficiently); kill spacing; no dead air (no enemy on screen) | not tedious |
+| Pacing | no fixed time limit: a fight hands over to efficient tactics only when it turns repetitive (a long straight-line chase, the same target held unchanged, circling without closing, nothing new on screen); no dead air | long is fine, repetitive isn't |
 | Repetition | similarity of technique sequences between consecutive fights | not repetitive |
-| Our deaths | an acceptable risk for an exciting fight: budget up to ~5% of showcase fights (enemy deaths are the point) | losing the ship ends the show and costs a reload; the career cost is measured separately |
+| Our deaths | a risk to take for style: use the budget, up to ~5% of showcase fights (enemy deaths are the point) | losing the ship ends the show and costs a reload; the career cost is measured separately |
 | Career progress | one confirmation career: reaches Elite; tally per game hour | checked, not tuned against |
 
 **When to show off (dynamic):** a superiority margin checked throughout the fight: our weapons (laser,
