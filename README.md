@@ -19,11 +19,11 @@ and a death only loses the trip since.
 ## How fast it gets to Elite
 
 From a fresh Commander Jameson (100 Cr, a pulse laser) to the rank of **Elite in about 27 game
-hours**: 26.5 to 28.5 hours on five of five careers (seeds), average 27.4, with 3 deaths across
+hours**: 26.2 to 27.7 hours on five of five careers (seeds), average 26.9, with 4 deaths across
 all five, in efficient mode on the native emulator at the real machine's speed. The build before
 took 31.4 hours on the same seeds.
 
-![Kill tally against game hours: five careers on the current defaults reach Elite at 26.5 to 28.5 hours; the build before 30.8 hours on seed 13; without the missions 36.8 hours; with keyboard aim 57.3 hours](docs/img/climb.svg)
+![Kill tally against game hours: five careers on the current defaults reach Elite at 26.2 to 27.7 hours; an earlier build 30.8 hours on seed 13; without the missions 36.8 hours; with keyboard aim 57.3 hours](docs/img/climb.svg)
 
 The early ranks pass in the first three hours. From Deadly (2,560) to Elite (6,400) takes about
 14 hours of almost pure witchspace farming.
@@ -51,6 +51,9 @@ without them the career is ahead until about 30 hours, then reaches Elite 4.7 ho
   hunt: ones hanging back at 9,000-17,000 units used to block the in-system jump for most of an hour
   a career. And after the last witchspace fight of a session it leaves at once instead of
   recharging first. Together: 31.4 to 27.4 hours, all five careers faster, deaths 9 to 3.
+- **Running fights back.** Breaking off from a pack, it flies away tail-first on the rear laser and
+  shoots the nearest pursuer instead of just running: 7% more points a fight minute and fewer deaths
+  over the recorded fights, 26.9 hours to Elite.
 - **No wasted trips.** Routes avoid the systems the chart cursor can't select; the escape pod is
   bought only when rich and never holds up farming.
 
