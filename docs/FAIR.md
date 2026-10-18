@@ -6,8 +6,8 @@ and hidden. **Fair mode is fair in terms of information**: the player knows only
 screen, the scanner and the dashboard, plus the game's fixed rules and its own notes. No hidden RAM. It's still
 plainly a machine, with a machine's reflexes, attention and arithmetic: it reacts within the frame, watches
 every ship on the scanner at once and plans its turns by simulating Elite's own maths. Fair mode doesn't claim
-otherwise. It reaches Elite on every career tried: 32.7-38.5 game hours (with the optional hand limits, an
-earlier build), against 26.9 with the hidden bytes (§4).
+otherwise. It reaches Elite on every career tried: 30.2 game hours on average (27.7-34.0 on five careers),
+against 26.9 with the hidden bytes (§4).
 
 It's a switch, apart from the two career modes: efficient + fair, curious + fair. Off (the default) the player
 is the same program it always was, to the byte (checked on fights and careers, §4).
@@ -65,8 +65,8 @@ What it still reads from RAM, and why that's fair:
 what it knows. The stick moves at most 32 units a frame (lock to lock in 160 ms) and misses where it's put by
 Gaussian noise of sd 1 + 4% of the deflection (motor noise grows with the command: Harris & Wolpert 1998); at
 most 4 keys are down at once (3 while another is tapped); each key changes at most every 80 ms; taps last at
-least 4 frames down and 3 up. They cost about 10% of the points a fight minute in the lab and nothing visible
-in careers (§3, §4).
+least 4 frames down and 3 up. On top of the information limits they cost about 5% of the points a fight minute
+in the lab (§4); on their own, nothing visible in a 4-hour career (§3).
 
 **No reaction delay.** An earlier version saw everything 200 ms late and predicted over the delay with its own
 stick. The user dropped it: fair mode is about what the player knows, not when. It's gone from the code (bit 4
@@ -191,30 +191,36 @@ comes a little later, when it closes. Cyan dots out of the safe zone are now tak
 **Careers to Elite** (efficient + fair; run_sim on the native emulator at the real machine's speed, seeds as
 `SKEW`, the same five as the efficient record; macbox `~/work/fair/car/`):
 
-| Seed | efficient record (26.9 h) | fair, information only (`FAIR=1`) | fair + hands (`FAIRMASK=27`, the build before the master merge) |
+| Seed | efficient record | fair, information only (`FAIR=1`) | fair + hands (`FAIRMASK=27`, the build before the master merge) |
 |---|---|---|---|
-| 13 | 27.0 h | running | 33.6 h, 5 deaths |
-| 101 | 27.5 h | running | 32.7 h, 4 deaths |
-| 37 | 26.2 h | running | 38.5 h, 8 deaths |
-| 71 | 27.7 h | running | 34.8 h, 4 deaths |
-| 149 | 26.6 h | running | 32.8 h, 7 deaths |
-| mean | 26.9 h | | 34.5 h (record then 27.4 h) |
+| 13 | 27.0 h, 2 deaths, 1,860 fights | 34.0 h, 3 deaths, 3,347 fights | 33.6 h, 5 deaths |
+| 101 | 27.5 h, 0, 1,789 | 29.9 h, 2, 2,420 | 32.7 h, 4 |
+| 37 | 26.2 h, 0, 2,162 | 29.7 h, 4, 2,657 | 38.5 h, 8 |
+| 71 | 27.7 h, 1, 1,706 | 27.7 h, 4, 2,139 | 34.8 h, 4 |
+| 149 | 26.6 h, 1, 1,851 | 29.5 h, 5, 3,108 | 32.8 h, 7 |
+| mean | **26.9 h**, 0.8 deaths | **30.2 h** (+12%), 3.6 deaths | 34.5 h (record then 27.4 h) |
 
-All five fair careers reach Elite. **Where the gap comes from** (seed 13, fair + hands against the record, from
-the journals): witchspace farming makes about the same points (5,250 against 5,213) but in 18.8 hours instead of
-14.3 (4.6 points a minute against 6.1). Per witchspace session, the farming itself takes 1.32 minutes against
-1.14 (fights last longer: aiming at what it can't see as well), and the trip home to dock 4.0 against 3.2
-(travel fights against pirates it has to identify first). Bounty hunting is a little slower (1.1 points a
-minute against 1.4). Deaths 4-8 a career against 1-3: each costs only the trip since the last save.
+(Hours: run_sim's ELITE line, the first whole game minute docked at a tally of 6,400 or more, as for the record.
+Journals: macbox `~/work/fair/car/v6info/s_<seed>/journal.jsonl` for fair, `~/work/eff/car/brkrear/u_<seed>/` for
+the record, `~/work/fair/car/v5fair/s_<seed>/` for fair + hands.)
 
-**Fights, splits.** Those fair careers logged ~4,000 fights each against ~1,800 for the same kills. They were
-mostly splits, not more fighting: 2,074 of seed 13's "fights" lasted under a second and scored nothing (220 in
-the record). A dot taken for a pirate was seen close up as a trader and the fight ended at once (and then the
-old rule ignored everything about for 3 minutes, 232 times); and a dot's estimated range wandering across the
-edge of reach started and stopped fights. Fixed since: in a fight it takes 3,000 more range to end it than to
-start it, and a fight over within 10 s doesn't start the 3-minute ignore. A 6-hour career on the fixed build:
-86 sub-second fights against 2,074 in the old one's 33 hours (still more than the record's rate, from traders
-looked at and let go).
+All ten fair careers reach Elite; information-only on the merged build is 30.2 hours against 26.9, and one seed
+(71) ties the record. **Where the gap comes from** (from the journals, the five information-only careers against
+the record's five): witchspace farming makes slightly more points (5,488 a career against 5,244) in 16.5 hours
+instead of 14.4 (5.55 points a minute against 6.08). Per witchspace session (seed 13), the farming itself is no
+slower (0.97 minutes against 1.10: it chains as often), but the trip home to dock takes 3.60 minutes against 3.09:
+travel fights against ships it has to identify before it engages, and a few seconds lost to each dot that turns
+out a trader. Bounty hunting makes a fifth less (1.04 points a minute against 1.30): lone pirates parked as dots
+far out, and pirate Cobras and Pythons that look like traders until they fire. Deaths 2-5 a career against 0-2;
+each costs only the trip since the last save.
+
+**Fights, splits.** The fair careers log more fights for the same kills (2,734 a career against 1,874). They're
+splits more than extra fighting: a "fight" that starts and ends within a second and scores nothing, a dot taken
+for a pirate that a closer look shows is a trader, or a dot's estimated range wandering across the edge of reach.
+The first fair careers had 2,074 of them in seed 13 (220 in the record), and then ignored everything about for 3
+minutes, 232 times. Fixed: in a fight it takes 3,000 more range to end it than to start it, and a fight over
+within 10 s doesn't start the 3-minute ignore. On the merged build there are 176-1,031 such a career (192 in the
+record's seed 13): fewer, but still the main reason the count is higher; they cost about a second each.
 
 **The fight lab** (pts per fight minute, deaths; every fight from its recorded start, its own process):
 
