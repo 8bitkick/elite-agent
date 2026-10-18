@@ -95,6 +95,11 @@ big/small, 60 witchspace) to screen; **all** = the 9327 to confirm; **careers** 
 | Go after hostiles beyond reach that keep J refused on the way to the station (CHASE=40000: steer at the nearest at full speed until it's in reach; give up on one that opens for 10 s or after a minute) | careers: 27.35 -> 27.16 h (3 of 5 faster, -0.88 to +0.14 h), deaths 3 -> 3; cruising with J refused (planet far ahead) 0.41 -> 0.38 h a career: little left to win | rejected (noise; off) |
 | Witchspace: what a visit spends (bw, 200 fights, 368 visits) | the last Thargoid dies at 12.0 s; then 4.2 s on 2.2 Thargons (0.28 pts, 3% of the visit's points); 7.5 s more to the next arrival (regen, chart, mis-jump toggle, countdown). Leaving the Thargons for the countdown would trade ~18% of visit time for 3% of points and their fire on the chart: about even | not pursued |
 | The CMA-ES fight parameters (tuned before the joystick and the planner) one at a time on the current build, 300: hit_rate 0.3/0.8, t_floor 0/0.5, w_threat 0.7/2.8, lead 4/5, pitch_iters 2.5/3.5, roll_iters 1.4/2.1, spd_far 22/32, spd_mid 25, spd_near 8, far 3000/6000, turn_off 10/25, evade_shield 0/30, ram_dist 300/600 | all within -6% .. +0.6% overall: the aim's (lead, pitch_iters, roll_iters, turn_off) lose 2-6%; the rest flat. Hints only: t_floor 0 pirates +3.0% [+0.2, +6.3], evade_shield 0 pirates +1.1%; on mid (889, pirates only): -0.2% and -0.1% | the parameters stand |
+| Chaining without a second chart visit when the way out chosen on arrival is already the chain's system (CHQ) | bw (200 witchspace): visit 23.7 -> 23.4 s, pts/min +0.9% [-0.9, +2.8], deaths 0 -> 0. Too small for careers to show | **in** (efficient; it only removes redundant work) |
+| (Career side, tried because the hours are there) No re-measuring hunts once witchspace is twice as good (EXPLORE=2: hunting runs ~1.3 pts/min to witchspace's ~6, and one session in ten was a hunt, ~4.3 h a career) | careers 26.92 -> 37.3-39.4 h, all five much slower: Thargoids pay no bounty, the hunts were paying for the fuel; without them witchspace sessions fell 6.1 -> 3.0 pts/min (543 short sessions instead of 190) | rejected (off) |
+| Risk for speed (deaths only a cost): chain the next mis-jump at lower strength, CHE/CHS 200/150, 150/100, 100/50 (was 248/200) | bw (200 witchspace): pts/min +4.0 / +7.3 / +4.3%, deaths 0. Careers, 150/100: 26.91 -> **27.90 h** (13: 27.72, 101: 26.64, 37: 27.49, 71: 27.69, 149: 29.95; all five slower), deaths 10 -> 8 | rejected: the lab's witchspace gain doesn't reach the careers |
+| Risk for speed: bail out of witchspace later (t.bail_energy 120 / 60, was 180) | bw: pts/min -0.7 / -1.6% | rejected |
+| **Risk for speed: no break-off in efficient mode** (BRKOFF; the rear-laser break-off as base) | all: pirates pts/min +4% (2-3 small +4.2%, 4+ small +4.4%), deaths 20 -> 80 (the corpus is rich in hurt starts). Careers, seeds 13, 101, 37, 71, 149: 26.91 -> **26.14 h** (26.11, 25.74, 25.80, 27.11, 25.96; 4 of 5 faster), deaths 10 -> 5; seeds 7, 21, 44, 59, 88: 26.88 -> 26.21 h (26.51, 25.28, 26.97, 26.05, 26.26; 3 of 5 faster, seed 7 -3.5 h), deaths 4 -> 3. Ten seeds: 26.90 -> 26.18 h, 7 of 10 faster | **in** (efficient; curious keeps the break-off) |
 | No break-off (brk_energy=0) | 300: pts/min +6.8%, clear -8.7%, deaths 1 -> 2; all: clear -9.3% (2-3 small -25%), pirates pts/min +8.5%, but deaths 27 -> 80 (only A 5, only B 58) | rejected (the break-off still saves lives) |
 | Fight-parameter screens on 300: spd_turn 10 (move while turning), hot 240, fire_r 2, t_switch 1.2, witchspace rear laser at any range | pts/min -3.2 / +1.6 / -1.0 / +1.3 / +1.1%, all within noise (intervals span 0) | rejected (no signal) |
 
@@ -102,13 +107,18 @@ big/small, 60 witchspace) to screen; **all** = the 9327 to confirm; **careers** 
 
 | | baseline (c36b082) | now |
 |---|---|---|
-| careers to Elite, mean of 5 | 31.46 h (30.83, 31.29, 30.59, 30.75, 33.84) | **26.92 h** (26.89, 27.34, 26.15, 27.68, 26.52) |
-| career deaths, 5 seeds | 9 | 4 |
-| all fights: pts/min | 13.09 | 15.14 (witchspace 18.31 -> 21.09, pirates up 2-29%) |
-| all fights: clear | 7.7 s | 7.2 s |
-| all fights: per kill | 2.9 s | 2.5 s |
-| all fights: damage taken | 114 | 99 |
-| all fights: deaths | 27 | 20 |
+| careers to Elite, mean of 5 | 31.46 h (30.83, 31.29, 30.59, 30.75, 33.84) | **26.14 h** (26.11, 25.74, 25.80, 27.11, 25.96) |
+| careers, 5 more seeds (7, 21, 44, 59, 88) | | 26.21 h (26.51, 25.28, 26.97, 26.05, 26.26) |
+| career deaths, 5 seeds | 9 | 5 |
+| all fights: pts/min | 13.09 | 15.21 (+16.2% [+15.1, +17.5]; witchspace 18.31 -> 21.34, pirates +2 to +29%) |
+| all fights: clear | 7.7 s | 7.2 s (-6.7%) |
+| all fights: per kill | 2.9 s | 2.5 s (-12.8%) |
+| all fights: first kill | 4.6 s | 3.8 s |
+| all fights: damage taken | 114 | 100 |
+| all fights: deaths | 27 | 20 (80 with no break-off, the efficient default now: the lab's hurt starts) |
+
+Deaths are a cost, not a limit (user, 2026-10-18): a death costs the trip since the last dock save and a reload,
+and that is already in the hours to Elite. Changes are judged on those hours.
 
 (Seeds 13, 101, 37, 71, 149, in that order. The fight numbers are the lab's; the travel reach doesn't show
 there.)

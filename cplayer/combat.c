@@ -249,6 +249,11 @@ static int opportunity(const ship_t *s, int n, int view) {
 // time to clear -6.7%, damage -8%, deaths 27 -> 20 (2-3 small packs: clear -19%, deaths 8 -> 4); careers to Elite
 // 27.35 -> 26.92 h (3 of 5 faster). Both modes (fewer deaths and faster); BRKREAR=0 for the old run
 int g_brk_rear = 1;
+// (efficient: no break-off at all. Careers to Elite, ten seeds: 26.90 -> 26.18 h, 7 of 10 faster, deaths 14 -> 8,
+// though in the lab's 9327 fights (rich in hurt starts) deaths 20 -> 80: careers seldom meet a pack that hurt. Deaths are only
+// a cost in hours. -1: by mode (curious keeps it); BRKOFF=1 on, 0 off)
+int g_brk_mode = -1;
+static int break_off_mode(void) { extern int g_curious; return g_brk_mode < 0 ? g_curious : g_brk_mode; }
 static int s_force_rear;
 
 // one frame of attacking sh: the keys, the angle off (degrees), and the view to fight in (0 front,
@@ -526,7 +531,7 @@ PT_THREAD(engage(float seconds)) {
                 static uint32_t brk_logged_at;
                 double nearest = 1e9;
                 for (int i = 0; i < nt; i++) if (dist_of(th[i]) < nearest) nearest = dist_of(th[i]);
-                if (g_cpa->brk_energy && !c_en.breaking && fsh() < g_cpa->brk_shield && energy() < g_cpa->brk_energy && ash() > 2 * fsh() + 40 &&
+                if (g_cpa->brk_energy && break_off_mode() && !c_en.breaking && fsh() < g_cpa->brk_shield && energy() < g_cpa->brk_energy && ash() > 2 * fsh() + 40 &&
                     (!g_cpa->brk_clear || nearest >= g_cpa->brk_clear) && nt >= g_cpa->brk_n) {
                     extern int g_brk_log;
                     c_en.breaking = g_brk_log != 2;      // (2: only log where it would)

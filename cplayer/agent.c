@@ -402,15 +402,19 @@ static const char *witch_why(void) {
     if (witch_hop() == NULL) return "no witch: hop";
     return choose_witch() ? "witch" : "hunt chosen";
 }
+double g_explore_ratio = 0;     // (test, EXPLORE: 0 always explore)
 static int choose_witch(void) {
     if (!witch_ready()) return 0;
     if (g_fair && !g_fair_misjump) return 0;       // (fair, without the Easter egg: no forced mis-jumps)
     if (g_curious) return g_rate[1].n * 2 <= g_rate[0].n;          // one session in three
     if (g_rate[1].n < 3) return 1;
     if (g_rate[0].n < 3) return 0;
-    // one session in ten to the other: rates change as the ship and the galaxy do
+    // one session in ten to the other: rates change as the ship and the galaxy do. (Efficient: not while one is
+    // g_explore_ratio times the other: witchspace runs ~6 pts/min to hunting's ~1.3 all career, and the
+    // re-measuring hunts were ~20 sessions, ~2.8 game hours)
     int best = rate_of(1) > rate_of(0);
-    if ((g_rate[0].n + g_rate[1].n) % 10 == 9) return !best;
+    double hi = fmax(rate_of(0), rate_of(1)), lo = fmin(rate_of(0), rate_of(1));
+    if ((g_rate[0].n + g_rate[1].n) % 10 == 9 && !(g_explore_ratio > 0 && hi > g_explore_ratio * lo)) return !best;
     return best;
 }
 static struct { double t; uint32_t f; int kind, pending; } g_sess;      // kind: -1 none

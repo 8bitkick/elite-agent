@@ -16,30 +16,30 @@ build of the emulator (Pi or Mac) for development.
 
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
-| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.9 game hours** (26.2-27.7 on five careers, 4 deaths in all) |
+| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.1 game hours** (25.7-27.1 on five careers, 5 deaths in all) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.9 game hours**, efficient + fair (27.7-32.8 on five careers) |
 | **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **117.8 game hours** (two careers), show fighting in development |
 
 All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 26.2 to 27.7 hours, fair 27.7 to 32.8, curious 116.9 to 118.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 25.7 to 27.1 hours, fair 27.7 to 32.8, curious 116.9 to 118.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
 | | Efficient (5) | Fair (5) | Curious (2) |
 |---|---|---|---|
-| Game hours to Elite | 26.9 | 29.9 | 117.8 |
-| Star systems visited | 64 | 67 | 384 |
+| Game hours to Elite | 26.1 | 29.9 | 117.8 |
+| Star systems visited | 65 | 67 | 384 |
 | Galaxies | 3 | 3 | 8 |
-| Light years flown (dock to dock) | 636 | 672 | 4,513 |
-| Docks | 352 | 361 | 1,296 |
-| Fights | 1,874 | 2,570 | 5,090 |
-| Kills | 5,547 | 5,583 | 9,493 |
-| Witchspace sessions (Thargoids) | 191 | 197 | 77 |
+| Light years flown (dock to dock) | 638 | 672 | 4,513 |
+| Docks | 342 | 361 | 1,296 |
+| Fights | 1,987 | 2,570 | 5,090 |
+| Kills | 5,469 | 5,583 | 9,493 |
+| Witchspace sessions (Thargoids) | 183 | 197 | 77 |
 | Deaths (reloaded) | 1 | 4 | 50 |
 | Escape pods used | 0 | 0 | 11 |
-| Most credits held | 36,357 Cr | 25,649 Cr | 25,152 Cr |
+| Most credits held | 32,660 Cr | 25,649 Cr | 25,152 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
@@ -65,8 +65,10 @@ hours and pay for themselves: without them it reaches Elite 4.7 hours later.
 - **No waiting about.** It fights pirates on the way in as far out as it engages in a hunt (ones
   hanging back used to block the in-system jump), and leaves witchspace after its last fight without
   recharging: 31.4 to 27.4 hours.
-- **Running fights back.** Breaking off from a pack, it flies tail-first and shoots the nearest
-  pursuer with the rear laser: 7% more points a fight minute, fewer deaths, 26.9 hours.
+- **It never runs.** It fights every fight to the end: with a save at every dock a lost fight costs
+  only the trip since, and breaking off cost more time than the deaths it saved (26.9 to 26.1 hours;
+  over ten careers 26.9 to 26.2, deaths 14 to 8). Curious mode still breaks off, flying tail-first
+  and shooting the nearest pursuer with the rear laser.
 - **No wasted trips.** Routes avoid systems the chart cursor can't select; the escape pod waits
   until it's rich.
 
@@ -100,7 +102,7 @@ git clone --recursive https://github.com/8bitkick/elite-agent.git && cd elite-ag
 rp2350-bbc-micro/scripts/setup.sh --no-build   # ROMs and disc (and the Presto toolchain)
 cplayer/build.sh                               # run_sim: a career (elsewhere than Linux: ELITE_EMU=submodule path)
 cplayer/buildlab.sh                            # lab: the fight lab
-cplayer/run_sim 2400 "" journal.jsonl          # a career, up to 2,400 game minutes; Elite in ~27 h
+cplayer/run_sim 2400 "" journal.jsonl          # a career, up to 2,400 game minutes; Elite in ~26 h
 ```
 
 It runs about 100 times faster than a real BBC Master, prints its log as it plays and writes a JSON

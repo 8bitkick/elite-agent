@@ -210,6 +210,9 @@ int main(int argc, char **argv) {
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
     { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
     { extern int g_brk_rear; if (getenv("BRKREAR")) g_brk_rear = atoi(getenv("BRKREAR")); }
+    { extern int g_chain_quick; if (getenv("CHQ")) g_chain_quick = atoi(getenv("CHQ")); }
+    { extern int g_chain_energy, g_chain_shield; if (getenv("CHE")) g_chain_energy = atoi(getenv("CHE")); if (getenv("CHS")) g_chain_shield = atoi(getenv("CHS")); }
+    { extern int g_brk_mode; if (getenv("BRKOFF")) g_brk_mode = atoi(getenv("BRKOFF")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
     {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 the information limits; FAIRHANDS=1 the hand limits too; FAIRMASK=bits (1 see, 2 dashboard, 8 stick, 16 keys)

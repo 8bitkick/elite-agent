@@ -294,6 +294,11 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
     CO_END(c_cur);
 }
 
+int g_chain_quick = -1;     // (-1: by mode, efficient only; CHQ)
+static int chain_selected(const sys_t *d) {
+    const sys_t *n = nearest_system(galaxy(), target_x(), target_y());
+    return n && n->num == d->num && is_front();
+}
 static int thg_bail(void) { combat_thg_init(); return g_cp_thg.bail_energy; }
 // chained farming: cleared, back to full strength, and the fuel covers a hop from here and a way out
 // from where a mis-jump would drop us (x, y XOR 31): mis-jump again rather than fly in and dock (a
@@ -451,8 +456,12 @@ PT_THREAD(leave_witchspace(void)) {
         if (!chain_hop()) break;
         c_lw.dest = chain_hop();
         status_("Chaining: another mis-jump, towards %s (fuel %.1f LY)", c_lw.dest->name, fuel() / 10.0);
-        CO_CALL(c_lw, select_by_cursor(c_lw.dest));
-        CO_CALL(c_lw, hold_until(K_F0, is_front, 3, "front view"));
+        // (efficient: the way out chosen on arrival is often this same system, and the chart's selection stays: no
+        // second visit to the chart, where we neither steer nor shoot)
+        if (!((g_chain_quick < 0 ? !g_curious : g_chain_quick) && chain_selected(c_lw.dest))) {
+            CO_CALL(c_lw, select_by_cursor(c_lw.dest));
+            CO_CALL(c_lw, hold_until(K_F0, is_front, 3, "front view"));
+        }
         CO_CALL(c_lw, allow_misjumps());
         g_misjump = 1;
         CO_CALL(c_lw, hyperspace(c_lw.dest));

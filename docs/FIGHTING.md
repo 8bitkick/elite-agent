@@ -73,3 +73,4 @@ facing a pack can't.
 | 2026-10-18 | both | goals and metrics set; baseline = PLAN=1 default | see above | started |
 | 2026-10-18 | efficient | travel fights at the engage range (not 9000), no regen before leaving witchspace without a chain | careers 31.5 -> 27.4 h (5 of 5 faster), deaths 9 -> 3; lab witchspace pts/min +9% | in |
 | 2026-10-18 | both | break off on the rear laser (the run from a pack as a rear-view attack) | all fights pts/min +7.4%, clear -6.7%, deaths 27 -> 20; careers 27.35 -> 26.92 h | in |
+| 2026-10-18 | efficient | no break-off (deaths a cost, not a limit) | careers 26.90 -> 26.18 h over ten seeds (7 of 10 faster), deaths 14 -> 8; lab deaths 20 -> 80 | in |
