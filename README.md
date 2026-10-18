@@ -5,10 +5,6 @@ the machine's RAM and plays only through the keyboard and the analogue joystick 
 option). It runs standalone on the Pimoroni Presto (RP2350) inside the BBC Master emulator firmware,
 and on a native build of the same emulator (Pi or Mac) for development.
 
-Reading RAM instead of the screen saves recognising pixels, but it also exposes bytes the screen never
-shows, like an enemy's energy. [`docs/IO.md`](docs/IO.md) lists everything the agent reads and presses
-and how much of it a player could see; **fair mode** below plays with only that.
-
 | | | |
 |---|---|---|
 | ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
@@ -18,7 +14,7 @@ and how much of it a player could see; **fair mode** below plays with only that.
 
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
-| **Efficient** | straight for Elite | **26.9 game hours** (26.2-27.7 on five careers, 4 deaths in all) |
+| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.9 game hours** (26.2-27.7 on five careers, 4 deaths in all) |
 | **Fair** (a switch, with either mode) | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | 34.5 hours, efficient + fair (32.7-38.5 on five careers) |
 | **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | 117.8 hours (two careers), show fighting in development |
 
