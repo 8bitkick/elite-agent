@@ -212,6 +212,25 @@ int main(int argc, char **argv) {
     { extern int g_brk_rear; if (getenv("BRKREAR")) g_brk_rear = atoi(getenv("BRKREAR")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
+    {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 all of it; FAIRMASK=bits for a part (1 see, 2 dashboard, 8 stick, 16 keys)
+        extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
+        if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 27;
+        if (getenv("FAIRMASK")) g_fair = atoi(getenv("FAIRMASK"));
+        if (getenv("FAIRMJ")) g_fair_misjump = atoi(getenv("FAIRMJ"));
+        if (getenv("FAIRSTICK")) g_fair_stick_rate = atoi(getenv("FAIRSTICK"));
+        if (getenv("FAIRNOISE")) g_fair_noise = atof(getenv("FAIRNOISE"));
+        if (getenv("FAIRCAP")) g_fair_key_cap = atoi(getenv("FAIRCAP"));
+        if (getenv("FAIRGAP")) g_fair_key_gap = atoi(getenv("FAIRGAP"));
+        if (getenv("FAIRP")) {      // fair-mode tests: name=value,... (fair_set_param)
+            extern int fair_set_param(const char *name, double v);
+            char *fp = strdup(getenv("FAIRP")), *tok, *sv;
+            for (tok = strtok_r(fp, ",", &sv); tok; tok = strtok_r(NULL, ",", &sv)) {
+                char *eq = strchr(tok, '=');
+                if (eq) { *eq = 0; if (!fair_set_param(tok, atof(eq + 1))) fprintf(stderr, "FAIRP: unknown %s\n", tok); }
+            }
+        }
+    }
+    { extern int g_fair_check; g_fair_check = getenv("FAIRCHK") ? atoi(getenv("FAIRCHK")) : 0; }
     size_t sz = beeb_state_size();
     uint8_t *st = malloc(sz);
     char path[512];
@@ -562,6 +581,22 @@ int main(int argc, char **argv) {
         if (getenv("PHASES")) fprintf(stderr, "PHASES %d %d %d %d %d DMG %d %d %d %d %d\n", dg.ph[0], dg.ph[1], dg.ph[2], dg.ph[3], dg.ph[4],
                                       dmg_ph[0], dmg_ph[1], dmg_ph[2], dmg_ph[3], dmg_ph[4]);
         fflush(stdout);
+    }
+    if (getenv("FAIRCHK")) {
+        extern long g_fair_chk[10][4];
+        long (*c)[4] = g_fair_chk;
+        fprintf(stderr, "FAIRCHK hostile: seen hostile %ld, seen not %ld, unseen %ld | not hostile: seen hostile %ld, seen not %ld, unseen %ld | "
+                "energy err %.1f, position err %.0f at range %.0f (%ld hostile frames)\n", c[1][1], c[1][0], c[1][2], c[0][1], c[0][0], c[0][2],
+                c[2][0] ? (double) c[2][1] / c[2][0] : 0, c[2][0] ? (double) c[2][2] / c[2][0] : 0, c[2][0] ? (double) c[2][3] / c[2][0] : 0, c[2][0]);
+        fprintf(stderr, "FAIRDIR all: off %.2f deg, within the hit radius %.1f%% (%ld) | on screen: off %.2f deg, within %.1f%% (%ld)\n",
+                c[3][0] ? c[3][1] / 1000.0 / c[3][0] : 0, c[3][0] ? 100.0 * c[3][2] / c[3][0] : 0, c[3][0],
+                c[4][0] ? c[4][1] / 1000.0 / c[4][0] : 0, c[4][0] ? 100.0 * c[4][2] / c[4][0] : 0, c[4][0]);
+        fprintf(stderr, "FAIRSPD hostiles' speed: error %.2f, true %.2f, top %.2f (%ld)\n", c[5][0] ? (double) c[5][1] / c[5][0] : 0,
+                c[5][0] ? (double) c[5][2] / c[5][0] : 0, c[5][0] ? (double) c[5][3] / c[5][0] : 0, c[5][0]);
+        fprintf(stderr, "FAIRLAT motion across the line of sight: drawn: error %.2f of %.2f (%ld) | dots and scanner: error %.2f of %.2f (%ld)\n",
+                c[6][0] ? c[6][1] / 10.0 / c[6][0] : 0, c[6][0] ? c[6][2] / 10.0 / c[6][0] : 0, c[6][0],
+                c[7][0] ? c[7][1] / 10.0 / c[7][0] : 0, c[7][0] ? c[7][2] / 10.0 / c[7][0] : 0, c[7][0]);
+        fprintf(stderr, "FAIRLAT2 dots on the screen: error %.2f of %.2f (%ld)\n", c[8][0] ? c[8][1] / 10.0 / c[8][0] : 0, c[8][0] ? c[8][2] / 10.0 / c[8][0] : 0, c[8][0]);
     }
     fprintf(stderr, "TGT episodes %d gone %d switched_unacquired %d switched_acquired %d lock_losses %d\n",
             s_aim.episodes, s_aim.gone, s_aim.sw_unacq, s_aim.sw_acq, s_aim.lock_losses);

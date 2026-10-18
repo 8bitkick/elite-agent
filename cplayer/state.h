@@ -5,6 +5,8 @@
 #include "elite_ram.h"
 
 extern player_io_t *IO;
+extern int g_fair;                  // (fair.h: FAIR_DASH 2 the dashboard as drawn; any bit: our own stick from our hand)
+extern int g_own_jx, g_own_jy;
 static inline uint8_t R(uint16_t a) { return IO->ram[a]; }
 static inline uint16_t R16(uint16_t a) { return (uint16_t)(IO->ram[a] | IO->ram[a + 1] << 8); }
 
@@ -29,15 +31,16 @@ static inline int missiles(void) { return R(A_NOMSL); }
 static inline double tally(void) { return R16(A_TALLY) + R(A_TALLYL) / 256.0; }
 static inline int legal(void) { return R(A_FIST); }
 static inline int mission(void) { return R(A_TP); }
-static inline int energy(void) { return R(A_ENERGY); }
-static inline int fsh(void) { return R(A_FSH); }
-static inline int ash(void) { return R(A_ASH); }
+// (fair mode: as the bars show them: the energy banks to 4, the shields to 16)
+static inline int energy(void) { return (g_fair & 2) ? R(A_ENERGY) / 4 * 4 + 2 : R(A_ENERGY); }
+static inline int fsh(void) { return (g_fair & 2) ? R(A_FSH) / 16 * 16 + 8 : R(A_FSH); }
+static inline int ash(void) { return (g_fair & 2) ? R(A_ASH) / 16 * 16 + 8 : R(A_ASH); }
 static inline int speed(void) { return R(A_DELTA); }
-static inline int altitude(void) { return R(A_ALTIT); }
-static inline int laser_temp(void) { return R(A_GNTMP); }
+static inline int altitude(void) { return (g_fair & 2) ? R(A_ALTIT) / 16 * 16 + 8 : R(A_ALTIT); }
+static inline int laser_temp(void) { return (g_fair & 2) ? R(A_GNTMP) / 16 * 16 + 8 : R(A_GNTMP); }
 static inline int hyperspace_count(void) { return R(A_QQ22 + 1); }
-static inline int jstx(void) { return R(A_JSTX); }
-static inline int jsty(void) { return R(A_JSTY); }
+static inline int jstx(void) { return g_fair && g_own_jx >= 0 ? g_own_jx : R(A_JSTX); }
+static inline int jsty(void) { return g_fair && g_own_jy >= 0 ? g_own_jy : R(A_JSTY); }
 static inline int mcnt(void) { return R(A_MCNT); }
 static inline int has_ecm(void) { return R(A_ECM) != 0; }
 static inline int has_scoops(void) { return R(A_BST) != 0; }

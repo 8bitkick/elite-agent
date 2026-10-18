@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "fair.h"
 #include "docked.h"
 #include "galaxy.h"
 
@@ -239,6 +240,7 @@ PT_THREAD(save_commander(const char *name)) {
     // the game copies the commander to NA% (what a death restores) before the disc write
     if (memcmp(IO->ram + A_NA_PC + 8, IO->ram + A_TP, 73)) logf_("save: the copy doesn't match");
     note("{\"event\": \"save\", \"tally\": %.2f, \"cash\": %.1f}", tally(), cash() / 10.0);
+    fair_saved();
     CO_END(c_save);
 }
 
@@ -297,6 +299,7 @@ PT_THREAD(reload(void)) {
         hold_none();
     }
     CO_CALL(c_rl, from_title());
+    fair_reloaded();
     CO_END(c_rl);
 }
 
@@ -306,6 +309,7 @@ PT_THREAD(after_death(void)) {
     hold_none();
     CO_CALL(c_ad, wait_for(is_title1, 30, "title after death"));
     CO_CALL(c_ad, from_title());
+    fair_reloaded();
     CO_END(c_ad);
 }
 

@@ -11,6 +11,7 @@
 #include "flight.h"
 #include "pilot.h"
 #include "galaxy.h"
+#include "fair.h"
 
 #define NAME "CLAUDE"
 static const int ORARRA[2] = {144, 33}, CEERDI[2] = {215, 84}, BIRERA[2] = {63, 72};
@@ -58,7 +59,7 @@ static int m2(void) { return (mission() >> 2) & 3; }
 // (test) efficient without the missions: rank is the kill tally alone; the missions' galactic hyperdrive
 // meant ~4 game hours of trading in the first 15, with no farming meanwhile
 int g_no_missions;
-static int m2_due(void) { return !g_no_missions && m1() == 2 && m2() == 0 && tally() >= 1280; }
+static int m2_due(void) { return !g_no_missions && m1() == 2 && m2() == 0 && tally_seen() >= 1280; }
 static int explore_galaxy(void) { return g_curious && m1() == 2 && m2() == 3 && galaxy() < 7 && seen_count(galaxy()) >= EXPLORE_SEEN; }
 static int wants_hyperdrive(void) {
     return !has_hyperdrive() && ((!g_no_missions && m1() == 1 && galaxy() == 0) || (m2_due() && galaxy() == 1) || explore_galaxy());
@@ -280,7 +281,7 @@ PT_THREAD(hunt(float minutes)) {
         CO_CALL(c_hunt, fight_if_needed(&c_hunt.fought));
         if (c_hunt.fought) continue;
         static ship_t sh[NOSH];
-        int n = ships_read(IO->ram, sh);
+        int n = see_ships(sh);
         const ship_t *pl = find_planet(sh, n);
         keyset_t keys = {{0}, 0};
         steer(pl ? (vec_t){-pl->x, -pl->y, -pl->z} : (vec_t){0, 0, 1}, jstx(), jsty(), 3, 3, &keys);
@@ -293,7 +294,7 @@ PT_THREAD(hunt(float minutes)) {
         {
             static ship_t sh[NOSH];
             const ship_t *t[1];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             if (threats(sh, n, g_cp.engage_range, t, 1)) goto fight;     // (engage's own range: further off, it'd stop at once)
             if (tonnes_held() > c_hunt.held) {
                 c_hunt.scooped += tonnes_held() - c_hunt.held;
@@ -403,6 +404,7 @@ static const char *witch_why(void) {
 }
 static int choose_witch(void) {
     if (!witch_ready()) return 0;
+    if (g_fair && !g_fair_misjump) return 0;       // (fair, without the Easter egg: no forced mis-jumps)
     if (g_curious) return g_rate[1].n * 2 <= g_rate[0].n;          // one session in three
     if (g_rate[1].n < 3) return 1;
     if (g_rate[0].n < 3) return 0;
@@ -489,7 +491,7 @@ PT_THREAD(trip(void)) {
     }
     note("{\"event\": \"trip\", \"why\": \"%s\"}", witch_why());
     if (choose_witch()) {
-        g_sess.t = tally(), g_sess.f = now(), g_sess.kind = 1;
+        g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 1;
         CO_CALL(c_trip, witch());
         g_sess.pending = 1;          // (scored once docked again: a reload in between takes its points back)
         CO_EXIT(c_trip);
@@ -511,7 +513,7 @@ PT_THREAD(trip(void)) {
             CO_CALL(c_trip, refuel());
             CO_CALL(c_trip, shop());
             CO_CALL(c_trip, save_ours());
-            g_sess.t = tally(), g_sess.f = now(), g_sess.kind = 0;
+            g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 0;
             CO_CALL(c_trip, hunt(5));
             g_sess.pending = 1;
             CO_EXIT(c_trip);
@@ -601,7 +603,7 @@ PT_THREAD(career(void)) {
         mark_seen();
         s_played = 1;
         if (g_sess.kind >= 0) {         // (the last session is over, whether it came back or died)
-            rate_add(g_sess.kind, tally() - g_sess.t, now() - g_sess.f);
+            rate_add(g_sess.kind, tally_seen() - g_sess.t, now() - g_sess.f);
             g_sess.kind = -1, g_sess.pending = 0;
         }
         {
@@ -630,6 +632,7 @@ PT_THREAD(career(void)) {
 
 void player_init(player_io_t *io) {
     IO = io;
+    fair_reset();
     g_sess.kind = -1;
     g_fail = NULL;
     g_gen++;
@@ -638,6 +641,7 @@ void player_init(player_io_t *io) {
 }
 
 void player_frame(void) {
+    fair_begin_frame();         // (fair mode: what the player sees, and when)
     drv_frame_start();          // (a death sets g_fail)
     if (g_fail) {
         int died = !strcmp(g_fail, "died");
@@ -656,6 +660,7 @@ void player_frame(void) {
         c_car.gen = g_gen;
     }
     career();
+    fair_end_frame();
 }
 
 // ---- the fight lab (cplayer/lab.c): from a snapshot taken at a fight's start, fight (and in
@@ -669,7 +674,7 @@ int g_lab_undamped;
 static int lab_threats(int rng) {
     static ship_t sh[NOSH];
     const ship_t *t[1];
-    int n = ships_read(IO->ram, sh);
+    int n = see_ships(sh);
     return threats(sh, n, rng, t, 1);
 }
 PT_THREAD(lab(void)) {
@@ -700,6 +705,7 @@ PT_THREAD(lab(void)) {
 extern int g_depart_y;
 void player_lab_init(player_io_t *io) {
     IO = io;
+    fair_reset();
     g_fail = NULL;
     g_gen++;
     c_lab.pt.lc = 0;
@@ -713,9 +719,11 @@ void player_lab_init(player_io_t *io) {
 }
 const char *g_lab_why;
 int player_lab_frame(void) {        // 1 when finished (or dead: g_fail "died")
+    fair_begin_frame();
     drv_frame_start();
-    if (g_fail) { g_lab_why = g_fail; return 1; }
+    if (g_fail) { g_lab_why = g_fail; fair_end_frame(); return 1; }
     lab();
     if (g_fail) g_lab_why = g_fail;
+    fair_end_frame();
     return g_lab_done || g_fail != NULL;
 }

@@ -10,6 +10,7 @@
 //   player start | stop
 //   player load <name>               a commander from the disc, when next docked
 //   player mode efficient|curious   how it plays: straight for Elite, or seeing the galaxy
+//   player fair on|off           fair mode, with either: only what a human could see, at a human's speed (docs/FAIR.md)
 //   player log <0|1|2>           its USB log: STATUS lines only, + PLAYER (default), + DEBUG
 //   player status                a line: rank, tally, play time, kills, deaths
 // The web page shows its panel (machine_program_json): progress to Elite, where it is, the totals.
@@ -39,6 +40,7 @@ static uint32_t s_boot_frames, s_us_max, s_us_sum, s_n;
 static uint32_t s_last_frame;
 static int s_level = PLOG_INFO;
 extern int g_curious;
+extern int g_fair;
 
 // the totals, from the player's journal and status lines (it keeps playing; these only watch): for
 // this career (this commander) and since boot. In RAM only: nothing is written to flash but what
@@ -223,6 +225,13 @@ bool machine_command_hook(const char *cmd, char *reply, uint32_t reply_size)
         else if (!strcmp(a + 5, "efficient")) g_curious = 0;
         else { snprintf(reply, reply_size, "AGENT mode efficient|curious"); return true; }
         snprintf(reply, reply_size, "AGENT mode %s (from its next decision)", g_curious ? "curious" : "efficient");
+    } else if (!strncmp(a, "fair", 4) && (!a[4] || a[4] == ' ')) {
+        const char *v = a[4] ? a + 5 : "";
+        if (!strcmp(v, "on")) g_fair = 27;
+        else if (!strcmp(v, "off")) g_fair = 0;
+        else if (!*v) g_fair = g_fair ? 0 : 27;
+        else { snprintf(reply, reply_size, "AGENT fair on|off"); return true; }
+        snprintf(reply, reply_size, "AGENT fair %s (from the next frame)", g_fair ? "on" : "off");
     } else if (!strncmp(a, "log ", 4)) {
         int l = atoi(a + 4);
         s_level = l < 0 ? 0 : l > PLOG_DEBUG ? PLOG_DEBUG : l;
@@ -244,11 +253,11 @@ bool machine_command_hook(const char *cmd, char *reply, uint32_t reply_size)
         char t[16];
         hms(t, sizeof t, s_tot.car.frames);
         double ty = s_on ? tally() : 0;
-        snprintf(reply, reply_size, "AGENT %s %s %s, %s, tally %.1f of 6400, played %s, kills %lu, deaths %lu, pods %lu",
-                 s_tot.name, s_on ? "on" : "off", g_curious ? "curious" : "efficient", rank_of(ty), ty, t,
+        snprintf(reply, reply_size, "AGENT %s %s %s%s, %s, tally %.1f of 6400, played %s, kills %lu, deaths %lu, pods %lu",
+                 s_tot.name, s_on ? "on" : "off", g_curious ? "curious" : "efficient", g_fair ? " fair" : "", rank_of(ty), ty, t,
                  (unsigned long) s_tot.car.kills, (unsigned long) s_tot.car.deaths, (unsigned long) s_tot.car.pods);
     } else {
-        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, name <NAME>, log 0|1|2, status, save");
+        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, fair on|off, name <NAME>, log 0|1|2, status, save");
     }
     return true;
 }
@@ -290,14 +299,15 @@ const char *machine_program_json(void)
         "\"progress\":{\"label\":\"To Elite: %.1f of 6400\",\"value\":%.1f,\"max\":6400},"
         "\"actions\":[{\"label\":\"%s\",\"cmd\":\"agent %s\",\"on\":%s},"
         "{\"label\":\"Efficient\",\"cmd\":\"agent mode efficient\",\"on\":%s},"
-        "{\"label\":\"Curious\",\"cmd\":\"agent mode curious\",\"on\":%s}],\"log\":[",
-        s_tot.name, in_game ? s_tot.cmdr : "-", rank_of(ty), ty, cr, where, doing, g_curious ? "curious" : "efficient", t,
+        "{\"label\":\"Curious\",\"cmd\":\"agent mode curious\",\"on\":%s},"
+        "{\"label\":\"Fair\",\"cmd\":\"agent fair %s\",\"on\":%s}],\"log\":[",
+        s_tot.name, in_game ? s_tot.cmdr : "-", rank_of(ty), ty, cr, where, doing, g_curious ? (g_fair ? "curious, fair" : "curious") : (g_fair ? "efficient, fair" : "efficient"), t,
         (unsigned long) s_tot.car.kills, (unsigned long) s_tot.car.deaths, (unsigned long) s_tot.car.pods,
         (unsigned long) s_tot.car.fights, (unsigned long) s_tot.car.docks,
         (unsigned long) s_tot.careers, tl, (unsigned long) s_tot.life.kills, (unsigned long) s_tot.life.deaths,
         (unsigned long) s_tot.resets, ty, ty,
         s_on ? "Stop" : "Start", s_on ? "stop" : "start", s_on ? "true" : "false",
-        g_curious ? "false" : "true", g_curious ? "true" : "false");
+        g_curious ? "false" : "true", g_curious ? "true" : "false", g_fair ? "off" : "on", g_fair ? "true" : "false");
     for (int i = s_logn - 1, k = 0; i >= 0 && k < LOGN && n < (int) sizeof j - 220; i--, k++) {
         jstr(q, sizeof q, s_log[i % LOGN]);
         n += snprintf(j + n, sizeof j - n, "%s%s", k ? "," : "", q);

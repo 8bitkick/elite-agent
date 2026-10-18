@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pilot.h"
+#include "fair.h"
 #include "keyq.h"
 #include "flight.h"
 #include "galaxy.h"
@@ -149,6 +150,18 @@ static int pl_in(const pl_t *p, double r2) { return p->z > 0 && p->x * p->x + p-
 // x, y, z: the target in the view; v: its own motion per loop (view frame); r2: the hit cylinder's radius squared;
 // a0, b0: the rates the stick gives now. Out: the rates to ask for. Returns the predicted loops to the sights
 // one rollout: (al, be) held for `hold` loops (al = 99: the base law throughout), then the base law
+static int jx_for_alpha(int a);
+static int jy_for_beta(int b);
+// (fair mode: a hand moves the stick at most s_pl_lim units a game loop: the first loop of a plan gets only that far
+// from where the stick is, s_pl_jx/jy. 0: the stick goes anywhere at once)
+static int s_pl_lim, s_pl_jx, s_pl_jy;
+static void pl_limit(int *al, int *be) {
+    if (!s_pl_lim) return;
+    int jx = jx_for_alpha(*al), jy = jy_for_beta(*be), dx = jx - s_pl_jx, dy = jy - s_pl_jy;
+    dx = dx > s_pl_lim ? s_pl_lim : dx < -s_pl_lim ? -s_pl_lim : dx;
+    dy = dy > s_pl_lim ? s_pl_lim : dy < -s_pl_lim ? -s_pl_lim : dy;
+    *al = alpha_from_jstx(s_pl_jx + dx), *be = beta_from_jsty(s_pl_jy + dy);
+}
 static double pl_roll(pl_t p, int a0, int b0, int al0, int be0, int hold, double spd, double r2) {
     enum { H = 50 };
     pl_step(&p, a0, b0, spd);                       // (the loop already under way: the stick as it is)
@@ -163,6 +176,7 @@ static double pl_roll(pl_t p, int a0, int b0, int al0, int be0, int hold, double
         cost += atan2(hypot(p.x, p.y), p.z) * 180 / M_PI;      // (progress between whole loops)
         int al, be;
         if (al0 != 99 && k <= hold) al = al0, be = be0; else pl_policy(&p, &al, &be);
+        if (k == 1) pl_limit(&al, &be);
         pl_step(&p, al, be, spd);
     }
     return H + atan2(hypot(p.x, p.y), p.z) * 180 / M_PI + 1e-4 * cost;
@@ -197,6 +211,7 @@ static int jy_for_beta(int b) {      // ... and BETA (opposite sign to the stick
 // stick as it is. Sets *want_jx, *want_jy (joystick positions) and returns the predicted loops to get there
 double plan_stick(vec_t pos, vec_t vel, double spd, double radius, int jx, int jy, int *want_jx, int *want_jy) {
     int a, b;
+    { extern int g_fair, g_fair_stick_rate; s_pl_lim = (g_fair & 8) ? (int) (g_fair_stick_rate / fmax(g_ipf, 0.2)) : 0; s_pl_jx = jx, s_pl_jy = jy; }
     double t = plan_rates(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, spd, radius * radius, alpha_from_jstx(jx), beta_from_jsty(jy), &a, &b);
     *want_jx = jx_for_alpha(a), *want_jy = jy_for_beta(b);
     return t;
@@ -225,7 +240,7 @@ const ship_t *find_station(const ship_t *s, int n) {
 void apply_flight(keyset_t *keys) {
     if (!is_docked() && altitude() < 70) {
         static ship_t sh[NOSH];
-        int n = ships_read(IO->ram, sh);
+        int n = see_ships(sh);
         const ship_t *pl = find_planet(sh, n);
         if (pl) {
             vec_t P = pos_of(pl);
@@ -247,7 +262,7 @@ void apply_flight(keyset_t *keys) {
 int g_jump_log;             // (JLOG: why no in-system jump on the way to the station)
 static int jump_allowed(const ship_t *sh, int n) {
     if (witchspace() || R(A_SSPR)) return 0;
-    if (R(A_FRIN + 2 + R(A_JUNK)) != 0) return 0;
+    if (!(g_fair & FAIR_DASH) && R(A_FRIN + 2 + R(A_JUNK)) != 0) return 0;     // (fair: press J and see)
     const ship_t *pl = find_planet(sh, n);
     if (!pl) return 0;
     long m = labs(pl->x);
@@ -293,7 +308,7 @@ static int chase_blocker(const ship_t *sh, int n, keyset_t *keys) {
     return 1;
 }
 
-static struct { CO; double t0; int hp0;  const sys_t *to; } c_fin;
+static struct { CO; double t0; int hp0;  const sys_t *to; uint32_t f0; } c_fin;
 static uint32_t s_ignore_until;
 static int s_ignore_hp;
 int g_flee_n = 3;       // with the pulse laser, jump out from this many or more (0 off)
@@ -323,7 +338,7 @@ PT_THREAD(fight_if_needed(int *fought)) {
     {
         static ship_t sh[NOSH];
         const ship_t *t[4];
-        int n = ships_read(IO->ram, sh);
+        int n = see_ships(sh);
         if (!threats(sh, n, fight_reach(), t, 1)) CO_EXIT(c_fin);
         if (g_flee_n && laser(0) == 0x0F && !witchspace() && !hyperspace_count() && nearest_system(galaxy(), here_x(), here_y()) &&
             threats(sh, n, 30000, t, 4) >= g_flee_n)
@@ -334,9 +349,11 @@ PT_THREAD(fight_if_needed(int *fought)) {
     }
     *fought = 1;
     if (c_fin.to) { CO_CALL(c_fin, hyperspace_fighting(c_fin.to)); CO_EXIT(c_fin); }
-    c_fin.t0 = tally(), c_fin.hp0 = energy() + fsh() + ash();
+    c_fin.t0 = tally_seen(), c_fin.hp0 = energy() + fsh() + ash(), c_fin.f0 = now();
     CO_CALL(c_fin, engage(240));
-    if (tally() == c_fin.t0 && energy() + fsh() + ash() >= c_fin.hp0) {
+    // (fair mode: not when the "fight" was over within 10 s: a dot we took for a pirate turned out a trader when we
+    // saw it close. Ignoring everything for 3 minutes after that left real pirates alone: 232 times a career)
+    if (tally_seen() == c_fin.t0 && energy() + fsh() + ash() >= c_fin.hp0 && (!g_fair || now() - c_fin.f0 > 500)) {
         s_ignore_until = deadline(180);
         s_ignore_hp = energy() + fsh() + ash() - 20;
         logf_("a fight with nothing scored either way: ignoring them for 3 minutes");
@@ -376,7 +393,7 @@ PT_THREAD(to_station(float seconds)) {
         }
         {
             static ship_t sh[NOSH];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             const ship_t *pl = find_planet(sh, n);
             keyset_t keys = {{0}, 0};
             if (chase_blocker(sh, n, &keys)) ;
@@ -448,7 +465,7 @@ PT_THREAD(dock(float seconds)) {
         }
         {
             static ship_t sh[NOSH];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             if (!find_station(sh, n)) {
                 c_dk.final = 0;
                 goto need_station;
@@ -456,7 +473,7 @@ PT_THREAD(dock(float seconds)) {
         }
         {
             static ship_t sh[NOSH];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             const ship_t *st = find_station(sh, n);
             vec_t S = pos_of(st), nv = vnorm(fvec(st->nosev)), rel = vneg(S), goal;
             double along = vdot(rel, nv);

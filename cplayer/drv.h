@@ -36,6 +36,7 @@ void ks_del(keyset_t *s, uint8_t k);
 extern keyset_t g_flight;
 void hold(const keyset_t *s);       // exactly these held (sent only when they change)
 void hold_none(void);
+void drv_fair_pump(void);           // (fair mode: the hands, once a frame)
 void drv_reset_keys(void);
 extern int g_hold_ctrl;
 // what the player is doing this frame (lab diagnostics): 0 other, 1 fighting, 2 on the chart,

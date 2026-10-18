@@ -10,20 +10,20 @@ acquire 2.11 s, hold 79.2%, 27 deaths; careers to Elite 31.4 game hours (5 seeds
 
 ## 1. Efficient mode: kill fastest, reach Elite soonest
 
-**Goal:** each fight ends as soon as possible with every enemy dead and no damage the ship can't afford;
-overall, the fewest game hours from Jameson to Elite with zero deaths.
+**Goal:** each fight ends as soon as possible with every enemy dead; overall, the fewest game hours
+from Jameson to Elite. Deaths are allowed: with a save at every dock a death costs only the trip since
+and a reload, which the career hours already count, so a riskier rule that gets to Elite sooner wins.
 
 | Metric | What it is | Why |
 |---|---|---|
 | **Game hours to Elite** (primary) | `run_sim` careers, the same 5 seeds, efficient mode | the end goal |
-| Deaths (careers + all fights) | must not rise | a death costs a reload and a trip |
+| Deaths (careers + all fights) | reported, not a constraint | their cost is already in the hours |
 | Time to kill (TTK) | seconds from engage to each kill, per scenario | the per-fight goal |
 | Fight clear time | seconds until no hostiles remain | whole-battle speed |
 | pts/min | tally gained per minute of fight | combines kills and points |
 | Damage taken | energy + shields lost a fight | the cost of speed |
 
-A change is **in** when the career hours fall (or stay level with fewer deaths) and no fight scenario gets
-worse beyond its noise.
+A change is **in** when the career hours fall. Fight-lab numbers screen candidates; careers decide.
 
 ## 2. Curious mode: battles worth watching
 
@@ -41,7 +41,8 @@ it fights as in efficient mode.
 
 | Metric | What it is | Why |
 |---|---|---|
-| **Show score** (primary) | a weighted mix of the measures below, per fight | one number to tune |
+| **Size x time on screen** (primary) | per fight: seconds with an enemy drawn 20 px or more (and 40 px), and the largest enemy's drawn size summed over frames, per fight minute | what makes a fight worth watching is how big and for how long the enemies are on screen; distance shots don't do it |
+| Show score | a weighted mix of the measures below, per fight | tie-breakers once size x time is there |
 | Screen presence | % of fight frames with ≥1 enemy drawn in the view on screen (front, rear, left or right); mean ships on screen | the viewer sees the fight |
 | Closeness | mean distance of on-screen enemies; frames with one big on screen (near) | close is exciting |
 | Technique variety | distinct techniques a fight (front/rear laser, missile, ECM, energy bomb, flyby, loop, roll-under, bait, a side glance at a pass), views used, entropy across fights | not one trick every time |

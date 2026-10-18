@@ -1,6 +1,7 @@
 #include "flight.h"
 #include "docked.h"
 #include "pilot.h"
+#include "fair.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -196,7 +197,7 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
             // bailing out of witchspace: run, don't fight (engage() would give up at once and leave
             // us sitting still): full speed straight away from them, jinking
             static ship_t sh[NOSH];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             vec_t away = {0, 0, 1};
             double sx = 0, sy = 0, sz = 0;
             for (int i = 0; i < n; i++)
@@ -273,10 +274,15 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
                 hold(&none);
             }
             CO_CALL(c_cur, idle(4));
+            if (g_fair) CO_CALL(c_cur, idle(4));     // (a hand: the stick takes a few frames to get there)
             {
                 int ndx = c_cur.dest->x - target_x(), ndy = c_cur.dest->y - target_y();
                 if (px && abs(ndx) > abs(dx) && target_x() != c_cur.x0) sx = -sx;
                 if (py && abs(ndy) > abs(dy) && target_y() != c_cur.y0) sy = -sy;
+                // (fair mode: and pushed against the chart's edge, it doesn't move at all: the other way. A noisy stick
+                // once taught it the wrong way and it sat at x 255 until the career gave up on it)
+                if (g_fair && px && target_x() == c_cur.x0 && (target_x() <= 1 || target_x() >= 254)) sx = -sx;
+                if (g_fair && py && target_y() == c_cur.y0 && (target_y() <= 1 || target_y() >= 254)) sy = -sy;
             }
         } else {
             CO_CALL(c_cur, press(c_cur.key, 2, 1));
@@ -318,7 +324,7 @@ static const sys_t *chain_hop(void) {
 // launched Thargon isn't flagged yet: we chained into one and died on the chart)
 static int danger_near(void) {
     static ship_t sh[NOSH];
-    int n = ships_read(IO->ram, sh);
+    int n = see_ships(sh);
     for (int i = 0; i < n; i++) {
         const ship_t *q = &sh[i];
         if (!ship_in_space(q) || ship_dead(q)) continue;
@@ -389,7 +395,7 @@ PT_THREAD(leave_witchspace(void)) {
         {
             static ship_t sh[NOSH];
             const ship_t *t[1];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             g_bail_energy = thg_bail();
             // (no military laser: three Thargoids at 240 energy each are out of reach, so don't fight
             // at all: out at once, running through the countdown. A random mis-jump early in the career
@@ -413,7 +419,7 @@ PT_THREAD(leave_witchspace(void)) {
             static ship_t sh[NOSH];
             const ship_t *t[1];
             for (;;) {
-                int n = ships_read(IO->ram, sh);
+                int n = see_ships(sh);
                 if (threats(sh, n, 60000, t, 1) || danger_near() || full_strength() || expired(c_lw.until)) break;
                 if (now() % 50 == 0) for (int i = 0; i < n; i++) if (ship_in_space(&sh[i]))
                     dbgf_("regen: slot %d type %d dist %.0f newb %02x flags %02x E %d", sh[i].slot, sh[i].type,
@@ -438,7 +444,7 @@ PT_THREAD(leave_witchspace(void)) {
                 }
                 CO_YIELD(c_lw);
             }
-            if (threats(sh, ships_read(IO->ram, sh), 60000, t, 1) || danger_near()) continue;
+            if (threats(sh, see_ships(sh), 60000, t, 1) || danger_near()) continue;
         }
         { keyset_t k = {{0}, 0}; apply_flight(&k); }       // (let go: a held flight key blocks the view keys)
         if (!full_strength() || danger_near()) break;

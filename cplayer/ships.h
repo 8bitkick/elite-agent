@@ -16,7 +16,9 @@ typedef struct {
     float nosev[3], roofv[3], sidev[3];   // 1.0 = &6000
     int speed, accel, roll, pitch;
     uint8_t flags31, ai, energy, newb;
+    uint8_t vis, cls, id;           // what's known of it (VIS_*; ships_read: everything), its scanner colour, and (fair.c) which ship it is
 } ship_t;
+enum { VIS_TYPE = 1, VIS_HEAD = 2, VIS_SCREEN = 4, VIS_NOW = 8, VIS_LOOK = 16 };     // (VIS_LOOK: fair mode, only to go and look at)
 
 typedef struct {
     const char *name;

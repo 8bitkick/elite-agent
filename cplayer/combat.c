@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "pilot.h"
+#include "fair.h"
 #include "keyq.h"
 #include "flight.h"
 
@@ -357,7 +358,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
-    if (near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0) ks_add(keys, K_FIRE);
+    if (near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK)) ks_add(keys, K_FIRE);
     else if (g_opp_fire && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
     {
         extern int g_steer_log;
@@ -376,7 +377,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
 
 static int is_docked_or_briefing(void) { return is_docked() || briefing(); }
 
-static struct { CO; uint32_t until; int target, missile_at, view, breaking; uint8_t key; double tally0; int energy0, energy_min, kills, scn_n, ttype, tries; double tx, ty, tz; } c_en;
+static struct { CO; uint32_t until; int target, missile_at, view, breaking; uint8_t key; double tally0; int energy0, energy_min, kills, scn_n, ttype, tries, tid; double tx, ty, tz; } c_en;
 int combat_target(void) { return c_en.target; }     // (for the lab's aiming measures)
 
 // status lines for the fight: each hostile announced when it appears and when it blows up. By
@@ -444,11 +445,13 @@ PT_THREAD(engage(float seconds)) {
         {
             static ship_t sh[NOSH];
             const ship_t *th[NOSH];
-            int n = ships_read(IO->ram, sh);
+            int n = see_ships(sh);
             announce(sh, n);
             if (energy() < c_en.energy_min) c_en.energy_min = energy();
             // (in witchspace, every Thargoid about: they keep shooting while we pick a way out)
-            int nt = threats(sh, n, witchspace() ? 60000 : g_cp.engage_range, th, NOSH);
+            // (fair mode: a little further to stay in a fight than to start one: a dot's estimated range wanders,
+            // and at the edge of reach fights started and stopped every few frames)
+            int nt = threats(sh, n, witchspace() ? 60000 : g_cp.engage_range + (g_fair ? g_fair_stay : 0), th, NOSH);
             // in witchspace there's no escape pod: below g_bail_energy, stop and let the caller jump out
             // (the countdown is 15 s of being shot at: with more of them, go sooner. A fixed 180 left us at
             // 176 among six, dead before the jump)
@@ -473,6 +476,9 @@ PT_THREAD(engage(float seconds)) {
             if (c_en.target >= 0 && c_en.ttype) {
                 const ship_t *f = NULL;
                 double fd = 2500;
+                if (g_fair & FAIR_SEE) {        // (as perceived: the ship we've been following, whatever we now think it is)
+                    for (int i = 0; i < nt; i++) if (th[i]->id == c_en.tid) f = th[i];
+                } else
                 for (int i = 0; i < nt; i++) if (th[i]->type == c_en.ttype) {
                     double dx = th[i]->x - c_en.tx, dy = th[i]->y - c_en.ty, dz = th[i]->z - c_en.tz, d = sqrt(dx * dx + dy * dy + dz * dz);
                     if (d < fd) fd = d, f = th[i];
@@ -506,7 +512,7 @@ PT_THREAD(engage(float seconds)) {
             }
             const ship_t *t = NULL;
             for (int i = 0; i < nt; i++) if (th[i]->slot == c_en.target) t = th[i];
-            if (t) c_en.ttype = t->type, c_en.tx = t->x, c_en.ty = t->y, c_en.tz = t->z; else c_en.ttype = 0;
+            if (t) c_en.ttype = t->type, c_en.tid = t->id, c_en.tx = t->x, c_en.ty = t->y, c_en.tz = t->z; else c_en.ttype = 0;
             keyset_t keys = {{0}, 0};
             int view;
             double off;
@@ -647,8 +653,10 @@ PT_THREAD(engage(float seconds)) {
                 if (missiles() && t->type != 1 && ((cheap && enemies >= 3) || energy() < 150) &&
                     c_en.missile_at != t->slot) {
                     int mstg = R(A_MSTG);
+                    // (fair: the indicator says it's locked; on what, the ship that was in our sights then)
+                    if ((g_fair & FAIR_DASH) && mstg != 0xFF) mstg = fair_lock_slot() >= 0 ? fair_lock_slot() : 0xFE;
                     if (mstg == 0xFF && R(A_MSAR) == 0 && off < 20) c_en.key = K_TARGET;
-                    else if (mstg == c_en.target) { c_en.missile_at = c_en.target; c_en.key = K_MISSILE; }
+                    else if (mstg == c_en.target) { c_en.missile_at = c_en.target; c_en.key = K_MISSILE; if (g_fair) fair_missile_fired(); }
                     else if (mstg != 0xFF && mstg != c_en.target) c_en.key = K_UNARM;
                 }
             }

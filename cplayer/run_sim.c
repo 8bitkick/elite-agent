@@ -280,6 +280,24 @@ int main(int argc, char **argv) {
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
+    {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 all of it; FAIRMASK=bits for a part (1 see, 2 dashboard, 8 stick, 16 keys)
+        extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
+        if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 27;
+        if (getenv("FAIRMASK")) g_fair = atoi(getenv("FAIRMASK"));
+        if (getenv("FAIRMJ")) g_fair_misjump = atoi(getenv("FAIRMJ"));
+        if (getenv("FAIRSTICK")) g_fair_stick_rate = atoi(getenv("FAIRSTICK"));
+        if (getenv("FAIRNOISE")) g_fair_noise = atof(getenv("FAIRNOISE"));
+        if (getenv("FAIRCAP")) g_fair_key_cap = atoi(getenv("FAIRCAP"));
+        if (getenv("FAIRGAP")) g_fair_key_gap = atoi(getenv("FAIRGAP"));
+        if (getenv("FAIRP")) {      // fair-mode tests: name=value,... (fair_set_param)
+            extern int fair_set_param(const char *name, double v);
+            char *fp = strdup(getenv("FAIRP")), *tok, *sv;
+            for (tok = strtok_r(fp, ",", &sv); tok; tok = strtok_r(NULL, ",", &sv)) {
+                char *eq = strchr(tok, '=');
+                if (eq) { *eq = 0; if (!fair_set_param(tok, atof(eq + 1))) fprintf(stderr, "FAIRP: unknown %s\n", tok); }
+            }
+        }
+    }
     if (getenv("CP")) {     // fight parameter overrides, name=value,... (as the lab's LABP)
         char *cp = strdup(getenv("CP")), *tok, *save;
         for (tok = strtok_r(cp, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {

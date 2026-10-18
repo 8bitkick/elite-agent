@@ -90,6 +90,7 @@ static void parse_block(const uint8_t *b, int slot, int type, ship_t *s)
     s->ai = b[32];
     s->energy = b[35];
     s->newb = b[36];
+    s->vis = VIS_TYPE | VIS_HEAD | VIS_SCREEN | VIS_NOW, s->cls = 0, s->id = 0;     // (everything known)
 }
 
 int ships_read(const uint8_t *ram, ship_t out[NOSH])

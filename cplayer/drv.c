@@ -1,9 +1,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "drv.h"
 #include "keys.h"
 #include "state.h"
+#include "fair.h"
 
 player_io_t *IO;
 const char *g_fail;
@@ -37,14 +39,8 @@ int g_hold_ctrl;     // CTRL held too, whatever else is (a forced mis-jump: flig
 // 65536, JSTY = 1 + ch1 * 253 / 65536
 int g_want_jx = -1, g_want_jy = -1;
 static int joystick_on(void) { return IO && IO->analogue && R(0x2C5C) != 0; }
-static void stick_out(keyset_t *k) {
-    int jx = g_want_jx, jy = g_want_jy, rx = R(A_JSTX), ry = R(A_JSTY);
-    // (off the space view, a chart or a docked screen, the stick reads as the cursor: centred unless
-    // something's steering it there; left leaning, the chart's cursor drifted after a system was
-    // chosen and we jumped somewhere else)
-    if (R(0x81) != 0) rx = ry = 128;
-    if (jx < 0) jx = rx + (ks_has(k, K_ROLL_LEFT) ? 7 : 0) - (ks_has(k, K_ROLL_RIGHT) ? 7 : 0);
-    if (jy < 0) jy = ry + (ks_has(k, K_DIVE) ? 14 : 0) - (ks_has(k, K_CLIMB) ? 14 : 0);
+// the stick out to the port: JSTX/JSTY units (as the game will read them) to ADC values
+static void analogue_out(int jx, int jy) {
     // (the game's own options flip what the port reads: the calibration's with JSTGY &2C5A set, as
     // RESET leaves it, and JSTE &2C5B clear)
     if (R(0x2C5B)) jx = 256 - jx, jy = 256 - jy;
@@ -54,16 +50,95 @@ static void stick_out(keyset_t *k) {
     long vx = (long) (jx - 3) * 65536 / 250, vy = (long) (jy - 1) * 65536 / 253;      // (65536 at the top: clamp,
     IO->analogue(IO->ctx, 0, (uint16_t) (vx > 0xFFFF ? 0xFFFF : vx));                // not wrap to 0: full right
     IO->analogue(IO->ctx, 1, (uint16_t) (vy > 0xFFFF ? 0xFFFF : vy));                // read as full left)
+}
+// fair mode: where we've put the stick (we know our own hand), and where the hand is going
+int g_own_jx = -1, g_own_jy = -1;
+static int s_want_sx = -1, s_want_sy = -1;
+static double s_act_sx = 128, s_act_sy = 128, s_nx, s_ny;
+static void stick_out(keyset_t *k) {
+    int jx = g_want_jx, jy = g_want_jy, rx = R(A_JSTX), ry = R(A_JSTY);
+    if (g_fair && g_own_jx >= 0) rx = g_own_jx, ry = g_own_jy;
+    // (off the space view, a chart or a docked screen, the stick reads as the cursor: centred unless
+    // something's steering it there; left leaning, the chart's cursor drifted after a system was
+    // chosen and we jumped somewhere else)
+    if (R(0x81) != 0) rx = ry = 128;
+    if (jx < 0) jx = rx + (ks_has(k, K_ROLL_LEFT) ? 7 : 0) - (ks_has(k, K_ROLL_RIGHT) ? 7 : 0);
+    if (jy < 0) jy = ry + (ks_has(k, K_DIVE) ? 14 : 0) - (ks_has(k, K_CLIMB) ? 14 : 0);
+    if (g_fair & FAIR_STICK) s_want_sx = jx, s_want_sy = jy;        // (the hand moves it: drv_fair_pump)
+    else {
+        analogue_out(jx, jy);
+        g_own_jx = jx < 3 ? 3 : jx > 253 ? 253 : jx, g_own_jy = jy < 1 ? 1 : jy > 254 ? 254 : jy;
+    }
     ks_del(k, K_ROLL_LEFT), ks_del(k, K_ROLL_RIGHT), ks_del(k, K_DIVE), ks_del(k, K_CLIMB);
     g_want_jx = g_want_jy = -1;
 }
+static keyset_t s_want_keys;
+static int s_have_want;
 void hold(const keyset_t *s) {
     keyset_t k = *s;
     if (joystick_on()) stick_out(&k);
+    else g_own_jx = g_own_jy = -1;
     if (g_hold_ctrl) ks_add(&k, K_CTRL);
+    if (g_fair & FAIR_KEYS) { s_want_keys = k, s_have_want = 1; return; }    // (the fingers: drv_fair_pump)
     if (ks_same(&k, &s_held)) return;
     s_held = k;
     IO->hold(IO->ctx, k.k, k.n);
+}
+
+// fair mode, once a frame: the hand moves the stick towards where it's wanted, at most g_fair_stick_rate a
+// frame, missing by a little (motor noise, more for a bigger deflection: Harris & Wolpert's signal-dependent
+// noise); the fingers hold at most g_fair_key_cap keys (the most needed first), and no key changes twice
+// within g_fair_key_gap frames
+static uint32_t s_key_at[128], s_rng = 12345;
+static double gauss(void) {         // (deterministic: the same run twice is the same run)
+    double u = 0;
+    for (int i = 0; i < 4; i++) { s_rng = s_rng * 1103515245u + 12345u; u += (s_rng >> 8 & 0xFFFF) / 65536.0; }
+    return (u - 2) * 1.732;
+}
+static int key_rank(uint8_t c) {
+    static const uint8_t P[] = {K_CTRL, K_FIRE, K_ECM, K_JUMP, K_SPACE, K_SLOW, K_ROLL_LEFT, K_ROLL_RIGHT, K_DIVE, K_CLIMB};
+    for (int i = 0; i < (int) sizeof P; i++) if (P[i] == c) return i;
+    return 20;
+}
+void drv_fair_pump(void) {
+    if (!g_fair) return;
+    if ((g_fair & FAIR_STICK) && joystick_on() && s_want_sx >= 0) {
+        double dx = s_want_sx - 128, dy = s_want_sy - 128, a = 0.9;      // (the noise wanders over ~10 frames)
+        s_nx = a * s_nx + sqrt(1 - a * a) * (1 + g_fair_noise * fabs(dx)) * gauss();
+        s_ny = a * s_ny + sqrt(1 - a * a) * (1 + g_fair_noise * fabs(dy)) * gauss();
+        double tx = s_want_sx + s_nx, ty = s_want_sy + s_ny, r = g_fair_stick_rate;
+        s_act_sx += fmax(-r, fmin(r, tx - s_act_sx));
+        s_act_sy += fmax(-r, fmin(r, ty - s_act_sy));
+        int jx = (int) lround(s_act_sx), jy = (int) lround(s_act_sy);
+        analogue_out(jx, jy);
+        g_own_jx = jx < 3 ? 3 : jx > 253 ? 253 : jx, g_own_jy = jy < 1 ? 1 : jy > 254 ? 254 : jy;
+    }
+    if ((g_fair & FAIR_KEYS) && s_have_want) {
+        keyset_t w = s_want_keys, k = {{0}, 0};
+        for (int i = 1; i < w.n; i++)           // (most needed first)
+            for (int j = i; j > 0 && key_rank(w.k[j]) < key_rank(w.k[j - 1]); j--) { uint8_t t = w.k[j]; w.k[j] = w.k[j - 1]; w.k[j - 1] = t; }
+        int cap = g_fair_key_cap - (IO->taps_done != s_taps_sent ? 1 : 0);     // (a finger on a tapped key)
+        if (w.n > cap) w.n = (uint8_t) (cap < 0 ? 0 : cap);
+        int sent = s_held.n != 0xff;
+        for (int i = 0; i < w.n; i++)           // wanted down: down unless it went up too recently
+            if ((sent && ks_has(&s_held, w.k[i])) || IO->frame - s_key_at[w.k[i] & 127] >= (uint32_t) g_fair_key_gap) ks_add(&k, w.k[i]);
+        if (sent) for (int i = 0; i < s_held.n; i++)       // held, not wanted: up unless it went down too recently
+            if (!ks_has(&w, s_held.k[i]) && IO->frame - s_key_at[s_held.k[i] & 127] < (uint32_t) g_fair_key_gap && k.n < g_fair_key_cap) ks_add(&k, s_held.k[i]);
+        if (!sent || !ks_same(&k, &s_held)) {
+            for (int c = 0; c < 128; c++) {
+                int was = sent && ks_has(&s_held, (uint8_t) c), is = ks_has(&k, (uint8_t) c);
+                if (was != is) s_key_at[c] = IO->frame;
+            }
+            s_held = k;
+            IO->hold(IO->ctx, k.k, k.n);
+        }
+    }
+    fair_note_out(joystick_on() ? g_own_jx : -1, joystick_on() ? g_own_jy : -1, s_held.n != 0xff && ks_has(&s_held, K_FIRE));
+}
+// (fair mode: a finger taps a key for at least 4 frames down and 3 up: ~7 keys a second, a fast typist)
+static void tap(uint8_t key, int down, int up) {
+    if (g_fair & FAIR_KEYS) { if (down < 4) down = 4; if (up < 3) up = 3; }
+    IO->tap(IO->ctx, key, down, up);
 }
 
 void hold_none(void) {
@@ -123,7 +198,7 @@ static int taps_done_by(uint32_t target) { return (int32_t)(IO->taps_done - targ
 static struct { CO; uint32_t target; } c_press;
 PT_THREAD(press(uint8_t key, int down, int up)) {
     CO_BEGIN(c_press);
-    IO->tap(IO->ctx, key, down, up);
+    tap(key, down, up);
     c_press.target = ++s_taps_sent;
     CO_WAIT(c_press, taps_done_by(c_press.target));
     CO_END(c_press);
@@ -135,7 +210,7 @@ PT_THREAD(type_text(const char *text)) {
     for (const char *p = text; *p; p++) {
         int k = key_for_char(*p);
         if (k >= 0) {
-            IO->tap(IO->ctx, (uint8_t) k, 3, 4);
+            tap((uint8_t) k, 3, 4);
             s_taps_sent++;
         }
     }
@@ -166,7 +241,7 @@ PT_THREAD(hold_until(uint8_t key, cond_fn cond, float seconds, const char *what)
     CO_BEGIN(c_hu);
     c_hu.until = deadline(seconds);
     for (;;) {
-        IO->tap(IO->ctx, key, 8, 2);
+        tap(key, 8, 2);
         c_hu.target = ++s_taps_sent;
         CO_WAIT(c_hu, taps_done_by(c_hu.target));
         c_hu.step = now() + 25;
