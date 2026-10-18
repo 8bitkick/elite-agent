@@ -1,9 +1,11 @@
 # Elite agent
 
-A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build), in plain C rules. It reads
+A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build), written in pure C. It reads
 the machine's RAM and plays only through the keyboard and the analogue joystick (Elite's own joystick
-option). It runs standalone on the Pimoroni Presto (RP2350) inside the BBC Master emulator firmware,
-and on a native build of the same emulator (Pi or Mac) for development.
+option). It's self-contained: no OS, no heap, no network, no model, just rules, about 100 KB of code
+and 60 KB of RAM compiled for the RP2350's Cortex-M33. It runs on that microcontroller, a Pimoroni
+Presto, beside the BBC Master emulator, taking under 1% of each frame; the same code runs on a native
+build of the emulator (Pi or Mac) for development.
 
 | | | |
 |---|---|---|
