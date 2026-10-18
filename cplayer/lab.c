@@ -35,6 +35,10 @@ static long s_expo[5];
 long g_trk[8][4];
 static long s_ttk[4];           // frames: slewing, tracking, in the sights, no target          // gun-frames on us: all, jousting, ahead, behind; and frames
 static int s_pod0;
+// efficiency split (FX line per fight): fight frames by what the player is doing, kill times, clear time
+enum { FX_SLEW, FX_TRACK, FX_IN, FX_NOTGT, FX_BREAK, FX_MSL, FX_RAM, FX_EVADE, FX_COUNT, FX_WAITH, FX_IDLE, FX_N };
+static long s_fx[FX_N], s_fx_far, s_fx_ff, s_fx_clear, s_fx_kt[64], s_fx_arr[16];
+static int s_fx_nk, s_fx_na, s_fx_where;
 extern uint32_t g_lab_cleared, g_lab_t0, g_pause_frames;
 
 static beeb_t *B;
@@ -201,6 +205,11 @@ int main(int argc, char **argv) {
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_lab_window; if (getenv("LABWIN")) g_lab_window = atoi(getenv("LABWIN")); }
     { extern int g_plan; if (getenv("PLAN")) g_plan = atoi(getenv("PLAN")); }
+    { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
+    { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
+    { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
+    { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
+    { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
     size_t sz = beeb_state_size();
     uint8_t *st = malloc(sz);
@@ -253,6 +262,7 @@ int main(int argc, char **argv) {
         memset(e_prev, -1, sizeof e_prev); memset(dead_prev, 0, sizeof dead_prev); memset(s_down, 0, sizeof s_down);
         diag_frame(&dg, e_prev, dead_prev); dg.start_n = dg.left; dg.kills = 0; dg.present = 0;
         int prev = energy() + fsh() + ash(), dmg = 0, died = 0;
+        memset(s_fx, 0, sizeof s_fx); s_fx_far = s_fx_ff = 0; s_fx_clear = -1; s_fx_nk = s_fx_na = 0;
         g_pause_frames = 0;
         s_pod0 = has_escape_pod();
         extern int g_lab_window;
@@ -463,7 +473,37 @@ int main(int argc, char **argv) {
                 L->n = k;
             }
             int ph_now = g_phase;
+            int kills_was = dg.kills;
             if (!R(0x87)) diag_frame(&dg, e_prev, dead_prev);
+            {   // the efficiency split: what this fight frame went on
+                extern int g_en_mode;
+                static ship_t sh[NOSH];
+                int c = FX_IDLE;
+                if (ph_now == 1) {
+                    if (g_en_mode) c = FX_BREAK + g_en_mode - 1;
+                    else {
+                        int n = ships_read(io.ram, sh), tg = combat_target();
+                        c = FX_NOTGT;
+                        for (int i = 0; i < n; i++) if (sh[i].slot == tg && ship_in_space(&sh[i]) && !ship_dead(&sh[i])) {
+                            int rear = R(A_VIEW) == 1;
+                            double x = rear ? -sh[i].x : sh[i].x, z = rear ? -sh[i].z : sh[i].z, y = sh[i].y;
+                            double off = atan2(sqrt(x * x + y * y), z) * 180 / M_PI;
+                            c = in_crosshairs(&sh[i], rear) ? FX_IN : off < 10 ? FX_TRACK : FX_SLEW;
+                            if (sqrt(x * x + y * y + z * z) > 6000) s_fx_far++;
+                        }
+                    }
+                } else if (ph_now == 3 || ph_now == 4) c = FX_COUNT;
+                else if (dg.left) c = FX_WAITH;
+                s_fx[c]++;
+                if (dg.kills > kills_was) for (int k = kills_was; k < dg.kills && s_fx_nk < 64; k++) s_fx_kt[s_fx_nk++] = s_fx_ff;
+                if (s_fx_clear < 0 && !dg.left) s_fx_clear = s_fx_ff;
+                {   // arrivals (a chained mis-jump, or the way out): where we are changes
+                    int w = here_x() << 9 | here_y() << 1 | (R(A_MJ) != 0);
+                    if (s_fx_ff == 0) s_fx_where = w;
+                    else if (w != s_fx_where && s_fx_na < 16) s_fx_arr[s_fx_na++] = s_fx_ff * 2 + (R(A_MJ) != 0), s_fx_where = w;
+                }
+                s_fx_ff++;
+            }
             int now_ = energy() + fsh() + ash();
             if (now_ < prev) { dmg += prev - now_; static int byph[5]; (void) byph; dmg_ph[ph_now < 5 ? ph_now : 0] += prev - now_; }
             prev = now_;
@@ -499,6 +539,16 @@ int main(int argc, char **argv) {
         }
         if (getenv("SWWHY")) { extern long g_sw_why[4]; fprintf(stderr, "SWWHY lost %ld missile %ld better %ld back %ld\n", g_sw_why[0], g_sw_why[1], g_sw_why[2], g_sw_why[3]); }
         fprintf(stderr, "EXPO %ld %ld %ld %ld %ld\n", s_expo[0], s_expo[1], s_expo[2], s_expo[3], s_expo[4]);
+        {
+            char kt[400]; int k = 0;
+            for (int i = 0; i < s_fx_nk && k < 380; i++) k += snprintf(kt + k, sizeof kt - k, " %ld", s_fx_kt[i]);
+            kt[k] = 0;
+            fprintf(stderr, "FX %s n0 %d clear %ld frames %ld far %ld cat", path, dg.start_n, s_fx_clear, s_fx_ff, s_fx_far);
+            for (int i = 0; i < FX_N; i++) fprintf(stderr, " %ld", s_fx[i]);
+            fprintf(stderr, " kt%s arr", kt);
+            for (int i = 0; i < s_fx_na; i++) fprintf(stderr, " %ld", s_fx_arr[i]);     // (frame * 2 + 1 if into witchspace)
+            fprintf(stderr, "\n");
+        }
         fprintf(stderr, "TTK %ld %ld %ld %ld\n", s_ttk[0], s_ttk[1], s_ttk[2], s_ttk[3]);
         memset(s_ttk, 0, sizeof s_ttk);
         memset(s_expo, 0, sizeof s_expo);

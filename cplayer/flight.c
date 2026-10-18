@@ -293,6 +293,8 @@ static int thg_bail(void) { combat_thg_init(); return g_cp_thg.bail_energy; }
 // from where a mis-jump would drop us (x, y XOR 31): mis-jump again rather than fly in and dock (a
 // dock costs two minutes; the fight half a minute)
 int g_chain = 1;
+extern int g_curious;
+int g_ws_noregen = -1;      // (-1: by mode, efficient only)
 static const sys_t *chain_hop(void) {
     const sys_t *c[8];
     int d[8];
@@ -402,7 +404,9 @@ PT_THREAD(leave_witchspace(void)) {
             g_bail_energy = 0;
             CO_EXIT(c_lw);
         }
-        if (!g_chain || energy() < thg_bail()) break;
+        // (no chain to come: leave now, not after getting our strength back here, ~6 s a session; the energy unit
+        // refills on the long way to the station. Efficient mode; the lab's witchspace pts/min +7.6% on eff300)
+        if (!g_chain || energy() < thg_bail() || ((g_ws_noregen < 0 ? !g_curious : g_ws_noregen) && !chain_hop())) break;
         // cleared: get our strength back where we are (new arrivals: fight them, as above)
         c_lw.until = deadline(100);
         {

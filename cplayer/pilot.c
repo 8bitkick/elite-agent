@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,7 +113,7 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
 // held for the next loop, then the base steering law (roll it above or below, pitch flat out, stopping on it);
 // take the first step of the plan that brings it into the hit cylinder soonest (and keeps it there), re-plan
 // next loop. The first loop flies on the stick as it is (the lag)
-int g_plan;
+int g_plan = 1;
 double g_plan_hand = 0.5;       // (deg: inside max(this, 3 hit radii) the tracking law takes over; 2: acquire 143 -> 144 frames)
 static const int PL_A[] = {0, 1, -1, 2, -2, 3, -3, 8, -8, 12, -12, 16, -16, 20, -20, 24, -24, 28, -28, 31, -31};
 static const int PL_B[] = {0, 1, -1, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8};
@@ -243,6 +244,7 @@ void apply_flight(keyset_t *keys) {
     hold(&g_flight);
 }
 
+int g_jump_log;             // (JLOG: why no in-system jump on the way to the station)
 static int jump_allowed(const ship_t *sh, int n) {
     if (witchspace() || R(A_SSPR)) return 0;
     if (R(A_FRIN + 2 + R(A_JUNK)) != 0) return 0;
@@ -252,6 +254,42 @@ static int jump_allowed(const ship_t *sh, int n) {
     if (labs(pl->y) > m) m = labs(pl->y);
     if (labs(pl->z) > m) m = labs(pl->z);
     if (pl->z > 0 && m < 2 * 65536) return 0;
+    return 1;
+}
+
+// (efficient, test) on the way to the station, the in-system jump is refused while any ship but junk is about: a
+// hostile that keeps its distance beyond the travel fight's reach holds us to cruising speed for minutes. When
+// only such hostiles stand in the way, go and get them (they come into reach, or we give up on one that opens)
+int g_chase = 0;            // (the furthest to go after one; 0 off)
+static int is_junk(int t) { return (t >= 3 && t <= 10) || t == 15; }
+static int fight_reach(void);
+static int chase_blocker(const ship_t *sh, int n, keyset_t *keys) {
+    static int slot = -1, type;
+    static uint32_t since, start, gave_up_until;
+    static double d0;
+    if (!g_chase || witchspace() || R(A_SSPR) || !expired(gave_up_until)) return 0;
+    const ship_t *pl = find_planet(sh, n), *b = NULL;
+    if (!pl) return 0;
+    long m = labs(pl->x);
+    if (labs(pl->y) > m) m = labs(pl->y);
+    if (labs(pl->z) > m) m = labs(pl->z);
+    if (pl->z > 0 && m < 2 * 65536) { slot = -1; return 0; }        // (no jump here anyway)
+    double bd = 1e18;
+    for (int i = 0; i < n; i++) {
+        const ship_t *q = &sh[i];
+        if (!ship_in_space(q) || !ship_is_ship(q) || q->type == SHIP_SST || is_junk(q->type)) continue;
+        if (ship_dead(q)) return 0;                                   // (exploding: it'll be gone in a moment)
+        if (!(q->newb & NEWB_HOSTILE) && q->type != 29 && q->type != 30) return 0;   // (a trader: chasing won't free the jump)
+        double d = vlen(pos_of(q));
+        if (d < bd) bd = d, b = q;
+    }
+    if (!b || bd > g_chase || bd < fight_reach()) { slot = -1; return 0; }
+    if (b->slot != slot || b->type != type) slot = b->slot, type = b->type, since = start = now(), d0 = bd;
+    // (opening on us for 10 s, or a minute without reaching it: leave it for 3 minutes)
+    if ((now() - since > 500 && bd > d0) || now() - start > 3000) { gave_up_until = deadline(180); slot = -1; return 0; }
+    if (now() - since > 500) since = now(), d0 = bd;
+    steer(pos_of(b), jstx(), jsty(), 3, 3, keys);
+    speed_keys(speed(), 40, keys);
     return 1;
 }
 
@@ -271,6 +309,13 @@ static const sys_t *flee_to(void) {
     }
     return best;
 }
+// travelling, fight hostiles within this. They spawn ~11000 out (6400 on each axis) and chase us at about our
+// speed, while we cruise on with the in-system jump refused: the 9000 of the first C port left them closing for
+// tens of seconds at every encounter (seeds 13, 101, 37: 0.7-0.9 h a career). Efficient mode meets them at the
+// fight's own engage range (careers to Elite, with WSNOREGEN: 31.5 -> 27.4 h, all five faster, deaths 9 -> 3).
+// 0: by mode (curious keeps 9000); FIGHTR=n sets it
+int g_fight_reach = 0;
+static int fight_reach(void) { extern int g_curious; return g_fight_reach ? g_fight_reach : g_curious ? 9000 : g_cp.engage_range; }
 PT_THREAD(fight_if_needed(int *fought)) {
     CO_BEGIN(c_fin);
     *fought = 0;
@@ -279,7 +324,7 @@ PT_THREAD(fight_if_needed(int *fought)) {
         static ship_t sh[NOSH];
         const ship_t *t[4];
         int n = ships_read(IO->ram, sh);
-        if (!threats(sh, n, 9000, t, 1)) CO_EXIT(c_fin);
+        if (!threats(sh, n, fight_reach(), t, 1)) CO_EXIT(c_fin);
         if (g_flee_n && laser(0) == 0x0F && !witchspace() && !hyperspace_count() && nearest_system(galaxy(), here_x(), here_y()) &&
             threats(sh, n, 30000, t, 4) >= g_flee_n)
             c_fin.to = flee_to();
@@ -334,7 +379,8 @@ PT_THREAD(to_station(float seconds)) {
             int n = ships_read(IO->ram, sh);
             const ship_t *pl = find_planet(sh, n);
             keyset_t keys = {{0}, 0};
-            if (pl) {
+            if (chase_blocker(sh, n, &keys)) ;
+            else if (pl) {
                 vec_t P = pos_of(pl);
                 double off;
                 int want = 40;
@@ -361,6 +407,13 @@ PT_THREAD(to_station(float seconds)) {
                 if (now() - c_ts.last_log > 100) {
                     c_ts.last_log = now();
                     dbgf_("to station: planet %.0f, alt %d, off %.0f, spd %d", vlen(P), altitude(), off, speed());
+                    if (g_jump_log && !jump_allowed(sh, n)) {      // (why no in-system jump: what's in the bubble)
+                        char b[300]; int k = 0;
+                        for (int i = 0; i < n && k < 260; i++) if (ship_in_space(&sh[i]) && sh[i].type < 128)
+                            k += snprintf(b + k, sizeof b - k, " t%d d%.0f%s%s", sh[i].type, vlen(pos_of(&sh[i])), (sh[i].newb & NEWB_HOSTILE) ? "h" : "", ship_dead(&sh[i]) ? "x" : "");
+                        b[k] = 0;
+                        dbgf_("  no jump: sspr %d junk %d:%s", R(A_SSPR), R(A_JUNK), b);
+                    }
                 }
             }
             apply_flight(&keys);

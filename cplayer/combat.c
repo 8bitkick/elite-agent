@@ -52,6 +52,7 @@ int g_bail_energy;
 int g_brk_log;
 int g_msl_side = 2500;     // the missile-side turn, for missiles within this (0 off)
 long g_sw_why[4];
+int g_en_mode;             // (for the lab's time split) this frame's fight mode: 0 attack, 1 break off, 2 missile side, 3 ram dodge, 4 evade
 extern int g_steer_log;
 static double dist_of(const ship_t *s) { return sqrt((double) s->x * s->x + (double) s->y * s->y + (double) s->z * s->z); }
 
@@ -155,6 +156,24 @@ static double target_value(const ship_t *s) {
     return (points_of(s->type) + g_cpa->t_floor + g_cpa->w_threat * threat) / (1 + (t + kill) / 25.0);   // (25 iterations ~ a second)
 }
 
+// (efficient, test) a target's worth with the others it brings: ships near it in our view (within g_clu_deg of its
+// direction) are in the sights with it or soon after, so their points count towards it, by closeness; a lone ship
+// off to the side then waits for the pack
+double g_clu_deg = 0, g_clu_w = 1;
+int g_clu_ws = 1;           // (and in witchspace)
+static double target_value_with(const ship_t *s, const ship_t **th, int nt) {
+    double v = target_value(s);
+    if (g_clu_deg <= 0 || s->type == 1 || (!g_clu_ws && witchspace())) return v;
+    double ds = dist_of(s) + 1, extra = 0;
+    for (int j = 0; j < nt; j++) {
+        const ship_t *o = th[j];
+        if (o == s || o->type == 1) continue;
+        double c = (s->x * (double) o->x + s->y * (double) o->y + s->z * (double) o->z) / (ds * (dist_of(o) + 1));
+        double a = acos(fmax(-1.0, fmin(1.0, c))) * 180 / M_PI;
+        if (a < g_clu_deg) extra += points_of(o->type) * (1 - a / g_clu_deg);
+    }
+    return v * (1 + g_clu_w * extra / (points_of(s->type) + g_cpa->t_floor));
+}
 
 // attacking us or will: the hostile flag, alive, not the station; and missiles coming for us
 // (first, whatever the distance). Nearest first.
@@ -209,6 +228,20 @@ static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *m
     return worst;
 }
 
+
+// (efficient) a shot at whatever enemy is in the sights on the way: Elite's laser hits every ship in the crosshairs,
+// not only the one we're turning to, and a Thargon (20) dies to one military-laser hit
+int g_opp_fire = 0;
+static int opportunity(const ship_t *s, int n, int view) {
+    for (int i = 0; i < n; i++) {
+        const ship_t *o = &s[i];
+        if (!ship_in_space(o) || ship_dead(o) || !ship_is_ship(o) || o->type == 1) continue;
+        if (!(o->newb & NEWB_HOSTILE) && o->type != 29 && o->type != 30) continue;
+        if (o->type >= 3 && o->type <= 8) continue;
+        if (laser_power(view, o->type) > 0 && in_crosshairs(o, view)) return 1;
+    }
+    return 0;
+}
 
 // one frame of attacking sh: the keys, the angle off (degrees), and the view to fight in (0 front,
 // 1 rear: with a rear laser, a target behind is fought from the rear view, where our turns look
@@ -278,6 +311,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         ks_clear(keys);
         steer((vec_t){mx * 4000, my * 4000, 1500}, jstx(), jsty(), 3, 3, keys);
         want = 30;
+        g_en_mode = 3;
     } else if (off > P->turn_off && dist < P->turn_close) want = P->spd_turn_close;
     else if (off > P->turn_off) want = P->spd_turn_far;
     else if (dist > P->far) want = P->spd_far;
@@ -301,6 +335,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
                 ks_add(keys, K_ROLL_LEFT);
                 ks_add(keys, K_CLIMB);
                 want = 25;
+                g_en_mode = 4;
                 if (now() >= evade_until) evade_until = now() + P->evade_on, evade_next = now() + P->evade_on + P->evade_gap;
                 break;
             }
@@ -315,6 +350,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
     if (near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0) ks_add(keys, K_FIRE);
+    else if (g_opp_fire && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
     {
         extern int g_steer_log;
         if (g_steer_log)
@@ -442,7 +478,7 @@ PT_THREAD(engage(float seconds)) {
                 const ship_t *best = NULL, *cur = NULL;
                 double bv = -1, cv = -1;
                 for (int i = 0; i < nt; i++) {
-                    double v = target_value(th[i]);
+                    double v = target_value_with(th[i], th, nt);
                     if (th[i]->slot == c_en.target) cur = th[i], cv = v;
                     if (v > bv) bv = v, best = th[i];
                 }
@@ -507,6 +543,7 @@ PT_THREAD(engage(float seconds)) {
                     speed_keys(speed(), 40, &keys);
                     view = 0;
                     off = 180;
+                    g_en_mode = 1;
                     goto flown;
                 }
             }
@@ -530,10 +567,12 @@ PT_THREAD(engage(float seconds)) {
                         speed_keys(speed(), front ? 40 : 10, &keys);
                         view = space_view();
                         off = 180;
+                        g_en_mode = 2;
                         goto flown;
                     }
                 }
             }
+            g_en_mode = 0;
             off = combat_keys(sh, n, t, &keys, &view);
         flown:
             // outnumbered and hurting: the energy bomb destroys every ship about but Thargoids and

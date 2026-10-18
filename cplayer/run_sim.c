@@ -269,6 +269,13 @@ int main(int argc, char **argv) {
     { extern int g_ws_fight; if (getenv("WSFIGHT")) g_ws_fight = atoi(getenv("WSFIGHT")); }
     { extern int g_ws_shield; if (getenv("WSSHIELD")) g_ws_shield = atoi(getenv("WSSHIELD")); }
     { extern int g_dock_log; g_dock_log = getenv("DOCKLOG") != NULL; }
+    { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
+    { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
+    { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
+    { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
+    { extern int g_chase; if (getenv("CHASE")) g_chase = atoi(getenv("CHASE")); }
+    { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
+    { extern int g_jump_log; g_jump_log = getenv("JLOG") != NULL; }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
