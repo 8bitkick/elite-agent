@@ -6,6 +6,8 @@
 #include "fair.h"
 #include "keyq.h"
 #include "flight.h"
+#include "show.h"
+#include "ptime.h"
 
 // (lead: aim this many game loops ahead of the target: the pitch gain's time constant (pitch_iters, 3) plus
 // the keys' lag (~1.5 loops), so the aim point's lead feeds the target's sightline rate forward exactly once.
@@ -212,7 +214,7 @@ int threats(const ship_t *s, int n, int rng, const ship_t **out, int max) {
 static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *miss);
 const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss) { return collision_risk(s, n, margin, miss); }
 static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *miss) {
-    double horizon = g_cpa->ram_iters;
+    double horizon = show_ram_iters(g_cpa->ram_iters);      // (curious show: it may look further)
     const ship_t *worst = NULL;
     double wd = 1e30;
     for (int i = 0; i < n; i++) {
@@ -267,14 +269,16 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     // per iteration, the target moves along its nose at its speed and we fly on at ours
     vec_t vel = {sh->nosev[0] * sp, sh->nosev[1] * sp, sh->nosev[2] * sp - speed()};
     vec_t aim = {sh->x + vel.x * k, sh->y + vel.y * k, sh->z + vel.z * k};
+    show_aim(sh, &aim.x, &aim.y, &aim.z);       // (curious mode's show: the flyby)
     vec_t v = {sh->x, sh->y, sh->z};
     // (the rear laser means facing away: further than rear_max, it's a chase we never close)
     int rear = s_force_rear || laser_power(1, sh->type) > 0 && sh->z < 0 && atan2(hypot(sh->x, sh->y), -(double) sh->z) * 180 / M_PI < P->rear_cone &&
-               (!P->rear_max || dist < P->rear_max);
+               (!P->rear_max || dist < P->rear_max) && show_rear_ok(dist);
     if (rear) {
         v = (vec_t){-v.x, v.y, -v.z};
         aim = (vec_t){-aim.x, aim.y, -aim.z};
     }
+    int weave = show_weave(sh, rear, &aim.x, &aim.y, &aim.z);     // (curious mode's show: the weave; in the view's frame)
     // (the stick as seen from the rear view is mirrored too, both ways: steer() compares where it is
     // with where it should be, so it has to be in the same mirrored frame as the aim. Unmirrored, it
     // pushed the stick the wrong way and only came round when it hit the stop: the bouncing)
@@ -283,7 +287,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     { extern double g_aim_tol; const shiptype_t *tt = ship_type(sh->type); g_aim_tol = atan2(tt && tt->area ? sqrt((double) tt->area) : 80, dist + 1); }
     double off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
     { extern int g_want_jx, g_want_jy;
-      if (g_plan && g_want_jx >= 0 && IO->analogue && R(0x2C5C)) {
+      if (g_plan && g_want_jx >= 0 && IO->analogue && R(0x2C5C) && !show_flyby() && !weave && !show_noplan()) {     // (not in a flyby: it aims beside)
           const shiptype_t *tt = ship_type(sh->type);
           double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
           double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
@@ -314,7 +318,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
             ks_add(&m, c == K_ROLL_LEFT ? K_ROLL_RIGHT : c == K_ROLL_RIGHT ? K_ROLL_LEFT : c == K_CLIMB ? K_DIVE : c == K_DIVE ? K_CLIMB : c);
         }
         *keys = m;
-    }
+    } else show_knife(sh, keys);        // (curious mode's show: the flyby goes past on one side)
     int want;
     vec_t q;
     const ship_t *rc = collision_risk(s, n, P->ram_dist, &q);
@@ -355,6 +359,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
             }
         }
     }
+    if (!rc) want = show_speed(sh, dist, want);       // (curious mode's show: show.c)
     speed_keys(speed(), want, keys);
     const shiptype_t *ti = ship_type(sh->type);
     double r = ti && ti->area ? sqrt((double) ti->area) : 80;
@@ -363,8 +368,8 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
-    if (near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK)) ks_add(keys, K_FIRE);
-    else if (g_opp_fire && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
+    if (show_fire(sh, dist, near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK))) ks_add(keys, K_FIRE);
+    else if (g_opp_fire && !show_on() && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
     {
         extern int g_steer_log;
         if (g_steer_log)
@@ -436,6 +441,7 @@ PT_THREAD(engage(float seconds)) {
     c_en.tally0 = tally();
     c_en.energy0 = c_en.energy_min = energy();
     c_en.kills = 0;
+    show_begin();
     note("{\"event\": \"fight_start\", \"tally\": %.2f, \"energy\": %d}", tally(), energy());
     for (;;) {
         CO_YIELD(c_en);
@@ -452,6 +458,7 @@ PT_THREAD(engage(float seconds)) {
             const ship_t *th[NOSH];
             int n = see_ships(sh);
             announce(sh, n);
+            { PT_START(ts0); show_frame(sh, n); PT_ADD(3, ts0); }     // (curious mode's show: on while we're clearly on top)
             if (energy() < c_en.energy_min) c_en.energy_min = energy();
             // (in witchspace, every Thargoid about: they keep shooting while we pick a way out)
             // (fair mode: a little further to stay in a fight than to start one: a dot's estimated range wanders,
@@ -494,13 +501,15 @@ PT_THREAD(engage(float seconds)) {
                 // the target: most kill points for the time it takes to bring the guns on it (front, or
                 // the rear laser), more for one shooting at our weaker shield; a new one only if it's
                 // clearly better, so we don't dither between them
+                PT_START(tt0);
                 const ship_t *best = NULL, *cur = NULL;
                 double bv = -1, cv = -1;
                 for (int i = 0; i < nt; i++) {
-                    double v = target_value_with(th[i], th, nt);
+                    double v = show_value(th[i], target_value_with(th[i], th, nt), th, nt);     // (curious show: groups in witchspace)
                     if (th[i]->slot == c_en.target) cur = th[i], cv = v;
                     if (v > bv) bv = v, best = th[i];
                 }
+                PT_ADD(1, tt0);
                 if (!cur || bv > g_cpa->t_switch * cv) {
                     if (cur && best != cur && g_steer_log)
                         dbgf_("switch: target t%d (value %.2f, turn %.0f, e %d, d %.0f) -> t%d (value %.2f, turn %.0f, e %d, d %.0f)",
@@ -604,7 +613,7 @@ PT_THREAD(engage(float seconds)) {
                 }
             }
             g_en_mode = 0;
-            off = combat_keys(sh, n, t, &keys, &view);
+            { PT_START(tk0); off = combat_keys(sh, n, t, &keys, &view); PT_ADD(2, tk0); }
         flown:
             // outnumbered and hurting: the energy bomb destroys every ship about but Thargoids and
             // the mission ships, each scoring its kill points; before the pod
@@ -646,7 +655,9 @@ PT_THREAD(engage(float seconds)) {
                     }
             }
             apply_flight(&keys);
-            if (!c_en.key && space_view() != view) c_en.key = view == 1 ? K_F1 : K_F0;     // rear / front view
+            { PT_START(tv0); view = show_view(view, sh, n, t); PT_ADD(4, tv0); }       // (curious mode's show: a glance left or right at a pass)
+            if (!c_en.key && space_view() != view) c_en.key = view == 1 ? K_F1 : view == 2 ? K_F2 : view == 3 ? K_F3 : K_F0;     // rear / front view
+            if (!c_en.key) c_en.key = show_key(sh, n, th, nt, t, off);       // (curious mode's show: show.c)
             // missiles at tough ships, when hurt, or when outnumbered: T arms, the lock comes when the
             // target crosses the sights (MSTG = its slot), then M
             if (!c_en.key) {
@@ -671,7 +682,7 @@ PT_THREAD(engage(float seconds)) {
         // (view keys are read from KL, which holds the highest-numbered key down: F0 (&20) is lower
         // than every flight key, so with any held it never registered and we stayed in the rear view
         // unable to fire. Let go of everything for the press, as press_h does for H)
-        if (c_en.key == K_F0 || c_en.key == K_F1) {
+        if (c_en.key == K_F0 || c_en.key == K_F1 || c_en.key == K_F2 || c_en.key == K_F3) {
             hold_none();
             CO_CALL(c_en, press(c_en.key, 4, 1));
         }

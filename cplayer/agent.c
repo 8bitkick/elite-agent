@@ -144,6 +144,17 @@ static int is_anarchy(const sys_t *s) { return s->government == 0; }
 static int g_hunts_here;
 static const sys_t *g_ground;      // the anarchy we're on our way to hunt at
 static int is_fresher_anarchy(const sys_t *s) { return s->government == 0 && g_hunts[s->num] < g_hunts_here; }
+static int is_ground(const sys_t *s) { return s == g_ground; }
+int show_hurt(void);        // (pilot.c: energy under 200 or a shield under 128)
+// (curious: trips since the last hunting or witchspace session. The solid career, after galaxy 8 was charted,
+// flew 85 h between two systems: the way to a fresher anarchy went by bfs from the anarchy and by route() from
+// the hop, route() failed there, the fallback was the nearest anarchy (the one just left), and back again. No
+// session was ever scored after that, so the one-in-three rule never chose witchspace again either)
+static int g_no_session;
+// (curious: the systems the last four trips started from. A, B, A, B is a ping-pong (the round-3 career shuttled
+// between two systems for ~100 h, 600 'hunt chosen' trips per 40 h and no hunt): then hunt at the nearest anarchy,
+// hunted or not, reached by breadth-first search, a hop nearer each time)
+static int g_last_sys[4] = {-1, -1, -1, -1}, g_force_hunt;
 
 // ---- shopping, in list order: save up for the next thing before anything after it
 static struct { CO; int i, s; int32_t cash0; } c_shop;
@@ -232,7 +243,7 @@ PT_THREAD(fly_to(const sys_t *dest, const sys_t *then)) {
     CO_CALL(c_fly, hyperspace(c_fly.dest));
     if (witchspace()) {
         CO_CALL(c_fly, leave_witchspace());
-    } else if (c_fly.then && c_fly.dest->government <= 1 &&
+    } else if (c_fly.then && c_fly.dest->government <= 1 && !(g_curious && show_hurt()) &&      // (curious: not on hurt)
                distance_qq8(c_fly.dest->x, c_fly.dest->y, c_fly.then->x, c_fly.then->y) <= fuel() - (70 - jump_max(galaxy(), c_fly.dest->num))) {
         // (and enough left over that a mis-jump on the second leg can't strand us: see jump_max)
         logf_("through %s without stopping, on to %s", c_fly.dest->name, c_fly.then->name);
@@ -304,7 +315,10 @@ PT_THREAD(hunt(float minutes)) {
             }
             c_hunt.held = tonnes_held();
             for (int i = 0; i < 17; i++) c_hunt.hold[i] = (uint8_t) cargo(i);
+            // (curious: home sooner, energy under 200 or a shield under 100: its show fights leave the front shield low,
+            // and the next wave met it there)
             if (energy() < 150 || fsh() + ash() < 250 || expired(c_hunt.until)) break;
+            if (g_curious && (energy() < 200 || fsh() < 100 || ash() < 100)) break;
             keyset_t keys = {{0}, 0};
             const ship_t *cn = scoopable(sh, n);
             if (cn) {
@@ -494,17 +508,34 @@ PT_THREAD(trip(void)) {
         }
     }
     note("{\"event\": \"trip\", \"why\": \"%s\"}", witch_why());
-    if (choose_witch()) {
+    if (g_curious) g_no_session++;
+    // (the backstop: a dozen trips with no session at all, witchspace if it's ready)
+    if (choose_witch() || (g_curious && g_no_session >= 12 && witch_ready())) {
+        g_no_session = 0;
         g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 1;
         CO_CALL(c_trip, witch());
         g_sess.pending = 1;          // (scored once docked again: a reload in between takes its points back)
         CO_EXIT(c_trip);
+    }
+    if (g_curious) {
+        const sys_t *h0 = here_sys();
+        int me = h0 ? h0->num : -1;
+        if (me != g_last_sys[0]) {
+            for (int i = 3; i > 0; i--) g_last_sys[i] = g_last_sys[i - 1];
+            g_last_sys[0] = me;
+        }
+        if (me >= 0 && g_last_sys[2] == me && g_last_sys[1] == g_last_sys[3] && g_last_sys[1] != me && !g_force_hunt) {
+            g_force_hunt = 1, g_ground = NULL;
+            logf_("ping-pong between two systems: hunting at the nearest anarchy");
+            note("{\"event\": \"pingpong\"}");
+        }
     }
     if (farm_ready()) {                           // bounty hunting, moving round the anarchies
         const sys_t *h = here_sys();
         if (h && h->government == 0) {
             // three sessions here, then on to the nearest anarchy we've hunted less
             g_hunts_here = g_hunts[h->num];
+            if (g_force_hunt) g_force_hunt = 0, g_hunts_here = 0;      // (curious, after a ping-pong: here, now)
             if (g_hunts_here >= (g_curious ? 1 : 3) && (c_trip.n = bfs(is_fresher_anarchy, c_trip.path, 12)) > 1) {
                 g_ground = c_trip.path[c_trip.n - 1];
                 logf_("hunted %s %d times: on to %s", h->name, g_hunts_here, g_ground->name);
@@ -518,11 +549,15 @@ PT_THREAD(trip(void)) {
             CO_CALL(c_trip, shop());
             CO_CALL(c_trip, save_ours());
             g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 0;
+            g_no_session = 0;
             CO_CALL(c_trip, hunt(5));
             g_sess.pending = 1;
             CO_EXIT(c_trip);
         }
-        if (g_ground) c_trip.n = route(galaxy(), here_x(), here_y(), g_ground->x, g_ground->y, 3.0f, c_trip.path, 24);
+        if (g_ground && !(g_curious && g_force_hunt)) c_trip.n = route(galaxy(), here_x(), here_y(), g_ground->x, g_ground->y, 3.0f, c_trip.path, 24);
+        else c_trip.n = 0;
+        // (curious: no route, then the same breadth-first way that chose it, a hop nearer each time)
+        if (g_curious && g_ground && c_trip.n < 2) c_trip.n = bfs(is_ground, c_trip.path, 24);
         if (!g_ground || c_trip.n < 2) c_trip.n = bfs(is_anarchy, c_trip.path, 24);
         if (c_trip.n > 1) {
             CO_CALL(c_trip, fly_to(c_trip.path[1], NULL));
@@ -570,8 +605,28 @@ trading:
         uint8_t avl[17], crg[17];
         for (int i = 0; i < 17; i++) { avl[i] = R(A_AVL + i); crg[i] = (uint8_t) cargo(i); }
         if (!plan_trip_seen(galaxy(), here_x(), here_y(), R(A_QQ28), R(A_QQ26), avl, cash(), fuel(), cargo_bay(), crg,
-                            g_seen[galaxy()], NOVELTY, &c_trip.plan))
+                            g_seen[galaxy()], NOVELTY, &c_trip.plan)) {
+            // (curious: no trade worth flying, then bounties instead of a reload: the round-4 career, short of cash after
+            // a replacement energy bomb, reloaded the same docked save for 80 game hours. Here if it's an anarchy, else on
+            // to the nearest)
+            if (g_curious) {
+                const sys_t *h = here_sys();
+                if (h && h->government == 0) {
+                    logf_("nowhere to trade: bounty hunting here");
+                    g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 0;
+                    g_no_session = 0;
+                    CO_CALL(c_trip, hunt(5));
+                    g_sess.pending = 1;
+                    CO_EXIT(c_trip);
+                }
+                if ((c_trip.n = bfs(is_anarchy, c_trip.path, 24)) > 1) {
+                    logf_("nowhere to trade: on to the nearest anarchy");
+                    CO_CALL(c_trip, fly_to(c_trip.path[1], NULL));
+                    CO_EXIT(c_trip);
+                }
+            }
             CO_FAIL(c_trip, "nowhere to go");
+        }
     }
     logf_("plan: %s %d.%d LY, expected +%.1f Cr", c_trip.plan.dest->name, c_trip.plan.dist / 10, c_trip.plan.dist % 10,
           c_trip.plan.profit / 10);

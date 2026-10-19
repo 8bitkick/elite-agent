@@ -194,6 +194,113 @@ static double plan_rates(double x, double y, double z, double vx, double vy, dou
     }
     return best;
 }
+
+// ---- The same planner in single precision, and bounded (g_plan_f, the default; PLANF=0 for the double one above).
+// The Presto's FPU (Cortex-M33) does float only: in double every step's atan2/hypot/cos went through software, and
+// the full search (316 rollouts of up to 50 loops) cost 200 ms a frame on the board (1.4 ms on a macbox core).
+// Bounded: (1) a rollout stops once its loop count reaches the best plan's so far (its score can't be lower: exact);
+// (2) at most g_plan_cap steps a call (pf_step's), keeping the best found by then (the candidates go small rates
+// first, so the cap cuts the big ones)
+int g_plan_f = 3;               // bit 0: float, bit 1: prune
+int g_plan_cap = 8000;          // steps a call (0: no cap): ~11 ms on the Presto (1.4 us a step in RAM)
+long g_plan_steps, g_plan_calls, g_plan_capped, g_plan_maxsteps;       // (counters: the sim's timing report)
+// (PF_HOT: on the Presto, in RAM (the SDK's .time_critical sections): from flash, through the XIP cache the emulator
+// shares, a step cost ~1.7 us)
+#ifdef PICO_BUILD
+#define PF_HOT __attribute__((noinline, section(".time_critical.plan")))
+#else
+#define PF_HOT
+#endif
+typedef struct { float x, y, z, vx, vy, vz; } pf_t;
+static int s_pf_steps;
+static inline void pf_step(pf_t *p, int al, int be, float spd) {   // (inlined into the PF_HOT callers)
+    float a = al * (1.0f / 256), b = be * (1.0f / 256), K2;
+    K2 = p->y - a * p->x; p->z = p->z + b * K2; p->y = K2 - b * p->z; p->x = p->x + a * p->y;
+    K2 = p->vy - a * p->vx; p->vz = p->vz + b * K2; p->vy = K2 - b * p->vz; p->vx = p->vx + a * p->vy;
+    p->x += p->vx, p->y += p->vy, p->z += p->vz - spd;
+    s_pf_steps++;
+}
+static inline int pf_alpha_q(float a) {
+    int m = (int) (fabsf(a) + 0.5f);
+    if (m > 31) m = 31;
+    if (m > 3 && m < 8) m = m < 6 ? 3 : 8;
+    return a < 0 ? -m : m;
+}
+static inline int pf_beta_q(float b) {
+    int m = (int) (fabsf(b) + 0.5f);
+    if (m > 8) m = 8;
+    if (m == 2) m = fabsf(b) < 2 ? 1 : 3;
+    return b < 0 ? -m : m;
+}
+// (a fast atan2: a minimax polynomial for atan on [0, 1], max error ~1e-5 rad; newlib's atan2f was most of a step)
+static inline float pf_atan2(float y, float x) {
+    const float PI = 3.14159265f;
+    float ax = fabsf(x), ay = fabsf(y), mx = ax > ay ? ax : ay, mn = ax > ay ? ay : ax;
+    if (mx == 0) return 0;
+    float t = mn / mx, s = t * t;
+    float a = t * (0.99997726f + s * (-0.33262347f + s * (0.19354346f + s * (-0.11643287f + s * (0.05265332f + s * -0.01172120f)))));
+    if (ay > ax) a = PI / 2 - a;
+    if (x < 0) a = PI - a;
+    return y < 0 ? -a : a;
+}
+// the base law (pl_policy); returns the angle off the nose (radians), which the rollout's cost needs too.
+// (cos(roll_err) is |y| / r: rolling to put it straight above or below)
+static PF_HOT float pf_policy(const pf_t *p, int *al, int *be) {
+    const float PI = 3.14159265f;
+    float r = sqrtf(p->x * p->x + p->y * p->y), off = pf_atan2(r, p->z), clock = pf_atan2(p->x, p->y);
+    int up = p->y >= 0;
+    float roll_err = up ? clock : clock - copysignf(PI, clock);
+    float roll_w = fminf(1.0f, fminf(off / 0.06f, (PI - off) / 0.5f));
+    *al = pf_alpha_q(-roll_err * (256 / 1.726f) * roll_w);
+    float pw = r > 0 ? fabsf(p->y) / r : 1;
+    *be = pf_beta_q(fminf(8.0f, off * 256 * pw * pw * pw) * (up ? 1 : -1));
+    return off;
+}
+static inline int pf_in(const pf_t *p, float r2) { return p->z > 0 && p->x * p->x + p->y * p->y <= r2; }
+static inline float pf_off(const pf_t *p) { return pf_atan2(sqrtf(p->x * p->x + p->y * p->y), p->z) * (180 / 3.14159265f); }
+// one rollout, as pl_roll; bound: the best score so far (stop once this one can't beat it: its score is at least
+// the loop it arrives on)
+static PF_HOT float pf_roll(pf_t p, int a0, int b0, int al0, int be0, int hold, float spd, float r2, float bound) {
+    enum { H = 50 };
+    pf_step(&p, a0, b0, spd);
+    float cost = 0;
+    for (int k = 1; k < H; k++) {
+        if (k >= bound) return 1e9f;
+        if (pf_in(&p, r2)) {
+            int stay = 0;
+            pf_t q = p;
+            for (int m = 0; m < 4; m++) { int al, be; pf_policy(&q, &al, &be); pf_step(&q, al, be, spd); stay += pf_in(&q, r2); }
+            return k + 0.5f * (4 - stay) + 1e-4f * cost;
+        }
+        int al, be;
+        float off = pf_policy(&p, &al, &be);
+        cost += off * (180 / 3.14159265f);
+        if (al0 != 99 && k <= hold) al = al0, be = be0;
+        if (k == 1) pl_limit(&al, &be);
+        pf_step(&p, al, be, spd);
+    }
+    return H + pf_off(&p) + 1e-4f * cost;
+}
+static double plan_rates_f(double x, double y, double z, double vx, double vy, double vz, double spd, double r2, int a0, int b0, int *aout, int *bout) {
+    pf_t p0 = {(float) x, (float) y, (float) z, (float) vx, (float) vy, (float) vz};
+    float fs = (float) spd, fr2 = (float) r2;
+    int prune = g_plan_f & 2;
+    s_pf_steps = 0;
+    { pf_t q = p0; pf_step(&q, a0, b0, fs); pf_policy(&q, aout, bout); }
+    float best = pf_roll(p0, a0, b0, 99, 0, 0, fs, fr2, 1e9f);
+    int na = sizeof PL_A / sizeof *PL_A, nb = sizeof PL_B / sizeof *PL_B, capped = 0;
+    // (small rates first, both axes together: the order the cap cuts in)
+    for (int s = 0; s < na + nb && !capped; s++) for (int i = 0; i < na; i++) {
+        int j = s - i;
+        if (j < 0 || j >= nb) continue;
+        if (g_plan_cap && s_pf_steps >= g_plan_cap) { capped = 1; break; }
+        float sc = pf_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, fs, fr2, prune ? best : 1e9f);
+        if (sc < best) best = sc, *aout = PL_A[i], *bout = PL_B[j];
+    }
+    g_plan_steps += s_pf_steps, g_plan_calls++, g_plan_capped += capped;
+    if (s_pf_steps > g_plan_maxsteps) g_plan_maxsteps = s_pf_steps;
+    return best;
+}
 static int jx_for_alpha(int a) {     // a stick position giving exactly this ALPHA
     int m = abs(a), d = m == 0 ? 0 : m <= 3 ? m * 8 + 4 : m * 4 + 2;
     if (d > 127) d = 127;
@@ -209,11 +316,14 @@ static int jy_for_beta(int b) {      // ... and BETA (opposite sign to the stick
 // view (x right, y up, z ahead); vel, its own motion per game loop in the same frame; spd, our speed (game units
 // a loop along z; negate it in the rear view); radius, how close to the line of fire counts as on it; jx, jy, the
 // stick as it is. Sets *want_jx, *want_jy (joystick positions) and returns the predicted loops to get there
+#include "ptime.h"
 double plan_stick(vec_t pos, vec_t vel, double spd, double radius, int jx, int jy, int *want_jx, int *want_jy) {
+    PT_START(t0);
     int a, b;
     { extern int g_fair, g_fair_stick_rate; s_pl_lim = (g_fair & 8) ? (int) (g_fair_stick_rate / fmax(g_ipf, 0.2)) : 0; s_pl_jx = jx, s_pl_jy = jy; }
-    double t = plan_rates(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, spd, radius * radius, alpha_from_jstx(jx), beta_from_jsty(jy), &a, &b);
+    double t = (g_plan_f & 1 ? plan_rates_f : plan_rates)(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, spd, radius * radius, alpha_from_jstx(jx), beta_from_jsty(jy), &a, &b);
     *want_jx = jx_for_alpha(a), *want_jy = jy_for_beta(b);
+    PT_ADD(0, t0);
     return t;
 }
 
@@ -365,7 +475,34 @@ PT_THREAD(leave_witchspace(void));      // flight.c
 
 static int is_docked_or_briefing(void) { return is_docked() || briefing(); }
 
-static struct { CO; uint32_t end, pod_at, last_log; int fought; } c_ts;
+static struct { CO; uint32_t end, pod_at, last_log, f0; int fought; } c_ts;
+extern int g_curious;
+
+// curious: after a fight that left the ship hurt, sit still and recharge (energy 240, both shields 200, or
+// g_recharge seconds), fighting anything that comes meanwhile. (Not called now: tried in to_station and dock,
+// it sat at anarchy stations where pirates keep coming: seed 13 at 65 h, fights 2578 -> 4323, 74 dock timeouts,
+// tally 3236 -> 1299. Docking refills the ship; a curious career now just doesn't set out on a new leg hurt)
+int g_recharge = 90;
+int show_hurt(void) { return energy() < 200 || fsh() < 128 || ash() < 128; }
+static int hurt(void) { return show_hurt(); }
+static int recharged(void) { return energy() >= 240 && fsh() >= 200 && ash() >= 200; }
+static struct { CO; uint32_t until; int fought; } c_rc;
+PT_THREAD(recharge(void)) {
+    CO_BEGIN(c_rc);
+    if (!g_curious || !g_recharge || !hurt() || witchspace()) CO_EXIT(c_rc);
+    c_rc.until = deadline((float) g_recharge);
+    status_("Recharging: energy %d, shields %d/%d", energy(), fsh(), ash());
+    while (!expired(c_rc.until) && !recharged()) {
+        CO_YIELD(c_rc);
+        if (is_docked() || dying() || title() || briefing() || R(A_SSPR)) CO_EXIT(c_rc);
+        CO_CALL(c_rc, fight_if_needed(&c_rc.fought));
+        if (c_rc.fought) continue;
+        keyset_t k = {{0}, 0};
+        speed_keys(speed(), 0, &k);
+        apply_flight(&k);
+    }
+    CO_END(c_rc);
+}
 PT_THREAD(to_station(float seconds)) {
     CO_BEGIN(c_ts);
     c_ts.end = deadline(seconds);
@@ -385,7 +522,11 @@ PT_THREAD(to_station(float seconds)) {
             CO_EXIT(c_ts);
         }
         if (expired(c_ts.end)) CO_FAIL(c_ts, "to station");
+        c_ts.f0 = now();
         CO_CALL(c_ts, fight_if_needed(&c_ts.fought));
+        // (curious: the leg's clock stops while we fight. Its showcase fights run 3-4 times as long, and in a
+        // career the leg timed out after them and reloaded the save, kills and all: 13 times in 100 h, efficient 1)
+        if (c_ts.fought && g_curious) c_ts.end += now() - c_ts.f0;
         if (c_ts.fought) continue;
         if (witchspace()) {
             CO_CALL(c_ts, leave_witchspace());
@@ -440,7 +581,7 @@ PT_THREAD(to_station(float seconds)) {
 }
 
 static struct {
-    CO; uint32_t end, last_log; int final, fought, have_spin, spin_mc; double spin, spin_psi; int spin_jx; int32_t left;
+    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
@@ -460,7 +601,9 @@ PT_THREAD(dock(float seconds)) {
         }
         if (expired(c_dk.end)) CO_FAIL(c_dk, "dock");
         if (!c_dk.final) {
+            c_dk.f0 = now();
             CO_CALL(c_dk, fight_if_needed(&c_dk.fought));
+            if (c_dk.fought && g_curious) c_dk.end += now() - c_dk.f0;      // (curious: as to_station)
             if (c_dk.fought) continue;
         }
         {

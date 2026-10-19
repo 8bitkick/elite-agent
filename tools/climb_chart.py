@@ -10,7 +10,7 @@ import json, sys
 
 W, H = 820, 420
 X0, X1, Y0, Y1 = 64, 640, 352, 24          # plot area
-HMAX, TMAX = 120, 7000
+HMAX, TMAX = 140, 7000
 STYLE = {   # colour, label (validated: violet / aqua / orange, every line direct-labelled)
     'efficient': ('#6250d6', 'Efficient'),
     'fair': ('#1baf7a', 'Fair (information)'),

@@ -18,34 +18,34 @@ build of the emulator (Pi or Mac) for development.
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.1 game hours** (25.7-27.1 on five careers, 5 deaths in all) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers; every RAM read audited) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; fights for show ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **117.8 game hours** (two careers), show fighting in development |
+| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **134.8 game hours** (one career, 272 systems in all 8 galaxies) |
 
 All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 25.7 to 27.1 hours, fair 29.0 to 30.7, curious 116.9 to 118.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 25.7 to 27.1 hours, fair 29.0 to 30.7, curious 134.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
-| | Efficient (5) | Fair (5) | Curious (2) |
+| | Efficient (5) | Fair (5) | Curious (1) |
 |---|---|---|---|
-| Game hours to Elite | 26.1 | 29.8 | 117.8 |
-| Star systems visited | 65 | 67 | 384 |
+| Game hours to Elite | 26.1 | 29.8 | 134.8 |
+| Star systems visited | 65 | 67 | 272 |
 | Galaxies | 3 | 3 | 8 |
-| Light years flown (dock to dock) | 638 | 677 | 4,513 |
-| Docks | 342 | 366 | 1,296 |
-| Fights | 1,987 | 2,521 | 5,090 |
-| Kills | 5,469 | 5,587 | 9,493 |
-| Witchspace sessions (Thargoids) | 183 | 198 | 77 |
-| Deaths (reloaded) | 1 | 3 | 50 |
-| Escape pods used | 0 | 0 | 11 |
-| Most credits held | 32,660 Cr | 23,538 Cr | 25,152 Cr |
+| Light years flown (dock to dock) | 638 | 677 | 3,109 |
+| Docks | 342 | 366 | 1,049 |
+| Fights | 1,987 | 2,521 | 5,523 |
+| Kills | 5,469 | 5,587 | 12,705 |
+| Witchspace sessions (Thargoids) | 183 | 198 | 66 |
+| Deaths (reloaded) | 1 | 3 | 115 |
+| Escape pods used | 0 | 0 | 0 |
+| Most credits held | 32,660 Cr | 23,538 Cr | 18,743 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
 
-Curious mode's fights are for the camera: over 600 recorded fights an enemy is drawn 20 pixels or
-bigger for 3.8 seconds a fight, against 1.0 in efficient mode, which kills from as far out as it can.
+Curious mode's fights are for the camera: over 4,232 recorded fights an enemy is drawn 20 pixels or
+bigger for about 6 seconds a fight, against none in efficient mode, which kills from as far out as it can.
 
 **Where efficient's time goes** (seed 13): witchspace farming of Thargoids, by a forced mis-jump, is
 55% of the time and 81% of the points, about 5 a game minute; bounty hunting at anarchies makes a

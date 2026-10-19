@@ -1,3 +1,4 @@
+#include "ptime.h"
 #include <string.h>
 // The galaxy (systems from the seeds, as the game makes them), markets, trade planning and routes.
 // (Ported from the first, Python, agent and checked bit-exact against it: same integer quirks and tie-breaking.)
@@ -186,6 +187,21 @@ const sys_t *nearest_system(int galaxy, int qq9, int qq10)
     return best;
 }
 
+// a system the chart cursor can select: the nearest to its own spot (none nearer by (|dx|/2 + |dy|/2)). Cached
+// a galaxy at a time: jump_max's table asked it 65,536 times over, a 256-system search each, and on the Presto
+// that first visit took a frame to 136 ms (the curious career's first mis-jump)
+static uint8_t s_own[8][256], s_own_ok[8];
+static int own_spot(int galaxy, int i)
+{
+    galaxy &= 7;
+    if (!s_own_ok[galaxy]) {
+        const sys_t *sys = galaxy_systems(galaxy);
+        for (int j = 0; j < 256; j++) s_own[galaxy][j] = nearest_system(galaxy, sys[j].x, sys[j].y) == &sys[j];
+        s_own_ok[galaxy] = 1;
+    }
+    return s_own[galaxy][i & 255];
+}
+
 // systems the game wouldn't let us jump to (H refused twice: a near neighbour takes the selection)
 uint8_t g_unreachable[8][32];
 
@@ -193,6 +209,24 @@ uint8_t g_unreachable[8][32];
 // with the fuel spent) can't strand: from there, some system must be in reach of what's left. Stranded
 // in witchspace there's no pod and no way out; without saves that's the career (0.5 LY to spare)
 int g_safe_jumps = 1;
+// the distance (distance_qq8) to the nearest selectable system from (x, y), not counting one on the spot; 999: none.
+// distance_qq8 is the square root of min(dx^2 + (dy/2)^2, 0xFFFF), never decreasing as that grows, so the nearest
+// is the one with the least such sum, and one square root does (jump_max's table took 131,072 of them, 3.6 ms on a
+// macbox core, ~100 ms on the Presto)
+static int nearest_reach(int galaxy, int x, int y)
+{
+    const sys_t *sys = galaxy_systems(galaxy);
+    int best = -1, bs = 1 << 30;
+    for (int j = 0; j < 256; j++) {
+        int dx = sys[j].x - x, dy = sys[j].y - y;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        dy >>= 1;
+        int s = dx * dx + dy * dy;
+        if (s > 0 && s < bs && own_spot(galaxy, j)) bs = s, best = j;
+    }
+    return best < 0 ? 999 : distance_qq8(x, y, sys[best].x, sys[best].y);
+}
 static int16_t s_jmax[8][256];
 static uint8_t s_jmax_ok[8], s_trap[8][256];
 int jump_max(int galaxy, int num)
@@ -200,25 +234,17 @@ int jump_max(int galaxy, int num)
     if (!g_safe_jumps) return 70;
     galaxy &= 7;
     if (!s_jmax_ok[galaxy]) {
+        PT_START(tj0);
         const sys_t *sys = galaxy_systems(galaxy);
         for (int i = 0; i < 256; i++) {
-            int lx = sys[i].x, ly = sys[i].y ^ 31, reach = 999;
-            for (int j = 0; j < 256; j++) {
-                int d = distance_qq8(lx, ly, sys[j].x, sys[j].y);
-                if (d > 0 && d < reach && nearest_system(galaxy, sys[j].x, sys[j].y) == &sys[j]) reach = d;
-            }
+            int reach = nearest_reach(galaxy, sys[i].x, sys[i].y ^ 31);
             int m = 70 - reach - 5;
             s_jmax[galaxy][i] = (int16_t) (m < 0 ? 0 : m);
         }
         // traps: no neighbour within that range, so no safe way on: never planned into
-        for (int i = 0; i < 256; i++) {
-            s_trap[galaxy][i] = 1;
-            for (int j = 0; j < 256; j++) {
-                int d = distance_qq8(sys[i].x, sys[i].y, sys[j].x, sys[j].y);
-                if (d > 0 && d <= s_jmax[galaxy][i] && nearest_system(galaxy, sys[j].x, sys[j].y) == &sys[j]) { s_trap[galaxy][i] = 0; break; }
-            }
-        }
+        for (int i = 0; i < 256; i++) s_trap[galaxy][i] = !(nearest_reach(galaxy, sys[i].x, sys[i].y) <= s_jmax[galaxy][i]);
         s_jmax_ok[galaxy] = 1;
+        PT_ADD(5, tj0);
     }
     return s_jmax[galaxy][num & 255];
 }
@@ -239,7 +265,7 @@ int in_range(int galaxy, int x, int y, int max_qq8, const sys_t **out, int *dist
         if (!(d > 0 && d <= max_qq8)) continue;
         // (the chart cursor snaps to the nearest system by (|dx|/2 + |dy|/2): one that loses its own
         // spot to a neighbour can't be selected, and the jump is refused)
-        if (nearest_system(galaxy, sys[i].x, sys[i].y) != &sys[i]) continue;
+        if (!own_spot(galaxy, i)) continue;
         // insert after every entry with dist <= d (systems arrive in num order: stable)
         int j = n;
         while (j > 0 && dist[j - 1] > d) j--;
@@ -445,7 +471,7 @@ int route(int galaxy, int x, int y, int to_x, int to_y, float risk_weight, const
             if (!(d > 0 && d <= 70)) continue;
             // (one the chart cursor can't select, losing its spot to a neighbour, as in in_range: a hop
             // through Razari, a unit from Alace in galaxy 3, landed at Alace each time, for 30 game hours)
-            if (nearest_system(galaxy, sys[b].x, sys[b].y) != &sys[b]) continue;
+            if (!own_spot(galaxy, b)) continue;
             if (b != goal->num && jump_trap(galaxy, b)) continue;
             // a hop a random mis-jump could strand us on (see jump_max): only where there's no other way,
             // as 25 hops' worth (Lave has no safe way out to the Leoned - Ceesxe loop; without the move
@@ -529,7 +555,7 @@ void safe_reach(int galaxy, int from)
         for (int b = 0; b < 256; b++) {
             if (g_loop_reach[b] != 255) continue;
             int d = distance_qq8(sys[a].x, sys[a].y, sys[b].x, sys[b].y);
-            if (d > 0 && d <= jump_max(galaxy, a) && !jump_trap(galaxy, b) && nearest_system(galaxy, sys[b].x, sys[b].y) == &sys[b]) {
+            if (d > 0 && d <= jump_max(galaxy, a) && !jump_trap(galaxy, b) && own_spot(galaxy, b)) {
                 g_loop_reach[b] = (uint8_t) (g_loop_reach[a] + 1 < 254 ? g_loop_reach[a] + 1 : 254);
                 q[t++] = b;
             }

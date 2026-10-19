@@ -67,6 +67,9 @@ static void key(int code, int down) {
 // on through them. (Ending it there, as this did until 2026-10-17, counted 45% of targets "switched before
 // aimed" and restarted their acquire clocks)
 extern int combat_target(void);
+void showm_begin(void);
+void showm_frame(uint32_t frame);
+void showm_end(const char *path, int died, int start_n, int left, int dmg, int lowest);
 static struct { int open, type, acquired, acq_frames, pend, locked_frames, in_frames, stop_frames; uint32_t last_fight; double off_sum; long acq_sum; int acq_n, acq_fail;
                 int was_in, episodes, gone, sw_unacq, sw_acq, lock_losses; double lx, ly, lz; } s_aim;
 static const ship_t *same_ship(const ship_t *sh, int n, int type, double x, double y, double z) {
@@ -173,6 +176,23 @@ static void diag_frame(diag_t *d, int *e_prev, uint8_t *dead_prev) {
 static void p_analogue(void *c, int ch, uint16_t v) { (void) c; beeb_analogue(B, ch, v); }
 static void p_log(void *c, int level, const char *s) { (void) c; if (getenv("LOG") && level <= atoi(getenv("LOG"))) fprintf(stderr, "%6u %s\n", io.frame, s); }
 
+// SHOTRAW=file: every frame of the fight as RGB24 (768 x 640), appended, for films (ffmpeg -f rawvideo); an
+// observer only, the fight runs as without it. SHOTTAIL frames more after the end (default 100: 2 s)
+int beeb_shot(beeb_t *b, uint8_t *out, int frames);
+int beeb_shot_height(void);
+static FILE *s_shot;
+static void shot_frame(void) {
+    static uint8_t *px, *rgb;
+    int h = beeb_shot_height();
+    if (!px) px = malloc(2048 * (size_t) h), rgb = malloc(2048 * 3 * (size_t) h);
+    int w = beeb_shot(B, px, 1);
+    static const uint8_t PAL[8][3] = {{0,0,0},{255,0,0},{0,255,0},{255,255,0},{0,0,255},{255,0,255},{0,255,255},{255,255,255}};
+    for (int i = 0; i < w * h; i++) memcpy(rgb + 3 * i, PAL[px[i] & 7], 3);
+    fwrite(rgb, 3, (size_t) w * h, s_shot);
+    static int said;
+    if (!said++) fprintf(stderr, "SHOT %dx%d\n", w, h);
+}
+
 extern int combat_set_param(const char *name, double v);
 static void set_param(const char *name, double v) {
     if (combat_set_param(name, v)) return;
@@ -206,6 +226,18 @@ int main(int argc, char **argv) {
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_lab_window; if (getenv("LABWIN")) g_lab_window = atoi(getenv("LABWIN")); }
     { extern int g_plan; if (getenv("PLAN")) g_plan = atoi(getenv("PLAN")); }
+    { extern int g_plan_f, g_plan_cap; if (getenv("PLANF")) g_plan_f = atoi(getenv("PLANF")); if (getenv("PLANCAP")) g_plan_cap = atoi(getenv("PLANCAP")); }
+    { extern int g_show; if (getenv("SHOW")) g_show = atoi(getenv("SHOW")); }
+    { extern int g_show_lab; g_show_lab = 1; }
+    if (getenv("SHOWP")) {      // show.c's numbers, name=value,...
+        extern int show_set_param(const char *name, double v);
+        char *s = strdup(getenv("SHOWP")), *tok, *save;
+        for (tok = strtok_r(s, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+            char *eq = strchr(tok, '=');
+            if (eq && (*eq = 0, !show_set_param(tok, atof(eq + 1)))) { fprintf(stderr, "unknown show parameter %s\n", tok); exit(1); }
+        }
+    }
+    { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
     { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
     { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
@@ -216,6 +248,7 @@ int main(int argc, char **argv) {
     { extern int g_brk_mode; if (getenv("BRKOFF")) g_brk_mode = atoi(getenv("BRKOFF")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }
     { extern int g_steer_log; g_steer_log = getenv("STEERLOG") != NULL; }
+    if (getenv("SHOTRAW")) s_shot = fopen(getenv("SHOTRAW"), "wb");
     {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 the information limits; FAIRHANDS=1 the hand limits too; FAIRMASK=bits (1 see, 2 dashboard, 8 stick, 16 keys)
         extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
         if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 3;           // (the information limits)
@@ -276,9 +309,12 @@ int main(int argc, char **argv) {
                 char t[8]; snprintf(t, sizeof t, "%d,", sh[i].type);
                 if (strlen(types) + strlen(t) < sizeof types) strcat(types, t);
             }
-            fprintf(stderr, "SCN %s ws %d n %d behind %d enemy_energy %d laser %d E %d F %d A %d nearest %.0f types %s\n", path, R(A_MJ) != 0, nh, behind, tsum, laser(0),
-                    energy(), fsh(), ash(), nearest, types);
+            fprintf(stderr, "SCN %s ws %d n %d behind %d enemy_energy %d laser %d E %d F %d A %d nearest %.0f types %s rear %d ecm %d engy %d bomb %d msl %d pod %d\n", path, R(A_MJ) != 0, nh, behind, tsum, laser(0),
+                    energy(), fsh(), ash(), nearest, types, laser(1), R(A_ECM) != 0, R(A_ENGY) != 0, R(A_BOMB) != 0, R(A_NOMSL), R(A_ESCP) != 0);
         }
+        if (getenv("SCANONLY")) continue;
+        showm_begin();
+        int lowest = energy();
         s_pdir = s_rdir = s_prev_n = s_rrev_n = 0;
         double t0 = tally();
         diag_t dg = {0};
@@ -352,12 +388,14 @@ int main(int argc, char **argv) {
                 }
             }
             io.taps_done += (uint32_t) keyq_step(io.frame, key);
-            beeb_frames(B, 1);
+            if (s_shot) shot_frame(); else beeb_frames(B, 1);
             io.frame++;
             if (getenv("TRACE") && fr > atoi(getenv("TRACE")))
                 fprintf(stderr, "%d E %d F %d A %d qq12 %d qq11 %d mcnt %d delta %d lasct %d damp %d\n", fr, energy(), fsh(), ash(), R(0x87), R(0x81), R(0x84), R(0x75), R(0x0E78), R(A_DAMP));
             { extern int g_pausing; if (io.frame < g_lab_t0 || g_pausing) continue; }      // (not fighting: setting up, or paused)
             aim_frame();
+            showm_frame(io.frame);
+            if (energy() < lowest) lowest = energy();
             if (getenv("TRACEJSON") && io.frame % 2 == 0) {     // the fight frame by frame, for the battle viewer
                 static FILE *tj;
                 if (!tj) tj = fopen(getenv("TRACEJSON"), "w");
@@ -478,8 +516,12 @@ int main(int argc, char **argv) {
                         double d = sqrt((double) sh[i].x * sh[i].x + (double) sh[i].y * sh[i].y + (double) sh[i].z * sh[i].z);
                         if (d < bd) bd = d, b = &sh[i];
                     }
-                    if (b) printf("COL drop %d type %d dist %.0f box %d\n", hp_prev - hp_, b->type, bd,
-                                  (int) fmax(fabs((double) b->x), fmax(fabs((double) b->y), fabs((double) b->z))));
+                    // (and the show then, the frame before: show mode (1 on), show_fire's last word (g_show_hold),
+                    // the toy follow's speed, the flyby's state, the fight mode (3 the ram dodge), the rammer our target)
+                    extern int g_show_mode, g_show_hold, g_show_toyspd, g_en_mode, combat_target(void), show_fb_state(void);
+                    if (b) printf("COL drop %d type %d dist %.0f box %d show %d hold %d toyspd %d fb %d en %d tgt %d\n", hp_prev - hp_, b->type, bd,
+                                  (int) fmax(fabs((double) b->x), fmax(fabs((double) b->y), fabs((double) b->z))),
+                                  g_show_mode, g_show_hold, g_show_toyspd, show_fb_state(), g_en_mode, b->slot == combat_target());
                 }
                 hp_prev = hp_;
             }
@@ -573,6 +615,8 @@ int main(int argc, char **argv) {
             memset(g_trk, 0, sizeof g_trk);
         }
         if (getenv("SWWHY")) { extern long g_sw_why[4]; fprintf(stderr, "SWWHY lost %ld missile %ld better %ld back %ld\n", g_sw_why[0], g_sw_why[1], g_sw_why[2], g_sw_why[3]); }
+        showm_end(path, died, dg.start_n, dg.left, dmg, lowest);
+        if (getenv("SHOWWHY")) { extern long g_show_why[6]; fprintf(stderr, "SHOWWHY off %ld offsince %ld missile %ld timeout %ld big %ld held %ld\n", g_show_why[0], g_show_why[1], g_show_why[2], g_show_why[3], g_show_why[4], g_show_why[5]); }
         fprintf(stderr, "EXPO %ld %ld %ld %ld %ld\n", s_expo[0], s_expo[1], s_expo[2], s_expo[3], s_expo[4]);
         {
             char kt[400]; int k = 0;
@@ -593,6 +637,11 @@ int main(int argc, char **argv) {
         printf("%s %.3f %.2f %.1f %d %d %d  %d %d %d %d %d %d %d %d %d %d  %d %d\n", path, died ? 0.0 : tally() - t0, (io.frame - (g_lab_t0 == 0xFFFFFFFF ? 0 : g_lab_t0) - g_pause_frames) / 3000.0, g_lab_cleared / 50.0, dmg,
                died, g_lab_pod, dg.kills, dg.start_n, dg.left, dg.present, dg.sights, dg.fire_on, dg.fire_off, dg.hot, dg.aimed, dg.dealt,
                s_prev_n, s_rrev_n);
+        if (s_shot) {     // the film's tail, the keys let go
+            for (int c = 0; c < 128; c++) beeb_key(B, c, 0);
+            for (int i = 0, k = getenv("SHOTTAIL") ? atoi(getenv("SHOTTAIL")) : 100; i < k; i++) shot_frame(), io.frame++;
+            fflush(s_shot);
+        }
         if (getenv("PHASES")) fprintf(stderr, "PHASES %d %d %d %d %d DMG %d %d %d %d %d\n", dg.ph[0], dg.ph[1], dg.ph[2], dg.ph[3], dg.ph[4],
                                       dmg_ph[0], dmg_ph[1], dmg_ph[2], dmg_ph[3], dmg_ph[4]);
         fflush(stdout);

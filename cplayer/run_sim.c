@@ -45,8 +45,20 @@ static int s_nev, s_recording, s_nfight;
 static uint32_t s_rec_start;
 static char s_enemies[600], s_killed[600];
 
+// ---- film (FILM=dir): every input to the machine (keys and joystick) by frame in dir/inputs.bin, and the
+// machine every SNAPEVERY frames (default 15000: 5 game minutes) in dir/NNNNNNNNN.snap: any moment of the
+// career replays exactly from the snapshot before it (sim/film.c), without the player
+static FILE *s_film;
+static const char *s_film_dir;
+static void film_input(uint8_t type, uint8_t a, uint16_t v) {
+    if (!s_film) return;
+    uint32_t fr = io.frame;
+    fwrite(&fr, 4, 1, s_film); fwrite(&type, 1, 1, s_film); fwrite(&a, 1, 1, s_film); fwrite(&v, 2, 1, s_film);
+}
+
 static void key(int code, int down) {
     beeb_key(B, code, down);
+    film_input(0, (uint8_t) code, (uint16_t) down);
     if (s_recording && s_nev < (int) (sizeof s_ev / sizeof s_ev[0]))
         s_ev[s_nev].frame = io.frame - s_rec_start, s_ev[s_nev].code = (uint8_t) code, s_ev[s_nev].down = (uint8_t) down, s_nev++;
 }
@@ -115,7 +127,28 @@ static void add_name(char *list, size_t cap, const char *name) {
     size_t n = strlen(list);
     snprintf(list + n, cap - n, "%s\"%s\"", n ? ", " : "", name);
 }
-static void p_analogue(void *c, int ch, uint16_t v) { (void) c; beeb_analogue(B, ch, v); }
+static int32_t s_adc[4] = {-1, -1, -1, -1};     // the joystick values we last set (-1: never); the core keeps them outside the machine
+static void p_analogue(void *c, int ch, uint16_t v) {
+    (void) c;
+    beeb_analogue(B, ch, v);
+    if (s_adc[ch & 3] != v) film_input(1, (uint8_t) ch, v);
+    s_adc[ch & 3] = v;
+}
+static void film_snap(void) {
+    char path[600];
+    snprintf(path, sizeof path, "%s/%09u.snap", s_film_dir, io.frame);
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    static uint8_t *st;
+    if (!st) st = malloc(beeb_state_size());
+    beeb_save(B, st);
+    uint32_t hdr[2] = {0x4D4C4946, (uint32_t) beeb_state_size()};    // "FILM"
+    fwrite(hdr, 4, 2, f);
+    fwrite(s_adc, 4, 4, f);
+    fwrite(st, 1, beeb_state_size(), f);
+    fclose(f);
+    fflush(s_film);
+}
 static void p_log(void *ctx, int level, const char *s) {
     if (s_sess_dir && level == PLOG_STATUS && !strncmp(s, "Launched from", 13)) { sess_end("restarted", NULL); sess_begin(); }
     (void) ctx;
@@ -245,6 +278,50 @@ static void step(void) {
     io.frame++;
 }
 
+// PTIME=1 (with PLAYER_TIMING built in): the player's cost a frame, by what it was doing: not fighting; fighting in
+// normal space, efficient or the show; in witchspace, efficient or the show. Average, p99, max, and the sections
+// (cplayer/ptime.h) inside it, printed at the end. A host's nanoseconds: the Presto (RP2350, 150 MHz) runs the same code
+// some 20-40 times slower
+#include "ptime.h"
+#ifdef PLAYER_TIMING
+long long g_pt[8];
+static long long s_pt0;
+static struct { long n; double sum; long long max; long hist[200]; double sec[8]; long long secmax[8]; } s_ptc[5];
+static const char *PTN[5] = {"not fighting", "fight, efficient", "fight, show", "witchspace, efficient", "witchspace, show"};
+static void ptime_frame_start(void) { memset(g_pt, 0, sizeof g_pt); s_pt0 = ptime_ns(); }
+static void ptime_frame_end(void) {
+    long long dt = ptime_ns() - s_pt0;
+    extern int g_phase, g_show_mode;
+    int c = g_phase != 1 ? 0 : (witchspace() ? 3 : 1) + (g_show_mode == 1);
+    s_ptc[c].n++, s_ptc[c].sum += dt;
+    if (dt > s_ptc[c].max) s_ptc[c].max = dt;
+    int b = (int) (dt / 2000); if (b > 199) b = 199;          // (2 us bins up to 400 us)
+    s_ptc[c].hist[b]++;
+    static int slow = -1;
+    if (slow < 0) { const char *e = getenv("PTIME"); slow = e && atoi(e) >= 2; }
+    if (slow && dt > 300000) fprintf(stderr, "PTSLOW %.1f us context %d frame %ld\n", dt / 1000.0, c, s_ptc[c].n);   // (PTIME=2)
+    for (int i = 0; i < 6; i++) { s_ptc[c].sec[i] += g_pt[i]; if (g_pt[i] > s_ptc[c].secmax[i]) s_ptc[c].secmax[i] = g_pt[i]; }
+}
+static void ptime_report(void) {
+    static const char *SN[6] = {"plan_stick", "target", "combat_keys", "show_frame", "show_view", "jump_max table"};
+    for (int c = 0; c < 5; c++) {
+        if (!s_ptc[c].n) continue;
+        long acc = 0; int p99 = 0;
+        for (int b = 0; b < 200; b++) { acc += s_ptc[c].hist[b]; if (acc >= s_ptc[c].n * 0.99) { p99 = b; break; } }
+        fprintf(stderr, "PTIME %-22s frames %8ld  avg %6.1f us  p99 %s%4d us  max %7.1f us |", PTN[c], s_ptc[c].n, s_ptc[c].sum / s_ptc[c].n / 1000,
+                p99 == 199 ? ">" : " ", p99 * 2, s_ptc[c].max / 1000.0);
+        for (int i = 0; i < 6; i++) fprintf(stderr, " %s avg %.1f max %.1f |", SN[i], s_ptc[c].sec[i] / s_ptc[c].n / 1000, s_ptc[c].secmax[i] / 1000.0);
+        fprintf(stderr, "\n");
+    }
+    extern long g_plan_steps, g_plan_calls, g_plan_capped, g_plan_maxsteps;
+    if (g_plan_calls) fprintf(stderr, "PTIME planner (float): %ld calls, %.0f steps a call, max %ld, capped %ld\n", g_plan_calls, (double) g_plan_steps / g_plan_calls, g_plan_maxsteps, g_plan_capped);
+}
+#else
+static void ptime_frame_start(void) {}
+static void ptime_frame_end(void) {}
+static void ptime_report(void) {}
+#endif
+
 int main(int argc, char **argv) {
     double minutes = argc > 1 ? atof(argv[1]) : 60;
     const char *home = getenv("HOME");
@@ -346,6 +423,16 @@ int main(int argc, char **argv) {
     // career from the same start)
     if (getenv("SKEW")) beeb_frames(B, atoi(getenv("SKEW")));
     { extern int g_plan; if (getenv("PLAN")) g_plan = atoi(getenv("PLAN")); }
+    { extern int g_plan_f, g_plan_cap; if (getenv("PLANF")) g_plan_f = atoi(getenv("PLANF")); if (getenv("PLANCAP")) g_plan_cap = atoi(getenv("PLANCAP")); }
+    { extern int g_show; if (getenv("SHOW")) g_show = atoi(getenv("SHOW")); }
+    if (getenv("SHOWP")) {      // show.c's numbers, name=value,...
+        extern int show_set_param(const char *name, double v);
+        char *s = strdup(getenv("SHOWP")), *tok, *save;
+        for (tok = strtok_r(s, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+            char *eq = strchr(tok, '=');
+            if (eq && (*eq = 0, !show_set_param(tok, atof(eq + 1)))) { fprintf(stderr, "unknown show parameter %s\n", tok); exit(1); }
+        }
+    }
     { extern int g_no_missions; if (getenv("NOMISSION")) g_no_missions = atoi(getenv("NOMISSION")); }
     { extern int g_no_pod; if (getenv("NOPOD")) g_no_pod = atoi(getenv("NOPOD")); }
     if (getenv("LOAD")) { extern char g_load_name[8]; strncpy(g_load_name, getenv("LOAD"), 7); }
@@ -356,7 +443,22 @@ int main(int argc, char **argv) {
     uint32_t end = (uint32_t) (minutes * 60 * 50);
     clock_t t0 = clock();
     int last_qq26 = -1, check_at = -1, checks = 0, bad = 0;
+    uint32_t snap_every = getenv("SNAPEVERY") ? (uint32_t) atoi(getenv("SNAPEVERY")) : 15000;
+    if ((s_film_dir = getenv("FILM"))) {
+        char p[600];
+        snprintf(p, sizeof p, "%s/inputs.bin", s_film_dir);
+        if (!(s_film = fopen(p, "wb"))) { fprintf(stderr, "can't write %s\n", p); return 1; }
+    }
+    int last_tp = -1;
     while (io.frame < end) {
+        if (s_film) {
+            if (io.frame % snap_every == 0) film_snap();
+            // (the moments for a film: each change of the mission byte, in the journal)
+            if (io.ram[A_TP] != last_tp) {
+                if (last_tp >= 0 && journal) { fprintf(journal, "{\"frame\": %u, \"e\": {\"event\": \"tp\", \"from\": %d, \"to\": %d}}\n", io.frame, last_tp, io.ram[A_TP]); fflush(journal); }
+                last_tp = io.ram[A_TP];
+            }
+        }
         if (getenv("AVLCHECK")) {
             if (io.ram[A_QQ26] != last_qq26) { last_qq26 = io.ram[A_QQ26]; check_at = (int) io.frame + 5; }
             if ((int) io.frame == check_at) {
@@ -375,7 +477,9 @@ int main(int argc, char **argv) {
             const uint8_t *real = io.ram;
             io.ram = scramble(real, lev);
             g_audit_on = 1;
+            ptime_frame_start();
             player_frame();
+            ptime_frame_end();
             g_audit_on = 0;
             io.ram = real;
         }
@@ -425,6 +529,7 @@ int main(int argc, char **argv) {
             break;
         }
     }
+    if (s_film) { film_snap(); fclose(s_film); }
     if (argc > 4) {
         size_t n = beeb_state_size();
         uint8_t *buf = malloc(n);
@@ -439,6 +544,7 @@ int main(int argc, char **argv) {
     }
     if (getenv("AVLCHECK")) fprintf(stderr, "markets checked %d, items wrong %d\n", checks, bad);
     audit_dump();
+    if (getenv("PTIME")) ptime_report();
     double s = (double) (clock() - t0) / CLOCKS_PER_SEC;
     fprintf(stderr, "%u frames in %.1f s (%.0fx real time)\n", io.frame, s, io.frame / 50.0 / s);
     return 0;
