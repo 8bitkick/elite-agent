@@ -52,7 +52,7 @@ show_params_t g_sp = {
     // before the firing range (close kills 0.16 -> 0.21); the knife-edge on any close pass; together 36.7. Witchspace:
     // target by group (263 fights: 35.2 -> 35.9, side views 25 -> 31% of fights). Not taken: the finishing window
     // (flat), no weave on targets turning away (34.0: static back up)
-    .ws_group = 1, .group_d = 2500, .finish_s = 0, .finish_px = 8, .weave_fac = -2, .pass_knife = 1, .pass_cpa = 600, .fire_recede = 0, .weave_t = 25, .toy_px = 24, .toy_s = 12, .follow_d = 600, .bore_s = 12, .frugal = 1000, .pursue = 0, .col_fire = 1, .col_t = 25, .col_r = 600, .ram_iters = 0, .noplan = 0, .toy_safe = 1000, .strafe = 0, .strafe_miss = 0.6f, .strafe_off = 3, .strafe_k = 5, .strafe_temp = 120, .strafe_e = 80, .strafe_px = 8,
+    .ws_group = 1, .group_d = 2500, .finish_s = 0, .finish_px = 8, .weave_fac = -2, .pass_knife = 1, .pass_cpa = 600, .fire_recede = 0, .weave_t = 25, .toy_px = 24, .toy_s = 12, .follow_d = 600, .bore_s = 12, .frugal = 1000, .pursue = 0, .col_fire = 1, .col_t = 25, .col_r = 600, .ram_iters = 0, .noplan = 0, .toy_safe = 1000, .strafe = 2, .strafe_miss = 0.6f, .strafe_off = 3, .strafe_k = 5, .strafe_temp = 120, .strafe_e = 80, .strafe_px = 8,
 };
 static struct { int on, was_on, fights, n_max, spent, empty, left, bore, bview, bslot, pursuing, want_msl, want_bomb, msl_target, msl_fired, our_msl; uint32_t t0, since, last; double margin, bpx, boff; } S;
 static struct { int view; uint32_t until, min_until, next; } G;
