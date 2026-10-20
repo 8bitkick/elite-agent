@@ -5,7 +5,7 @@ missions and the rank of Elite, replayed exactly from the film (sim/film) and cu
   tools/reel.py RUNDIR OUT.mp4 [--plan]       RUNDIR: journal.jsonl, fights/index.jsonl, film/ (snapshots, inputs.bin)
 
 --plan prints the clips it would use (and their frames) without rendering. Needs ffmpeg (libx264, drawtext).
-The emulator's ROMs and disc: $ELITE_EMU or the submodule; DISC=... for another disc (default the solid one).
+The emulator's ROMs and disc: $ELITE_EMU or rp2350-bbc-micro/ (scripts/fetch-emulator.sh); DISC=... for another disc (default the solid one).
 """
 import json, os, subprocess, sys
 

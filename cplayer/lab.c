@@ -97,10 +97,10 @@ static void aim_frame(void) {
     int n = ships_read(io.ram, sh), t = combat_target();
     const ship_t *tg = NULL;
     for (int i = 0; i < n; i++) if (sh[i].slot == t && !ship_dead(&sh[i]) && ship_in_space(&sh[i])) tg = &sh[i];
-    int fighting = g_phase == 1 && !R(0x87);
+    int fighting = g_phase == 1 && !R(A_QQ12);
     if (fighting) s_aim.last_fight = io.frame;
     const ship_t *cur = s_aim.open ? same_ship(sh, n, s_aim.type, s_aim.lx, s_aim.ly, s_aim.lz) : NULL;
-    if (s_aim.open && (R(0x87) || io.frame - s_aim.last_fight > 25)) { aim_end(cur != NULL); return; }   // the fight's over or paused
+    if (s_aim.open && (R(A_QQ12) || io.frame - s_aim.last_fight > 25)) { aim_end(cur != NULL); return; }   // the fight's over or paused
     if (fighting) {
         if (!tg) { if (s_aim.open) aim_end(cur != NULL); return; }
         if (!s_aim.open) aim_open(tg), cur = tg;
@@ -162,11 +162,11 @@ static void diag_frame(diag_t *d, int *e_prev, uint8_t *dead_prev) {
         if (dd > 1 && dd < 8000 && -(q->nosev[0] * q->x + q->nosev[1] * q->y + q->nosev[2] * q->z) / dd > 0.95) aimed++;
     }
     memcpy(e_prev, e_now, sizeof e_now); memcpy(dead_prev, dead_now, sizeof dead_now);
-    if (getenv("PHTRACE") && io.frame % 50 == 0) fprintf(stderr, "%6u phase %d hostiles %d E %d F %d A %d spd %d view %d qq11 %d\n", io.frame, g_phase, h, energy(), fsh(), ash(), speed(), space_view(), R(0x81));
+    if (getenv("PHTRACE") && io.frame % 50 == 0) fprintf(stderr, "%6u phase %d hostiles %d E %d F %d A %d spd %d view %d qq11 %d\n", io.frame, g_phase, h, energy(), fsh(), ash(), speed(), space_view(), R(A_QQ11));
     if (h) d->present++, d->ph[g_phase < 5 ? g_phase : 0]++;
     g_phase = 0;
     if (insight) d->sights++;
-    int firing = s_down[K_FIRE] && R(0x81) == 0;
+    int firing = s_down[K_FIRE] && R(A_QQ11) == 0;
     if (firing && insight) d->fire_on++;
     if (firing && !insight) d->fire_off++;
     if (laser_temp() > 200) d->hot++;
@@ -201,10 +201,12 @@ static void set_param(const char *name, double v) {
 }
 
 int main(int argc, char **argv) {
+    { extern int g_rr_log; g_rr_log = getenv("RRLOG") != NULL; }     // (a line a fight frame: combat.c)
     char roms[256], disc[256];
     snprintf(roms, sizeof roms, "%s/roms/mos3.20", beeb_emu_dir());
     snprintf(disc, sizeof disc, "%s/discs/elite-master-flicker-free-sng47.ssd", beeb_emu_dir());
     B = beeb_new(roms, disc);
+    elite_assume_master();      // (the lab: the Master's snapshots)
     if (!B) return 1;
     if (getenv("LABP")) {
         char *s = strdup(getenv("LABP")), *tok, *save;
@@ -238,6 +240,7 @@ int main(int argc, char **argv) {
         }
     }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
+    { extern void curious_env(void); curious_env(); }      // (curious steering numbers: CROLLDB, CRC*, PSW...)
     { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
     { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
@@ -285,9 +288,9 @@ int main(int argc, char **argv) {
         // (the setting a career picks while docked, before the fight: the harness sets it in the snapshot,
         // since switching it here would pause the fight already on. Elite's CAPS toggle flips the byte)
         { extern int g_lab_undamped; if (g_lab_undamped) beeb_ram(B)[A_DAMP] = 0xFF; }
-        { extern int g_joystick; if (g_joystick) beeb_ram(B)[0x2C5C] = 0xFF; }     // (joystick mode, as a career would have it)
+        { extern int g_joystick; if (g_joystick) beeb_ram(B)[A_JSTK] = 0xFF; }     // (joystick mode, as a career would have it)
         if (getenv("REARMIL") && beeb_ram(B)[A_LASER + 1]) beeb_ram(B)[A_LASER + 1] = 0x97;     // (test: a military laser at the rear in place of what is there)
-        if (getenv("NODJD")) beeb_ram(B)[0x2C57] = 0xFF;     // (test: no auto-recentre: the opposite key steps back)
+        if (getenv("NODJD")) beeb_ram(B)[A_DJD] = 0xFF;     // (test: no auto-recentre: the opposite key steps back)
         for (int c = 0; c < 128; c++) beeb_key(B, c, 0);
         memset(&io, 0, sizeof io);
         io.ram = beeb_ram(B);
@@ -379,7 +382,7 @@ int main(int argc, char **argv) {
                         int rv = R(A_VIEW) == 1;
                         double x = rv ? -me->x : me->x, y = me->y, z = rv ? -me->z : me->z, d = sqrt(x * x + y * y + z * z) + 1;
                         fprintf(stderr, "SL %4d off %6.2f clock %5.0f | jx %4d jy %4d | spd %2d d %5.0f mc %3d in %d\n", nfr, acos(fmax(-1.0, fmin(1.0, z / d))) * 180 / M_PI,
-                                atan2(x, y) * 180 / M_PI, (int) R(0xC1) - 128, (int) R(0xC2) - 128, R(A_DELTA), d, R(A_MCNT), in_crosshairs(me, rv));
+                                atan2(x, y) * 180 / M_PI, (int) R(A_JSTX) - 128, (int) R(A_JSTY) - 128, R(A_DELTA), d, R(A_MCNT), in_crosshairs(me, rv));
                     }
                     if (!alive || pend >= 3 || nfr > 1500) {
                         fprintf(stderr, "FE %s %s frames %d first_in %d in %d off %.0f clock %.0f d %.0f fac %.2f\n", path, !alive ? "killed" : pend >= 3 ? "dropped" : "timeout", nfr, f_in, n_in, a_off, a_clock, a_d, a_fac);
@@ -391,7 +394,7 @@ int main(int argc, char **argv) {
             if (s_shot) shot_frame(); else beeb_frames(B, 1);
             io.frame++;
             if (getenv("TRACE") && fr > atoi(getenv("TRACE")))
-                fprintf(stderr, "%d E %d F %d A %d qq12 %d qq11 %d mcnt %d delta %d lasct %d damp %d\n", fr, energy(), fsh(), ash(), R(0x87), R(0x81), R(0x84), R(0x75), R(0x0E78), R(A_DAMP));
+                fprintf(stderr, "%d E %d F %d A %d qq12 %d qq11 %d mcnt %d delta %d lasct %d damp %d\n", fr, energy(), fsh(), ash(), R(A_QQ12), R(A_QQ11), R(A_MCNT), R(A_DELTA), R(A_LASCT), R(A_DAMP));
             { extern int g_pausing; if (io.frame < g_lab_t0 || g_pausing) continue; }      // (not fighting: setting up, or paused)
             aim_frame();
             showm_frame(io.frame);
@@ -456,7 +459,7 @@ int main(int argc, char **argv) {
                     if (getenv("TRKLOG") && k >= 1) {  // per frame: the target's angles in our view (deg, x right y up), range, stick
                         double d = sqrt(x * x + y * y + z * z) + 1;
                         fprintf(stderr, "TL %6u ax %6.2f ay %6.2f d %5.0f jx %4d jy %4d in %d\n", io.frame, atan2(x, z) * 180 / M_PI, atan2(y, z) * 180 / M_PI,
-                                d, (int) R(0xC1) - 128, (int) R(0xC2) - 128, k == 2);
+                                d, (int) R(A_JSTX) - 128, (int) R(A_JSTY) - 128, k == 2);
                     }
                     if (getenv("TRK") && k >= 1) {     // aiming: by distance, the error over the sights' tolerance there
                         extern long g_trk[8][4];       // [distance bin]: frames tracking, frames in, sum of off/tol, frames off/tol < 3
@@ -551,7 +554,7 @@ int main(int argc, char **argv) {
             }
             int ph_now = g_phase;
             int kills_was = dg.kills;
-            if (!R(0x87)) diag_frame(&dg, e_prev, dead_prev);
+            if (!R(A_QQ12)) diag_frame(&dg, e_prev, dead_prev);
             {   // the efficiency split: what this fight frame went on
                 extern int g_en_mode;
                 static ship_t sh[NOSH];

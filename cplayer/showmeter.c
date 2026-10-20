@@ -29,6 +29,8 @@ static struct {
     long frames, seen, air, run, air0;
     double scr, close;
     int kills, ckills, tech[T_N], passes;
+    int thg_kills; long thg_last, tg20;
+    long big, fought;            // (frames with our target drawn 24 px+; of them centred (within 4.5 deg, ~20 px) or under fire)      // (Thargons killed, the frame of the last; frames a Thargoid drawn 20 px+)
     int ptype[NOSH + 2], palive[NOSH + 2], pours[NOSH + 2];
     double px[NOSH + 2], py[NOSH + 2], pz[NOSH + 2], ppx[NOSH + 2];
     int pon[NOSH + 2];
@@ -51,12 +53,16 @@ static struct {
     long lively_fr, static_fr, srun, static_air;
     long s20, s40;                 // frames with an enemy drawn 20 / 40 px or more (the user's measure: how big, how long)
     double sint;                   // the largest enemy's drawn size, summed over frames (capped at 100 px)
+    double bigv;                   // big_value() of it summed over frames: how big, for how long (the user's measure, round 8)
+    long spd_rev; int spd_last, spd_dir;   // our speed's changes of direction (speeding up, then slowing): pulsing
+    long spd_sum, spd_fast;        // speed summed over frames, and frames at 30 or more: a high speed chase
+    long stk_rev; int stk_lx, stk_ly, stk_dx, stk_dy;   // the stick's changes of direction (either axis): judder
     char kd[480];                  // each kill: distance, and how (f front, r rear, m missile, b bomb)
 } M;
 
 void showm_begin(void) {
     memset(&M, 0, sizeof M);
-    M.nomsl = R(A_NOMSL), M.bomb = R(A_BOMB), M.ecmp = R(0x0E72), M.last_mc = -1;
+    M.nomsl = R(A_NOMSL), M.bomb = R(A_BOMB), M.ecmp = R(A_ECMP), M.last_mc = -1;
     M.bomb_at = M.ecm_at = 0xFFFF0000u;
     M.pview = R(A_VIEW) & 3;
     M.pmode = -2;
@@ -82,6 +88,16 @@ static double on_screen_at(const ship_t *s, double *sx, double *sy) {
     if (sx) *sx = 128 + 256 * x / z, *sy = 96 - 256 * y / z;
     return 256 * r / z;
 }
+
+// how much a ship drawn this big is worth on screen, a frame (the user: "64px better than 24. too close (not possible to
+// fit in screen) might be worse"): nothing for a speck under 16 px, up to 1 at 64 px (a quarter of the 256 px view),
+// 1 to 160 px, down to nothing at 256 px, where it no longer fits
+static double big_value(double px) {
+    if (px < 16) return 0;
+    if (px < 64) return (px - 16) / 48;
+    if (px <= 160) return 1;
+    return px < 256 ? (256 - px) / 96 : 0;
+}
 static double on_screen(const ship_t *s) { return on_screen_at(s, NULL, NULL); }
 
 void showm_frame(uint32_t frame) {
@@ -89,13 +105,15 @@ void showm_frame(uint32_t frame) {
     static ship_t sh[NOSH];
     int n = ships_read(IO->ram, sh), alive = 0, non = 0, dot = 0, near4 = 0;
     double big = 0;
-    int nomsl = R(A_NOMSL), bomb = R(A_BOMB), ecmp = R(0x0E72);
+    int nomsl = R(A_NOMSL), bomb = R(A_BOMB), ecmp = R(A_ECMP);
     if (nomsl < M.nomsl) M.tech[T_MSL_LAUNCH]++;
     if (bomb == 0 && M.bomb) M.tech[T_BOMB]++, M.bomb_at = frame;
     if (ecmp && !M.ecmp) M.tech[T_ECM]++, M.ecm_at = frame;
     M.nomsl = nomsl, M.bomb = bomb, M.ecmp = ecmp;
     int cur_type[NOSH + 2] = {0}, cur_alive[NOSH + 2] = {0}, cur_ours[NOSH + 2] = {0};
-    double cur_px[NOSH + 2] = {0};
+    double cur_px[NOSH + 2] = {0}, tg_px = 0, my_px = 0, my_off = 180;
+    extern int combat_target(void), g_fire_now;
+    int my_slot = combat_target();
     for (int i = 0; i < n; i++) {
         const ship_t *s = &sh[i];
         int k = s->slot;
@@ -106,6 +124,12 @@ void showm_frame(uint32_t frame) {
         double d = sqrt((double) s->x * s->x + (double) s->y * s->y + (double) s->z * s->z);
         double px = on_screen(s);
         cur_px[k] = px;
+        if (s->slot == my_slot && !ship_dead(s)) {
+            int v = R(A_VIEW);
+            double z = v == 1 ? -s->z : s->z;
+            my_px = px, my_off = acos(fmax(-1.0, fmin(1.0, z / (d + 1)))) * 180 / M_PI;
+        }
+        if (s->type == 29 && !ship_dead(s) && px > tg_px) tg_px = px;
         // a kill: the same ship (type, slot) alive last frame and exploding now
         if (ship_dead(s) && M.ptype[k] == s->type && M.palive[k]) {
             if (s->type == 1) {
@@ -114,6 +138,7 @@ void showm_frame(uint32_t frame) {
                 else M.tech[T_SHOOTDOWN]++;
             } else if (enemy(s) || (s->newb & NEWB_HOSTILE)) {
                 M.kills++;
+                if (s->type == 30) M.thg_kills++, M.thg_last = M.frames;
                 int how = T_FRONT;
                 if (frame - M.bomb_at < 60) how = T_BOMB;
                 else {
@@ -181,7 +206,7 @@ void showm_frame(uint32_t frame) {
     // pitch, summed one way: a loop is 360 deg of it (BETA &42, sign-magnitude, 1/256 rad a main loop)
     if (R(A_MCNT) != M.last_mc) {
         M.last_mc = R(A_MCNT);
-        int b = R(0x42), beta = b & 0x80 ? -(b & 0x7F) : b;
+        int b = R(A_BETA), beta = b & 0x80 ? -(b & 0x7F) : b;
         double deg = beta / 256.0 * 180 / M_PI;
         if (deg * M.pitch < 0) M.pitch = 0;
         M.pitch += deg;
@@ -207,7 +232,19 @@ void showm_frame(uint32_t frame) {
     int cap = alive < 3 ? alive : 3;
     M.scr += (double) (non < cap ? non : cap) / cap;
     M.close += fmin(1.0, big / BIG_PX);
-    M.s20 += big >= 20, M.s40 += big >= 40, M.sint += fmin(big, 100);
+    M.tg20 += tg_px >= 20;
+    if (my_px >= 24) M.big++, M.fought += my_off < 4.5 || g_fire_now;
+    g_fire_now = 0;
+    M.s20 += big >= 20, M.s40 += big >= 40, M.sint += fmin(big, 100), M.bigv += big_value(big);
+    { int sp = speed(), d = sp > M.spd_last ? 1 : sp < M.spd_last ? -1 : 0;
+      if (d && M.spd_dir && d != M.spd_dir) M.spd_rev++;
+      if (d) M.spd_dir = d;
+      M.spd_last = sp; M.spd_sum += sp; M.spd_fast += sp >= 30; }
+    { int x = jstx(), y = jsty(), dx = x > M.stk_lx + 2 ? 1 : x < M.stk_lx - 2 ? -1 : 0, dy = y > M.stk_ly + 2 ? 1 : y < M.stk_ly - 2 ? -1 : 0;
+      if (dx && M.stk_dx && dx != M.stk_dx) M.stk_rev++;
+      if (dy && M.stk_dy && dy != M.stk_dy) M.stk_rev++;
+      if (dx) M.stk_dx = dx, M.stk_lx = x;
+      if (dy) M.stk_dy = dy, M.stk_ly = y; }
     // static: something seen but nothing moving, in runs over 2 s (a ship held dead centre, growing slowly)
     if (non && M.lively) M.lively_fr++;
     if (non && !M.lively) M.static_fr++, M.srun++;
@@ -235,8 +272,11 @@ void showm_end(const char *path, int died, int start_n, int left, int dmg, int l
         strcat(t, b);
     }
     long sfb, sfs;
+    char sfh[160] = "";
+    { extern long g_sf_hist[16]; int k = 0; for (int i = 0; i < 16; i++) k += snprintf(sfh + k, sizeof sfh - k, "%s%ld", i ? "," : "", g_sf_hist[i]); }
+    extern long g_ev_starts, g_ev_frames;
     { extern void show_strafe_count(long *, long *); show_strafe_count(&sfb, &sfs); }
-    fprintf(stderr, "SHOW %s frames %ld scr %.3f close %.3f seen %.3f air %.3f kills %d ckills %d passes %d start_n %d left %d dmg %d lowest %d died %d air0 %.3f views %ld,%ld,%ld,%ld switches %d showfr %ld modesw %d mode %d spent %d s20 %ld s40 %ld sint %.0f airsplit %ld,%ld,%ld lively %ld static %ld staticair %ld strafe %ld,%ld tmax %s kd %s tech %s\n",
+    fprintf(stderr, "SHOW %s frames %ld scr %.3f close %.3f seen %.3f air %.3f kills %d ckills %d passes %d start_n %d left %d dmg %d lowest %d died %d air0 %.3f views %ld,%ld,%ld,%ld switches %d showfr %ld modesw %d mode %d spent %d s20 %ld s40 %ld sint %.0f bigv %.0f spdrev %ld spdsum %ld spdfast %ld stkrev %ld airsplit %ld,%ld,%ld lively %ld static %ld staticair %ld strafe %ld,%ld thg %d,%ld,%ld ev %ld,%ld fought %ld,%ld sfh %s tmax %s kd %s tech %s\n",
             path, M.frames, M.frames ? M.scr / M.frames : 0, M.frames ? M.close / M.frames : 0, M.frames ? (double) M.seen / M.frames : 0,
-            M.frames ? (double) M.air / M.frames : 0, M.kills, M.ckills, M.passes, start_n, left, dmg, lowest, died, M.frames ? (double) (M.seen ? M.air0 : M.air) / M.frames : 0, M.vseen[0], M.vseen[1], M.vseen[2], M.vseen[3], M.switches, M.showfr, M.mode_sw, M.dmode, g_show_spent, M.s20, M.s40, M.sint, M.air_dot, M.air_off, M.air_far, M.lively_fr, M.static_fr, M.static_air, sfb, sfs, tm[0] ? tm : "-", M.kd[0] ? M.kd : "-", t[0] ? t : "-");
+            M.frames ? (double) M.air / M.frames : 0, M.kills, M.ckills, M.passes, start_n, left, dmg, lowest, died, M.frames ? (double) (M.seen ? M.air0 : M.air) / M.frames : 0, M.vseen[0], M.vseen[1], M.vseen[2], M.vseen[3], M.switches, M.showfr, M.mode_sw, M.dmode, g_show_spent, M.s20, M.s40, M.sint, M.bigv, M.spd_rev, M.spd_sum, M.spd_fast, M.stk_rev, M.air_dot, M.air_off, M.air_far, M.lively_fr, M.static_fr, M.static_air, sfb, sfs, M.thg_kills, M.thg_last, M.tg20, g_ev_starts, g_ev_frames, M.big, M.fought, sfh, tm[0] ? tm : "-", M.kd[0] ? M.kd : "-", t[0] ? t : "-");
 }

@@ -55,14 +55,14 @@ int g_bail_energy;
 int g_brk_log;
 int g_msl_side = 2500;     // the missile-side turn, for missiles within this (0 off)
 long g_sw_why[4];
-int g_en_mode;             // (for the lab's time split) this frame's fight mode: 0 attack, 1 break off, 2 missile side, 3 ram dodge, 4 evade
+int g_en_mode;             // (for the lab's time split) this frame's fight mode: 0 attack, 1 break off, 2 missile side, 3 ram dodge, 4 evade, 5 curious collision evasion
 extern int g_steer_log;
 static double dist_of(const ship_t *s) { return sqrt((double) s->x * s->x + (double) s->y * s->y + (double) s->z * s->z); }
 
 // kill points (the Master scores kills by type: Moxon's combat rank deep dive)
 static double points_of(int type) {
     const shiptype_t *t = ship_type(type);
-    return type == 1 ? 0.58 : t ? t->kill_points : 0.1;
+    return type == 1 ? (g_ev.kills_by_type ? 0.58 : 1.0) : t ? t->kill_points : 0.1;      // (the disc version: 1 a kill)
 }
 
 // iterations to bring the nose (or the rear laser) onto a point: roll it into our pitch plane, then
@@ -98,7 +98,7 @@ static double ramp_iters(double ang, int from, int step, double (*rate)(int)) {
 // take). jx, jy: the stick as seen in this view
 static double turn_iters_from(double x, double y, double z, int jx, int jy) {
     // (keys ramp the stick 5 / 13 a loop; a joystick is wherever we put it: no ramp)
-    int joy = IO->analogue && R(0x2C5C) != 0;
+    int joy = IO->analogue && R(A_JSTK) != 0;
     double d = sqrt(x * x + y * y + z * z);
     if (d < 1) return 0;
     double off = acos(fmax(-1.0, fmin(1.0, z / d)));
@@ -214,7 +214,7 @@ int threats(const ship_t *s, int n, int rng, const ship_t **out, int max) {
 static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *miss);
 const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss) { return collision_risk(s, n, margin, miss); }
 static const ship_t *collision_risk(const ship_t *s, int n, int margin, vec_t *miss) {
-    double horizon = show_ram_iters(g_cpa->ram_iters);      // (curious show: it may look further)
+    double horizon = g_cpa->ram_iters;
     const ship_t *worst = NULL;
     double wd = 1e30;
     for (int i = 0; i < n; i++) {
@@ -261,8 +261,12 @@ static int s_force_rear;
 // one frame of attacking sh: the keys, the angle off (degrees), and the view to fight in (0 front,
 // 1 rear: with a rear laser, a target behind is fought from the rear view, where our turns look
 // mirrored: the rolls swap, and so do climb and dive)
+int g_rr_log;                // (RRLOG, the sim: a line a fight frame: running away and rolling, and what was flying)
+static int s_rr_plan, s_rr_weave, s_rr_rear, s_rr_fire;
+int g_fire_now;              // (the lab's meter: our laser keyed on the target this frame; it clears it)
 static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *keys, int *view_out) {
     cp_select();
+    s_rr_plan = s_rr_weave = s_rr_rear = 0;
     const combat_params_t *P = g_cpa;
     double dist = dist_of(sh);
     double sp = 1.5 * sh->speed, k = P->lead;
@@ -278,7 +282,9 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         v = (vec_t){-v.x, v.y, -v.z};
         aim = (vec_t){-aim.x, aim.y, -aim.z};
     }
-    int weave = show_weave(sh, rear, &aim.x, &aim.y, &aim.z);     // (curious mode's show: the weave; in the view's frame)
+    int weave = show_extend(sh);      // (curious mode's show: straight on after a flyby, the nose where it is)
+    if (weave) aim = (vec_t){0, 0, 10000};
+    s_rr_weave = weave, s_rr_rear = rear;
     // (the stick as seen from the rear view is mirrored too, both ways: steer() compares where it is
     // with where it should be, so it has to be in the same mirrored frame as the aim. Unmirrored, it
     // pushed the stick the wrong way and only came round when it hit the stop: the bouncing)
@@ -287,7 +293,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     { extern double g_aim_tol; const shiptype_t *tt = ship_type(sh->type); g_aim_tol = atan2(tt && tt->area ? sqrt((double) tt->area) : 80, dist + 1); }
     double off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
     { extern int g_want_jx, g_want_jy;
-      if (g_plan && g_want_jx >= 0 && IO->analogue && R(0x2C5C) && !show_flyby() && !weave && !show_noplan()) {     // (not in a flyby: it aims beside)
+      if (g_plan && g_want_jx >= 0 && IO->analogue && R(A_JSTK) && !show_flyby() && !weave) {     // (not in a flyby: it aims beside)
           const shiptype_t *tt = ship_type(sh->type);
           double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
           double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
@@ -304,9 +310,12 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
                   double tvx = sh->nosev[0] * sp, tvy = sh->nosev[1] * sp, tvz = sh->nosev[2] * sp;
                   if (rear) tvx = -tvx, tvz = -tvz;
                   vec_t tp = {v.x, v.y, v.z}, tv = {tvx, tvy, tvz};
+                  { extern int g_plan_smooth, g_curious; g_plan_smooth = g_curious && show_on(); }      // (curious: smooth planning in the show)
                   plan_stick(tp, tv, rear ? -speed() : speed(), r, jx_, jy_, &pa, &pb);
+                  { extern int g_plan_smooth; g_plan_smooth = 0; }
               }
               g_want_jx = pa, g_want_jy = pb;
+              s_rr_plan = 1;
           }
       } }
     { extern double g_aim_tol; g_aim_tol = 0; }
@@ -322,7 +331,20 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int want;
     vec_t q;
     const ship_t *rc = collision_risk(s, n, P->ram_dist, &q);
-    if (rc) {
+    vec_t eq;
+    const ship_t *ev = show_evade(s, n, &eq);
+    if (ev) {
+        // (curious: the priority evasion, show.c's show_evade: pitch only, away from the side it'll pass, full speed)
+        double sy = eq.y >= 0 ? 1 : -1;
+        ks_clear(keys);
+        steer((vec_t){0, -sy * 4000, 1500}, jstx(), jsty(), 3, 3, keys);
+        ks_del(keys, K_ROLL_LEFT);
+        ks_del(keys, K_ROLL_RIGHT);
+        { extern int g_want_jx; if (g_want_jx >= 0) g_want_jx = jstx(); }      // (a joystick: the roll where it is)
+        want = 40;
+        g_en_mode = 5;
+        rc = ev;
+    } else if (rc) {
         double m = hypot(q.x, q.y);
         double mx = m > 1 ? q.x / m : 0, my = m > 1 ? q.y / m : 1;
         ks_clear(keys);
@@ -368,7 +390,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
-    if (show_fire(sh, dist, near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK))) ks_add(keys, K_FIRE);
+    if (show_fire(sh, dist, near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK))) ks_add(keys, K_FIRE), s_rr_fire = 1, g_fire_now = 1;
     else if (g_opp_fire && !show_on() && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
     {
         extern int g_steer_log;
@@ -431,6 +453,17 @@ static void announce(const ship_t *sh, int n) {
     }
 }
 
+// the fight's kills for the journal. The disc version scores 1 a kill, ours only: its tally's rise is the count.
+// The Master's (its tally is points by type) stays the hostile ships seen blowing up during the fight, ours or not
+// (as its journals always had it)
+static int fight_kills(void) { return ev_disc() ? (int) (tally() - c_en.tally0 + 0.5) : c_en.kills; }
+// (the disc version: every way out of a fight ends it in the journal, so fight times add up; the Master's
+// journal, as it was, has a fight_end only when no enemies are left or the time's up)
+static void fight_end_note(const char *how) {
+    if (ev_disc()) note("{\"event\": \"fight_end\", \"gained\": %.2f, \"kills\": %d, \"energy\": %d, \"energy_min\": %d, \"how\": \"%s\"}",
+                        tally() - c_en.tally0, fight_kills(), energy(), c_en.energy_min, how);
+}
+
 PT_THREAD(engage(float seconds)) {
     CO_BEGIN(c_en);
     c_en.until = deadline(seconds);
@@ -450,6 +483,7 @@ PT_THREAD(engage(float seconds)) {
             keyset_t k = {{0}, 0};
             g_flight = k;
             hold(&k);
+            fight_end_note("docked");
             CO_EXIT(c_en);
         }
         c_en.key = 0;
@@ -470,6 +504,7 @@ PT_THREAD(engage(float seconds)) {
             if (nt && witchspace() && g_bail_energy && energy() < g_bail_energy && !hyperspace_count()) {     // (counting: fight on)
                 logf_("energy %d in witchspace with %d enemies: bailing out by hyperspace", energy(), nt);
                 status_("Losing to the Thargoids: hyperspace out");
+                fight_end_note("bail");
                 CO_EXIT(c_en);
             }
             if (!nt || expired(c_en.until)) {
@@ -478,7 +513,7 @@ PT_THREAD(engage(float seconds)) {
                 logf_("fight over: tally %.2f -> %.2f, energy %d -> %d", c_en.tally0, tally(), c_en.energy0, energy());
                 status_("Fight over: %+.2f, energy %d", tally() - c_en.tally0, energy());
                 note("{\"event\": \"fight_end\", \"gained\": %.2f, \"kills\": %d, \"energy\": %d, \"energy_min\": %d}",
-                     tally() - c_en.tally0, c_en.kills, energy(), c_en.energy_min);
+                     tally() - c_en.tally0, fight_kills(), energy(), c_en.energy_min);
                 CO_EXIT(c_en);
             }
             cp_select();
@@ -615,6 +650,24 @@ PT_THREAD(engage(float seconds)) {
             g_en_mode = 0;
             { PT_START(tk0); off = combat_keys(sh, n, t, &keys, &view); PT_ADD(2, tk0); }
         flown:
+            if (g_rr_log) {
+                // RR: frame, game loop, every enemy behind us (1), the nearest's range and its change since last
+                // frame, our speed, the stick's roll (jx) and pitch, the view; and what was flying: show on, witchspace,
+                // fight mode (0 attack, 1 break off, 2 missile side, 3 ram dodge, 4 evade), planner, weave, rear
+                // laser, flyby state, toy follow, the angle off the target, its type
+                static double last_d = -1;
+                int behind = nt > 0;
+                double nd = 1e9;
+                for (int i = 0; i < nt; i++) { if (th[i]->z >= 0) behind = 0; double d = dist_of(th[i]); if (d < nd) nd = d; }
+                double rr = last_d >= 0 && nd < 1e8 ? nd - last_d : 0;
+                last_d = nd < 1e8 ? nd : -1;
+                extern int g_show_toyspd, show_fb_state(void);
+                const shiptype_t *tty = t ? ship_type(t->type) : NULL;
+                double td = t ? dist_of(t) : 0, tpx = t ? 256 * (tty && tty->area ? sqrt((double) tty->area) : 80) / (td + 1) : 0;
+                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f", now(), mcnt(), behind, nd, rr, speed(), jstx() - 128,
+                      jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0);
+                s_rr_fire = 0;
+            }
             // outnumbered and hurting: the energy bomb destroys every ship about but Thargoids and
             // the mission ships, each scoring its kill points; before the pod
             if (R(A_BOMB) && (energy() < 140 || (fsh() > ash() ? fsh() : ash()) < 60)) {

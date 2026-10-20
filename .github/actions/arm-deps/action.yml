@@ -1,0 +1,20 @@
+name: arm-deps
+description: the Arm GNU toolchain 14.2.rel1 (as rp2350-bbc-micro's setup.sh) and the Pico SDK 2.2.0, for its maths
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: cache
+      with:
+        path: ~/arm-deps
+        key: arm-deps-14.2.rel1-sdk-2.2.0-${{ runner.arch }}
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/arm-deps && cd ~/arm-deps
+        curl -fsSL https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-aarch64-arm-none-eabi.tar.xz | tar -xJ
+        git clone -q --depth 1 -b 2.2.0 https://github.com/raspberrypi/pico-sdk.git
+    - shell: bash
+      run: |
+        echo "$HOME/arm-deps/arm-gnu-toolchain-14.2.rel1-aarch64-arm-none-eabi/bin" >> "$GITHUB_PATH"
+        echo "PICO_SDK_PATH=$HOME/arm-deps/pico-sdk" >> "$GITHUB_ENV"

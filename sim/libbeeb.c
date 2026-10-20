@@ -1,4 +1,4 @@
-// The BBC Master (Kieran Connell's core, from the rp2350-bbc-micro submodule) as a library for the
+// The BBC Master (Kieran Connell's core, from rp2350-bbc-micro: scripts/fetch-emulator.sh) as a library for the
 // development build: the lab and run_sim step it a frame at a time, read its RAM, press keys and
 // save/restore the whole machine. No video.
 #include <stdio.h>
@@ -29,7 +29,7 @@ static const uint8_t *load(const char *dir, const char *name, size_t want)
     return buf;
 }
 
-// where the emulator is (its roms/ and discs/, fetched by setup.sh): $ELITE_EMU, or the submodule
+// where the emulator is (its roms/ and discs/, scripts/fetch-emulator.sh): $ELITE_EMU, or rp2350-bbc-micro/
 // beside the directory this program is in (cplayer/../rp2350-bbc-micro)
 const char *beeb_emu_dir(void)
 {
@@ -72,6 +72,9 @@ beeb_t *beeb_new(const char *roms, const char *disc_path)
     machine_autoboot(m);
     return b;
 }
+
+// a reset with the disc left in (its writes, the saves, kept) and booted, as the Presto's eject does
+int beeb_reboot(beeb_t *b) { machine_reset(&b->m); machine_autoboot(&b->m); return 0; }
 
 void beeb_frames(beeb_t *b, int n)
 {
@@ -209,3 +212,8 @@ int beeb_disc_dump(beeb_t *b, const char *path)
 
 // the joystick: an analogue channel's value (0..0xFFFF, 0x8000 centred)
 void beeb_analogue(beeb_t *b, int channel, int value) { machine_set_analogue(&b->m, channel, (uint16_t) value); }
+
+// the machine (machine_hook.h's model): a Master 128
+int beeb_model(void) { return 3; }
+// the disc drive spinning (run_sim's time split: the game waiting on the disc, or just after)
+int beeb_disc_busy(beeb_t *b) { return b->m.fdc.drive[0].spinning; }

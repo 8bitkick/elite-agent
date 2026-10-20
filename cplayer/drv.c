@@ -38,13 +38,22 @@ int g_hold_ctrl;     // CTRL held too, whatever else is (a forced mis-jump: flig
 // else move a virtual stick as the keyboard would. Calibrated in the simulator: JSTX = 3 + ch0 * 250 /
 // 65536, JSTY = 1 + ch1 * 253 / 65536
 int g_want_jx = -1, g_want_jy = -1;
-static int joystick_on(void) { return IO && IO->analogue && R(0x2C5C) != 0; }
+static int joystick_on(void) { return IO && IO->analogue && R(A_JSTK) != 0; }
 // the stick out to the port: JSTX/JSTY units (as the game will read them) to ADC values
 static void analogue_out(int jx, int jy) {
     // (the game's own options flip what the port reads: the calibration's with JSTGY &2C5A set, as
     // RESET leaves it, and JSTE &2C5B clear)
-    if (R(0x2C5B)) jx = 256 - jx, jy = 256 - jy;
-    if (!R(0x2C5A)) jy = 256 - jy;
+    if (!ev_master()) {
+        // (the disc version: JSTX/JSTY are the ADC's high byte (OSBYTE 128), EOR JSTE, and JSTY EOR JSTGY)
+        jx = jx < 1 ? 1 : jx > 254 ? 254 : jx, jy = jy < 1 ? 1 : jy > 254 ? 254 : jy;
+        if (R(A_JSTE)) jx ^= 0xFF, jy ^= 0xFF;
+        if (R(A_JSTGY)) jy ^= 0xFF;
+        IO->analogue(IO->ctx, 0, (uint16_t) (jx << 8 | 0x80));
+        IO->analogue(IO->ctx, 1, (uint16_t) (jy << 8 | 0x80));
+        return;
+    }
+    if (R(A_JSTE)) jx = 256 - jx, jy = 256 - jy;
+    if (!R(A_JSTGY)) jy = 256 - jy;
     jx = jx < 3 ? 3 : jx > 253 ? 253 : jx;
     jy = jy < 1 ? 1 : jy > 254 ? 254 : jy;
     long vx = (long) (jx - 3) * 65536 / 250, vy = (long) (jy - 1) * 65536 / 253;      // (65536 at the top: clamp,
@@ -61,7 +70,7 @@ static void stick_out(keyset_t *k) {
     // (off the space view, a chart or a docked screen, the stick reads as the cursor: centred unless
     // something's steering it there; left leaning, the chart's cursor drifted after a system was
     // chosen and we jumped somewhere else)
-    if (R(0x81) != 0) rx = ry = 128;
+    if (R(A_QQ11) != 0) rx = ry = 128;
     if (jx < 0) jx = rx + (ks_has(k, K_ROLL_LEFT) ? 7 : 0) - (ks_has(k, K_ROLL_RIGHT) ? 7 : 0);
     if (jy < 0) jy = ry + (ks_has(k, K_DIVE) ? 14 : 0) - (ks_has(k, K_CLIMB) ? 14 : 0);
     if (g_fair & FAIR_STICK) s_want_sx = jx, s_want_sy = jy;        // (the hand moves it: drv_fair_pump)

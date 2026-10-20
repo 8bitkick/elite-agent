@@ -94,9 +94,14 @@ def load(path):
         f['novel'] = (ts & RARE) | first_meetings().get(d['path'], set())
         f['airsplit'] = [int(x) for x in d.get('airsplit', '0,0,0').split(',')]
         import re as _re
+        f['ckills8'] = sum(1 for x in d.get('kd', '-').split(',') if _re.match(r'^\d+[frmbe](\d+)[SBMO]$', x) and int(_re.match(r'^\d+[frmbe](\d+)[SBMO]$', x).group(1)) >= 8)
         f['ckills20'] = sum(1 for x in d.get('kd', '-').split(',') if _re.match(r'^\d+[frmbe](\d+)[SBMO]$', x) and int(_re.match(r'^\d+[frmbe](\d+)[SBMO]$', x).group(1)) >= 20)
         f['strafe'] = d.get('strafe', '0,0')
-        f['s20'] = int(d.get('s20', 0)); f['s40'] = int(d.get('s40', 0)); f['sint'] = float(d.get('sint', 0))
+        f['thg'] = [int(x) for x in d.get('thg', '0,0,0').split(',')]
+        f['ev'] = [int(x) for x in d.get('ev', '0,0').split(',')]
+        f['fought'] = [int(x) for x in d.get('fought', '0,0').split(',')]
+        f['sfh'] = [int(x) for x in d.get('sfh', ','.join(['0'] * 16)).split(',')]
+        f['s20'] = int(d.get('s20', 0)); f['s40'] = int(d.get('s40', 0)); f['sint'] = float(d.get('sint', 0)); f['bigv'] = float(d.get('bigv', 0)); f['spdrev'] = int(d.get('spdrev', 0)); f['spdsum'] = int(d.get('spdsum', 0)); f['spdfast'] = int(d.get('spdfast', 0)); f['stkrev'] = int(d.get('stkrev', 0))
         f['lively'] = int(d.get('lively', 0)); f['static'] = int(d.get('static', 0)); f['staticair'] = int(d.get('staticair', 0))
         f['showfr'] = int(d.get('showfr', 0)); f['modesw'] = int(d.get('modesw', 0)); f['mode'] = int(d.get('mode', -1)); f['spent'] = int(d.get('spent', 0))
         s = scn.get(d['path'], {})
@@ -156,13 +161,33 @@ def summary(name, F):
     # 40 px or more; and the size-time integral (the largest enemy's drawn px, capped at 100, summed over frames) per
     # minute of fight, in px-seconds
     mins = max(1e-9, sum(f['frames'] for f in F) / 3000)
-    print('  COLLISIONS: %d in %d fights (%.1f per 1000), collision deaths %d (%.1f per 1000); kills drawn 20 px+ %.0f%%' % (
+    print('  COLLISIONS: %d in %d fights (%.1f per 1000), collision deaths %d (%.1f per 1000); kills drawn 20 px+ %.0f%%, 8 px+ %.0f%%' % (
         sum(f['cols'] for f in F), n, 1000 * sum(f['cols'] for f in F) / max(1, n), sum(f['cdied'] for f in F), 1000 * sum(f['cdied'] for f in F) / max(1, n),
-        100 * sum(f['ckills20'] for f in F) / max(1, sum(f['kills'] for f in F))))
+        100 * sum(f['ckills20'] for f in F) / max(1, sum(f['kills'] for f in F)), 100 * sum(f['ckills8'] for f in F) / max(1, sum(f['kills'] for f in F))))
+    print('  FOUGHT: %.2f s a fight minute (a big target, 24 px+, %.1f s a minute; centred or under fire %.0f%% of it)' % (
+        sum(f['fought'][1] for f in F) / 50 / mins, sum(f['fought'][0] for f in F) / 50 / mins, 100 * sum(f['fought'][1] for f in F) / max(1, sum(f['fought'][0] for f in F))))
+    h = [sum(f['sfh'][i] for f in F) for i in range(16)]
+    if sum(h):
+        lab = ['hit'] + ['%.1f-%.1f' % (i * 0.2, i * 0.2 + 0.2) for i in range(14)] + ['2.8+']
+        print('  NEAR MISSES (gap from the sights to its outline, x its drawn radius): %d shots; ' % sum(h) + ', '.join('%s %.0f%%' % (lab[i], 100 * h[i] / sum(h)) for i in range(16) if h[i]))
+    if any(f['ev'][0] for f in F):
+        print('  EVASIONS: %.2f a fight (in %.0f%% of fights), %.1f s each' % (sum(f['ev'][0] for f in F) / max(1, n),
+              100 * sum(1 for f in F if f['ev'][0]) / max(1, n), sum(f['ev'][1] for f in F) / 50 / max(1, sum(f['ev'][0] for f in F))))
+    tf = [f for f in F if f['thg'][0] or f['thg'][2]]
+    if tf:
+        print('  THARGONS: in %d fights, %.2f killed a fight, the last at %.1f s (median), a Thargoid drawn 20 px+ %.1f s a fight' % (
+            len(tf), sum(f['thg'][0] for f in tf) / len(tf), sorted(f['thg'][1] for f in tf)[len(tf) // 2] / 50, sum(f['thg'][2] for f in tf) / 50 / len(tf)))
     sf = [tuple(int(x) for x in str(f.get('strafe', '0,0')).split(',')) for f in F]
     if any(b for b, s in sf):
         print('  STRAFE: bursts in %.0f%% of fights, %.2f a fight, %.1f frames fired a burst' % (
             100 * sum(1 for b, s in sf if b) / max(1, n), sum(b for b, s in sf) / max(1, n), sum(s for b, s in sf) / max(1, sum(b for b, s in sf))))
+    print('  CAPPED: %d fights of %d ran 239 s or more' % (sum(1 for f in F if f['frames'] >= 239 * 50), n))
+    # (round 8, the user: "calibrate how big for how long": showmeter.c's big_value, 0 under 16 px, 1 at 64-160 px, 0 at 256)
+    print('  BIG SHIPS: %.1f s a fight minute (a ship drawn 64-160 px a whole second, less below or above), %.1f s a fight' % (
+        sum(f['bigv'] for f in F) / 50 / mins, sum(f['bigv'] for f in F) / 50 / max(1, n)))
+    fr = max(1, sum(f['frames'] for f in F))
+    print('  PULSING: our speed changed direction %.1f times a fight minute | speed %.1f mean, 30+ %.0f%% of fight time | stick reversals %.1f a minute (judder)' % (
+        sum(f['spdrev'] for f in F) / mins, sum(f['spdsum'] for f in F) / fr, 100 * sum(f['spdfast'] for f in F) / fr, sum(f['stkrev'] for f in F) / mins))
     print('  SIZE x TIME: >=20 px %.1f s a fight (%.1f s a minute), >=40 px %.1f s a fight (%.1f s a minute), size-time %.0f px.s a minute' % (
         sum(f['s20'] for f in F) / 50 / max(1, n), sum(f['s20'] for f in F) / 50 / mins, sum(f['s40'] for f in F) / 50 / max(1, n),
         sum(f['s40'] for f in F) / 50 / mins, sum(f['sint'] for f in F) / 50 / mins))

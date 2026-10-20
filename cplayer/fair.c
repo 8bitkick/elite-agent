@@ -273,7 +273,7 @@ static void speed_update(trk_t *t, const double m[3], double sig_r, double vmax)
     memcpy(t->q, m, sizeof t->q), t->qk = 0, t->has_q = 1;
 }
 
-static double pts_of(int type) { const shiptype_t *t = ship_type(type); return type == 1 ? 0 : t ? t->kill_points : 0; }
+static double pts_of(int type) { const shiptype_t *t = ship_type(type); return type == 1 ? (g_ev.kills_by_type ? 0 : 1) : t ? t->kill_points : 0; }
 static int place_now(void) { return R(A_GCNT) << 17 | R(A_QQ0) << 9 | R(A_QQ1) << 1 | (R(A_MJ) != 0); }
 
 void fair_reset(void) {
@@ -291,7 +291,9 @@ static void update_tally(void) {
     // the tally: our count of the kills we've seen, each at its type's points, kept within the 256 the "RIGHT ON
     // COMMANDER!" messages (each 256 points) say it's in. (The message comes as TALLY+1 counts up: the same thing)
     int hi = R(A_TALLY + 1);
-    if (s_tally_hi < 0) s_tally_est = hi * 256.0 + R(A_TALLY), s_tally_hi = hi;     // (the start: a commander's rank and record)
+    // (the start: a commander's rank and record. The disc version's titles come before any commander is in
+    // RAM: its TALLY there is anything, so the count starts again on each title frame)
+    if (s_tally_hi < 0 || (ev_disc() && title())) s_tally_est = hi * 256.0 + R(A_TALLY), s_tally_hi = hi;
     if (hi != s_tally_hi) {
         if (s_tally_est < hi * 256.0) s_tally_est = hi * 256.0;
         s_tally_hi = hi;

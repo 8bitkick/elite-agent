@@ -29,3 +29,6 @@ cplayer/test_galaxy
 cplayer/test_ships
 presto/build/
 presto/build.log
+cplayer/.beebjit-obj/
+presto/app/build/
+rp2350-bbc-micro/

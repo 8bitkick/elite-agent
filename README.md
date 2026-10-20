@@ -7,6 +7,9 @@ and 60 KB of RAM compiled for the RP2350's Cortex-M33. It runs on that microcont
 Presto, beside the BBC Master emulator, averaging about 2.4 ms of each 20 ms frame; the same code runs on a native
 build of the emulator (Pi or Mac) for development.
 
+It's also released as a plugin for [rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro)'s
+plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkick/elite-agent/releases).
+
 | | | |
 |---|---|---|
 | ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
@@ -18,7 +21,7 @@ build of the emulator (Pi or Mac) for development.
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.8 game hours** (26.2-27.4 on five careers, 5 deaths in all) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers; every RAM read audited) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | **134.8 game hours** (one career, 272 systems in all 8 galaxies) |
+| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time: its fights are for watching (Elite took 134.8 game hours on an earlier build, the column below) |
 
 All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
@@ -27,7 +30,7 @@ hours on the native emulator at the real machine's speed.
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
-| | Efficient (5) | Fair (5) | Curious (1) |
+| | Efficient (5) | Fair (5) | Curious (1, round 5) |
 |---|---|---|---|
 | Game hours to Elite | 26.8 | 29.8 | 134.8 |
 | Star systems visited | 64 | 67 | 272 |
@@ -44,8 +47,11 @@ hours on the native emulator at the real machine's speed.
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
 
-Curious mode's fights are for the camera: over 4,232 recorded fights an enemy is drawn 20 pixels or
-bigger for about 6 seconds a fight, against none in efficient mode, which kills from as far out as it can.
+Curious mode's fights are for the camera, and it's tuned on how big the enemy is on screen and for how long: a ship
+drawn 64 to 160 pixels counts a whole second, less as it gets smaller or too big to fit (`tools/show.py`'s BIG SHIPS).
+Over 300 recorded fights of a well-off commander that's about 5 seconds of every fight minute, with the stick
+smoothed near the target but free to break out, and specks that are getting away shot rather than chased. Efficient
+mode kills from as far out as it can.
 
 **Where efficient's time goes** (seed 13): witchspace farming of Thargoids, by a forced mis-jump, is
 55% of the time and 81% of the points, about 5 a game minute; bounty hunting at anarchies makes a
@@ -94,15 +100,17 @@ struct; one that fails sets `g_fail` and the career loop recovers.
 
 ## Running it headless
 
-The emulator is a git submodule ([rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro),
-`main`, building its BBC Master target). The ROMs and the Elite disc are in neither repository; `setup.sh` fetches them.
+The emulator is [rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro)'s BBC Master core,
+at a pinned commit. `scripts/fetch-emulator.sh` fetches it into `rp2350-bbc-micro/`, with the ROMs and
+the Elite disc, which are in neither repository.
 
 ```sh
-git clone --recursive https://github.com/8bitkick/elite-agent.git && cd elite-agent
-rp2350-bbc-micro/scripts/setup.sh --master --no-build   # Master ROMs and disc (and the Presto toolchain)
-cplayer/build.sh                               # run_sim: a career (elsewhere than Linux: ELITE_EMU=submodule path)
+git clone https://github.com/8bitkick/elite-agent.git && cd elite-agent
+scripts/fetch-emulator.sh                      # the emulator, the Master's ROMs and Elite
+cplayer/build.sh                               # run_sim: a career (elsewhere than Linux: ELITE_EMU=its path)
 cplayer/buildlab.sh                            # lab: the fight lab
 cplayer/run_sim 2400 "" journal.jsonl          # a career, up to 2,400 game minutes; Elite in ~26 h
+tests/career120.sh                             # the player's behaviour pinned: a 120-minute career's journal hash
 ```
 
 It runs about 100 times faster than a real BBC Master, prints its log as it plays and writes a JSON
@@ -135,9 +143,15 @@ career; `tools/climb_chart.py` draws the chart above from career journals.
 
 ## On the Presto
 
-`presto/build.sh` (`--curious` for curious mode) builds the firmware with the player in it, through
-the emulator's `core/machine_hook.h`: `presto/build/presto_master.uf2`. Hold BOOT, tap RESET, copy
-it to the RP2350 drive. The agent starts a little after boot.
+The plugin: `presto/app/build.sh` (`--efficient` for efficient mode; curious by default) builds
+`presto/app/build/elite-agent.bin` against the plugin interface in `presto/api/` (no Pico SDK but its
+maths). Install it on a Presto running rp2350-bbc-micro from the web panel's Plugin section, or with
+its `tools/presto.py app install elite-agent.bin`. A tag `v*` releases it (`.github/workflows/release.yml`).
+The agent starts a little after boot.
+
+Or built into the firmware: `presto/build.sh` (`--curious` for curious mode, the Pico SDK and
+`scripts/fetch-emulator.sh` first) builds `presto/build/presto_master.uf2`. Hold BOOT, tap RESET,
+copy it to the RP2350 drive.
 
 The web panel (http://beeb.local/) shows the rank and progress, credits, where it is and what it's
 doing, play time, kills, deaths and pods, its latest status lines, and buttons to start or stop it

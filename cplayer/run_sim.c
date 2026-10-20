@@ -17,9 +17,12 @@
 
 typedef struct beeb_t beeb_t;
 beeb_t *beeb_new(const char *roms, const char *disc_path);
+int beeb_model(void);
+int beeb_disc_busy(beeb_t *b);           // the machine (machine_hook.h's model: 1 Model B, 3 Master 128)
 void beeb_analogue(beeb_t *b, int channel, int value);
 const char *beeb_emu_dir(void);
 void beeb_frames(beeb_t *b, int n);
+int beeb_reboot(beeb_t *b);
 uint8_t *beeb_ram(beeb_t *b);
 void beeb_key(beeb_t *b, int code, int down);
 size_t beeb_state_size(void);
@@ -208,8 +211,13 @@ static void bb_dump(void) {
         printf("\n");
     }
 }
+static int s_stop;      // STOPTALLY=n: stop at the first save with the tally at n or more (a commander to hand on: DISCDUMP)
 static void p_note(void *ctx, const char *s) {
     (void) ctx;
+    if (getenv("STOPTALLY") && strstr(s, "\"event\": \"save\"")) {
+        const char *t = strstr(s, "\"tally\": ");
+        if (t && atof(t + 9) >= atof(getenv("STOPTALLY"))) s_stop = 1;
+    }
     if (strstr(s, "\"fight_start\"")) {     // the state we go into each fight in (a hurt start is the career's doing)
         static ship_t sh[NOSH];
         int n = ships_read(io.ram, sh), k = 0;
@@ -322,12 +330,22 @@ static void ptime_frame_end(void) {}
 static void ptime_report(void) {}
 #endif
 
+static int s_collog, s_turbolog;
+// TIMESPLIT=1: where the game time goes, frame by frame (printed at the end, not in the journal): the disc
+// drive spinning (loads and saves, and the second or so it runs on after), docked, fighting, witchspace, a hunting session's
+// flying, other flying; and fights started a game hour of normal-space flying
+static const char *const SPLIT[] = {"disc", "docked", "fight", "witchspace", "hunt flying", "other flying"};
+static long s_split[6], s_ns_fights, s_ns_fly, s_ns_loops;
+static int s_last_mcnt = -1;
+static int s_split_on, s_last_phase;
+static long s_turbo_fr, s_turbo_ui;
 int main(int argc, char **argv) {
     double minutes = argc > 1 ? atof(argv[1]) : 60;
     const char *home = getenv("HOME");
     char roms[256], disc[256];
-    snprintf(roms, sizeof roms, "%s/roms/mos3.20", beeb_emu_dir());
-    snprintf(disc, sizeof disc, "%s/discs/elite-master-flicker-free-sng47.ssd", beeb_emu_dir());
+    // (the machine's ROMs and its Elite: the Master's (libbeeb.c) or the Model B's (libbeebjit.c, run_sim_b))
+    snprintf(roms, sizeof roms, "%s/roms/%s", beeb_emu_dir(), beeb_model() == 1 ? "" : "mos3.20");
+    snprintf(disc, sizeof disc, "%s/discs/%s", beeb_emu_dir(), beeb_model() == 1 ? "elite-disc-flicker-free-sth.ssd" : "elite-master-flicker-free-sng47.ssd");
     B = beeb_new(roms, argc > 2 && *argv[2] ? argv[2] : disc);
     if (!B) { fprintf(stderr, "beeb_new failed\n"); return 1; }
     journal = fopen(argc > 3 ? argv[3] : "/dev/null", "w");
@@ -347,6 +365,12 @@ int main(int argc, char **argv) {
     { extern int g_ws_fight; if (getenv("WSFIGHT")) g_ws_fight = atoi(getenv("WSFIGHT")); }
     { extern int g_ws_shield; if (getenv("WSSHIELD")) g_ws_shield = atoi(getenv("WSSHIELD")); }
     { extern int g_dock_log; g_dock_log = getenv("DOCKLOG") != NULL; }
+    { extern int g_rr_log; g_rr_log = getenv("RRLOG") != NULL; }
+    s_collog = getenv("COLLOG") != NULL;
+    s_turbolog = getenv("TURBOLOG") != NULL;
+    s_split_on = getenv("TIMESPLIT") != NULL;
+    { extern int g_turbo_ui_fix; if (getenv("TURBOUI")) g_turbo_ui_fix = atoi(getenv("TURBOUI")); }
+    { extern void curious_env(void); curious_env(); }      // (curious steering numbers: CROLLDB, CRC*, PSW...)
     { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
     { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }
     { extern double g_clu_deg, g_clu_w; if (getenv("CLUDEG")) g_clu_deg = atof(getenv("CLUDEG")); if (getenv("CLUW")) g_clu_w = atof(getenv("CLUW")); }
@@ -435,11 +459,15 @@ int main(int argc, char **argv) {
     }
     { extern int g_no_missions; if (getenv("NOMISSION")) g_no_missions = atoi(getenv("NOMISSION")); }
     { extern int g_no_pod; if (getenv("NOPOD")) g_no_pod = atoi(getenv("NOPOD")); }
+    if (getenv("NAME")) { extern char g_name[8]; snprintf(g_name, sizeof g_name, "%s", getenv("NAME")); }
     if (getenv("LOAD")) { extern char g_load_name[8]; strncpy(g_load_name, getenv("LOAD"), 7); }
     { extern int g_save; if (getenv("SAVE")) g_save = atoi(getenv("SAVE")); }
     io.ram = beeb_ram(B);
     io.hold = p_hold; io.tap = p_tap; io.log = p_log; io.note = p_note; io.analogue = p_analogue;
+    io.machine = beeb_model();
     player_init(&io);
+    if (!elite_detect(io.machine, io.ram)) { fprintf(stderr, "no Elite this player knows on the disc\n"); return 1; }
+    printf("playing %s\n", g_ev.name);
     uint32_t end = (uint32_t) (minutes * 60 * 50);
     clock_t t0 = clock();
     int last_qq26 = -1, check_at = -1, checks = 0, bad = 0;
@@ -450,7 +478,20 @@ int main(int argc, char **argv) {
         if (!(s_film = fopen(p, "wb"))) { fprintf(stderr, "can't write %s\n", p); return 1; }
     }
     int last_tp = -1;
-    while (io.frame < end) {
+    // RESETAT=frame: the machine reset there and the disc booted, the player started afresh, as the
+    // Presto does when a disc is booted or ejected (its frame count from 0 again)
+    uint32_t reset_at = getenv("RESETAT") ? (uint32_t) atoi(getenv("RESETAT")) : 0;
+    while (io.frame < end && !s_stop) {
+        if (reset_at && io.frame == reset_at) {
+            reset_at = 0;
+            if (beeb_reboot(B)) { fprintf(stderr, "RESETAT: no reset on this machine\n"); return 1; }
+            beeb_frames(B, 2500);           // (the Presto's ELITE_AUTOSTART: the player starts 50 s after the reset)
+            end -= io.frame;
+            io.frame = 0;
+            player_init(&io);
+            printf("RESET: the disc booted, the player started again 2500 frames on (QQ11 %d QQ12 %d distaway %d)\n",
+                   io.ram[A_QQ11], io.ram[A_QQ12], io.ram[A_distaway]);
+        }
         if (s_film) {
             if (io.frame % snap_every == 0) film_snap();
             // (the moments for a film: each change of the mission byte, in the journal)
@@ -480,19 +521,71 @@ int main(int argc, char **argv) {
             ptime_frame_start();
             player_frame();
             ptime_frame_end();
+            if (s_turbolog) {      // (TURBOLOG: cruise turbo's frames, and those on a screen that isn't a space view or counting)
+                extern int player_dull_cruise(void);
+                if (player_dull_cruise()) { s_turbo_fr++; if (io.ram[A_QQ11] != 0 || io.ram[A_QQ22 + 1]) s_turbo_ui++; }
+            }
+            if (s_collog) {      // (COLLOG: a sudden loss of 100+ with a ship within 500: a ram, as the lab counts them)
+                static int hp_prev = -1;
+                int hp_ = io.ram[A_ENERGY] + io.ram[A_FSH] + io.ram[A_ASH];
+                if (hp_prev >= 0 && hp_prev - hp_ >= 100) {
+                    static ship_t sh[NOSH];
+                    int n = ships_read(io.ram, sh);
+                    double bd = 1e18; int bt = 0;
+                    for (int i = 0; i < n; i++) if (ship_in_space(&sh[i])) {
+                        double d = sqrt((double) sh[i].x * sh[i].x + (double) sh[i].y * sh[i].y + (double) sh[i].z * sh[i].z);
+                        if (d < bd) bd = d, bt = sh[i].type;
+                    }
+                    if (bd < 500) fprintf(stderr, "COLRAM frame %u drop %d type %d dist %.0f\n", io.frame, hp_prev - hp_, bt, bd);
+                }
+                hp_prev = hp_;
+            }
             g_audit_on = 0;
             io.ram = real;
         }
         step();
         bb_record();
+        if (s_split_on) {
+            extern int g_phase;
+            int player_session_kind(void);
+            int k;
+            if (beeb_disc_busy(B)) k = 0;
+            else if (io.ram[A_QQ12]) k = 1;
+            else if (g_phase == 1) k = 2;
+            else if (io.ram[A_MJ]) k = 3;
+            else k = player_session_kind() == 0 ? 4 : 5;
+            s_split[k]++;
+            if (k >= 2 && !io.ram[A_MJ]) {
+                s_ns_fly++;
+                int dm = s_last_mcnt < 0 ? 0 : (s_last_mcnt - io.ram[A_MCNT]) & 255;
+                if (dm < 16) s_ns_loops += dm;      // (the game's main loop: a ship can spawn every 256)
+                if (g_phase == 1 && s_last_phase != 1) s_ns_fights++;
+            }
+            s_last_phase = g_phase;
+            s_last_mcnt = io.ram[A_MCNT];
+        }
+        if (getenv("RAMAT")) {       // RAMAT=frame,frame,...: the 32 KB of main RAM at those frames, to ram-<frame>.bin
+            static char *spec;
+            if (!spec) spec = getenv("RAMAT");
+            for (char *p = spec; *p; ) {
+                if ((uint32_t) atol(p) == io.frame) {
+                    char nm[64];
+                    snprintf(nm, sizeof nm, "ram-%u.bin", io.frame);
+                    FILE *f = fopen(nm, "wb");
+                    if (f) { fwrite(io.ram, 1, 0x8000, f); fclose(f); }
+                }
+                while (*p && *p != ',') p++;
+                if (*p) p++;
+            }
+        }
         if (getenv("WATCH")) {       // every 10 frames between two frames: the ships about
             static unsigned w0, w1; static int init;
             if (!init) { sscanf(getenv("WATCH"), "%u-%u", &w0, &w1); init = 1; }
             if (io.frame >= w0 && io.frame <= w1 && io.frame % (getenv("WATCH1") ? 1 : 10) == 0) {
                 static ship_t sh[NOSH];
                 int n = ships_read(io.ram, sh);
-                printf("%7u W E %d F %d A %d spd %d view %d qq11 %d:", io.frame, io.ram[A_ENERGY], io.ram[A_FSH], io.ram[A_ASH], io.ram[A_DELTA], io.ram[A_VIEW], io.ram[0x81]);
-                printf(" q12 %d mcnt %d lasct %d away %d", io.ram[A_QQ12], io.ram[A_MCNT], io.ram[A_LASCT], io.ram[A_distaway]);
+                printf("%7u W E %d F %d A %d spd %d view %d qq11 %d:", io.frame, io.ram[A_ENERGY], io.ram[A_FSH], io.ram[A_ASH], io.ram[A_DELTA], io.ram[A_VIEW], io.ram[A_QQ11]);
+                printf(" q12 %d mcnt %d lasct %d away %d", io.ram[A_QQ12], io.ram[A_MCNT], io.ram[A_LASCT], A_distaway ? io.ram[A_distaway] : -1);
                 for (int i = 0; i < n; i++)
                     printf(" [%d t%d d%.0f nb%02x f%02x]", sh[i].slot, sh[i].type, sqrt((double) sh[i].x * sh[i].x + (double) sh[i].y * sh[i].y + (double) sh[i].z * sh[i].z), sh[i].newb, sh[i].flags31);
                 printf("\n");
@@ -504,7 +597,7 @@ int main(int argc, char **argv) {
             if (last >= 0 && f != last) {
                 static ship_t sh[NOSH];
                 int n = ships_read(io.ram, sh);
-                printf("FIST %d -> %d at frame %u view %d las %d |", last, f, io.frame, io.ram[A_VIEW], io.ram[0x0E78]);
+                printf("FIST %d -> %d at frame %u view %d las %d |", last, f, io.frame, io.ram[A_VIEW], io.ram[A_LASCT]);
                 for (int i = 0; i < n; i++) if (ship_in_space(&sh[i])) printf(" s%d t%d d%.0f newb %02x%s", sh[i].slot, sh[i].type,
                     sqrt((double) sh[i].x * sh[i].x + (double) sh[i].y * sh[i].y + (double) sh[i].z * sh[i].z), sh[i].newb, ship_dead(&sh[i]) ? " X" : "");
                 printf("\n");
@@ -519,11 +612,11 @@ int main(int argc, char **argv) {
                 const uint8_t *st = io.ram + 0x400 + 37;      // slot 1: the station
                 printf("%7.1f BUMP -%d (E %d F %d A %d speed %d safe %d docked %d) station nosev_z_hi %d (need >=214) roofv_x_hi %d (need >=80) z %d\n",
                        io.frame / 3000.0, prev - now_, io.ram[A_ENERGY], io.ram[A_FSH], io.ram[A_ASH], io.ram[A_DELTA], io.ram[A_SSPR] != 0,
-                       io.ram[0x87] != 0, st[14], st[16] & 0x7F, st[6] | st[7] << 8);
+                       io.ram[A_QQ12] != 0, st[14], st[16] & 0x7F, st[6] | st[7] << 8);
             }
             prev = now_;
         }
-        if (io.frame % 3000 == 0 && io.ram[A_TALLY + 1] >= 25 && io.ram[0x87]) {    // Elite, and docked
+        if (io.frame % 3000 == 0 && io.ram[A_TALLY + 1] >= 25 && io.ram[A_QQ12]) {    // Elite, and docked
             printf("%7.1f ELITE: tally %d after %.1f game hours\n", io.frame / 50.0 / 60.0,
                    io.ram[A_TALLY] | io.ram[A_TALLY + 1] << 8, io.frame / 50.0 / 3600.0);
             break;
@@ -546,6 +639,14 @@ int main(int argc, char **argv) {
     audit_dump();
     if (getenv("PTIME")) ptime_report();
     double s = (double) (clock() - t0) / CLOCKS_PER_SEC;
+    if (s_split_on) {
+        long all = 0;
+        for (int i = 0; i < 6; i++) all += s_split[i];
+        for (int i = 0; i < 6; i++) fprintf(stderr, "SPLIT %-13s %7.2f h %5.1f%%\n", SPLIT[i], s_split[i] / 180000.0, 100.0 * s_split[i] / (all ? all : 1));
+        fprintf(stderr, "SPLIT fights started in normal space: %ld in %.2f h of flying there (%.1f an hour)\n", s_ns_fights, s_ns_fly / 180000.0, s_ns_fights / (s_ns_fly / 180000.0 + 1e-9));
+        fprintf(stderr, "SPLIT the main loop there: %.2f iterations a frame\n", s_ns_loops / (s_ns_fly + 1e-9));
+    }
+    if (s_turbolog) fprintf(stderr, "TURBO cruise frames %ld, on a screen that isn't a space view or in a countdown %ld\n", s_turbo_fr, s_turbo_ui);
     fprintf(stderr, "%u frames in %.1f s (%.0fx real time)\n", io.frame, s, io.frame / 50.0 / s);
     return 0;
 }

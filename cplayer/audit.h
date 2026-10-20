@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include "elite_ram.h"
 #ifdef READ_AUDIT
 int g_audit_on;
 static struct { uint32_t n; char site[200]; } s_audit[0x8000];
@@ -33,9 +34,9 @@ static uint32_t s_scram_rng = 777;
 static const uint8_t *scramble(const uint8_t *ram, int level) {
     if (!level) return ram;
     memcpy(s_scram, ram, sizeof s_scram);
-    for (int i = 0; i < 12 && ram[0x0E41 + i]; i++) {
-        if (ram[0x0E41 + i] >= 128 || ram[0x0E41 + i] == 2) continue;      // (not the planet, sun or station)
-        uint8_t *b = s_scram + 0x0400 + 37 * i;
+    for (int i = 0; i < 12 && ram[A_FRIN + i]; i++) {
+        if (ram[A_FRIN + i] >= 128 || ram[A_FRIN + i] == 2) continue;      // (not the planet, sun or station)
+        uint8_t *b = s_scram + A_K_PC + g_ev.ni * i;
         int k[] = {27, 28, 29, 30, 32, 35};
         for (int j = 0; j < 6; j++) { s_scram_rng = s_scram_rng * 1103515245u + 12345u; b[k[j]] = (uint8_t) (s_scram_rng >> 16); }
         s_scram_rng = s_scram_rng * 1103515245u + 12345u;
@@ -43,8 +44,8 @@ static const uint8_t *scramble(const uint8_t *ram, int level) {
     }
     if (level >= 2) {
         s_scram_rng = s_scram_rng * 1103515245u + 12345u;
-        s_scram[0x127B] = (uint8_t) (s_scram_rng >> 16);       // TALLY's low byte
-        s_scram[0x1266] = (uint8_t) (s_scram_rng >> 8);        // TALLYL
+        s_scram[A_TALLY] = (uint8_t) (s_scram_rng >> 16);       // TALLY's low byte
+        if (A_TALLYL) s_scram[A_TALLYL] = (uint8_t) (s_scram_rng >> 8);        // TALLYL
     }
     return s_scram;
 }

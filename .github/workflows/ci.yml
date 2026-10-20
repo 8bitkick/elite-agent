@@ -1,0 +1,31 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  sim:
+    # (arm64, as the machines the careers run on: the journal's hash is the same there)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: rp2350-bbc-micro
+          key: emu-${{ hashFiles('scripts/fetch-emulator.sh') }}
+      - run: scripts/fetch-emulator.sh
+      - name: build the native sims and the lab
+        run: |
+          cd cplayer && ./build.sh && ./buildlab.sh && bash build_b.sh
+      - name: the player's behaviour (a 120-game-minute career, its journal's hash)
+        run: tests/career120.sh
+  plugin:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/arm-deps
+      - name: build elite-agent.bin (the link fails if it outgrows the 72 KB app RAM)
+        run: presto/app/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elite-agent.bin
+          path: presto/app/build/elite-agent.bin

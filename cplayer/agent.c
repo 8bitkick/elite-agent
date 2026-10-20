@@ -13,7 +13,7 @@
 #include "galaxy.h"
 #include "fair.h"
 
-#define NAME "CLAUDE"
+char g_name[8] = "CLAUDE";     // the commander's name: what it saves as (the Presto: agent name; run_sim NAME=)
 static const int ORARRA[2] = {144, 33}, CEERDI[2] = {215, 84}, BIRERA[2] = {63, 72};
 
 // ---- the shopping list, in order: (item, price in tenths, cash to keep back after buying)
@@ -193,7 +193,7 @@ PT_THREAD(shop(void)) {
     CO_END(c_shop);
 }
 
-static int name_is_ours(void) { return !memcmp(IO->ram + A_NAME, NAME, strlen(NAME)); }
+static int name_is_ours(void) { return !memcmp(IO->ram + A_NAME, g_name, strlen(g_name)); }
 
 // saving: both modes save at every dock. A save takes ~200 frames (4 s) docked; a trip is 10-15 minutes,
 // so it costs under 0.5% of the time, and a death costs only the trip since (back to the save). Fewer
@@ -204,11 +204,16 @@ static struct { CO; } c_save;
 // (never a broke commander over a solvent save: an escape pod left one with 25 Cr, fuel ate the rest,
 // and every dock saved it, down to 5 Cr. A reload then put it back where it couldn't buy fuel: 115 times)
 static long s_saved_cash = -1;
+// (curious: every third dock, and always before witchspace, s_save_force: the disk menu at every dock was 20-30 s of
+// a viewer's time each, 8% of it with the market screens; the round-7 review)
+static int s_save_force, s_save_n;
 PT_THREAD(save_ours(void)) {
     CO_BEGIN(c_save);
+    { extern int g_curious; if (g_curious && !s_save_force && s_saved_cash >= 0 && ++s_save_n % 3) CO_EXIT(c_save); }
+    s_save_force = 0;
     if (saving() && cash() < 2000 && s_saved_cash >= 0 && cash() < s_saved_cash) CO_EXIT(c_save);
     if (saving()) {
-        CO_CALL(c_save, save_commander(name_is_ours() ? NULL : NAME));
+        CO_CALL(c_save, save_commander(name_is_ours() ? NULL : g_name));
         s_saved_cash = cash();
     }
     CO_END(c_save);
@@ -374,6 +379,7 @@ PT_THREAD(witch(void)) {
     CO_CALL(c_ws, sell_all());
     CO_CALL(c_ws, refuel());
     CO_CALL(c_ws, shop());
+    s_save_force = 1;
     CO_CALL(c_ws, save_ours());
     CO_CALL(c_ws, allow_misjumps());         // (pause, X, unpause: it works docked too)
     status_("Into witchspace for Thargoids (a forced mis-jump towards %s)", c_ws.dest->name);
@@ -432,6 +438,7 @@ static int choose_witch(void) {
     return best;
 }
 static struct { double t; uint32_t f; int kind, pending; } g_sess;      // kind: -1 none
+int player_session_kind(void) { return g_sess.kind; }     // (run_sim's time split: 0 hunting, 1 witchspace, -1 neither)
 
 // ---- one step of the career from docked
 static struct { CO; const sys_t *path[24]; int n; plan_t plan; int i; double far; const sys_t *a, *b; } c_trip;
@@ -557,7 +564,10 @@ PT_THREAD(trip(void)) {
         if (g_ground && !(g_curious && g_force_hunt)) c_trip.n = route(galaxy(), here_x(), here_y(), g_ground->x, g_ground->y, 3.0f, c_trip.path, 24);
         else c_trip.n = 0;
         // (curious: no route, then the same breadth-first way that chose it, a hop nearer each time)
-        if (g_curious && g_ground && c_trip.n < 2) c_trip.n = bfs(is_ground, c_trip.path, 24);
+        // (and the Model B, efficient too: there the risk-weighted route from Teceinre to Teonus failed, the
+        // fallback took the nearest anarchy, Anatrean, which sent it on to Teonus via Teceinre again: 358 times,
+        // 27 game hours. The Master has the same fallback; left as it was there to keep its careers as they were)
+        if ((g_curious || ev_disc()) && g_ground && c_trip.n < 2) c_trip.n = bfs(is_ground, c_trip.path, 24);
         if (!g_ground || c_trip.n < 2) c_trip.n = bfs(is_anarchy, c_trip.path, 24);
         if (c_trip.n > 1) {
             CO_CALL(c_trip, fly_to(c_trip.path[1], NULL));
@@ -691,15 +701,24 @@ PT_THREAD(career(void)) {
 
 void player_init(player_io_t *io) {
     IO = io;
+    elite_forget();             // (a new machine: which Elite is found again)
     fair_reset();
     g_sess.kind = -1;
     g_fail = NULL;
     g_gen++;
     c_car.pt.lc = 0;
     c_car.gen = g_gen;
+    drv_reset_keys();           // (the platform's tap count starts again with it: on the Presto every restart, a reset's
+                                // too, zeroes taps_done, and the next tap waited for one the old count owed: for ever)
 }
 
 void player_frame(void) {
+    // which Elite: nothing is read or pressed until a known one is found in RAM (elite_ver.c)
+    if (!g_ev.id && !elite_detect(IO->machine, IO->ram)) {
+        static uint32_t told;
+        if (IO->frame - told >= 500 || !told) { told = IO->frame | 1; logf_("no Elite this player knows in RAM (machine %d): waiting", IO->machine); }
+        return;
+    }
     fair_begin_frame();         // (fair mode: what the player sees, and when)
     drv_frame_start();          // (a death sets g_fail)
     if (g_fail) {

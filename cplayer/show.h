@@ -1,88 +1,99 @@
-// Showcase fighting, curious mode (show.c): hooks for combat.c; each returns efficient mode's decision
-// unchanged unless the show is on (g_curious, g_show, the readiness gate at the fight's start, still healthy)
+// Showcase fighting, curious mode (show.c): the hooks combat.c calls. Each returns efficient mode's own decision
+// unchanged unless the show is on (curious mode, g_show, and the superiority margin says we're clearly on top).
 #pragma once
 #include "ships.h"
 #include "drv.h"
 
+// The show's numbers, by what they steer (show.c says why each value; docs/fighting-showcase.md has the history)
 typedef struct {
-    float fire_px;          // hold fire until the target is this big on screen (pixels across its hit radius)
-    int hold_max;           // (unused: the budget below took its place)
-    int budget_base, budget_per;   // the show's time a fight: base + per enemy (the most at once) seconds, then efficient
-    int safe_shield, safe_energy;   // below either: efficient mode for the rest of the fight
-    int close_speed, far;   // close in at this speed while the target is further than far
-    int ws;                 // the show in witchspace too (0: efficient there)
-    float ws_fire_px;       // fire_px in witchspace
-    float msl_odds;         // the share of fights with a missile showpiece: at a target on screen between msl_near and msl_far
-    int msl_near, msl_far;
-    float bomb_odds;        // the share of fights where the energy bomb ends it, with bomb_n of them within bomb_dist
-    int bomb_n, bomb_dist;
-    int glance, glance_d;   // look left or right (glance 1) at an enemy going past within glance_d, at least 20 px
-    float glance_max, glance_gap;   // for up to glance_max seconds, no sooner than glance_gap after the last
-    float glance_px;        // and only at one this big (px)
-    int gate;               // 1: the superiority margin decides, moment by moment; 0: the old fixed gate (kit and health at the start)
-    float on_m, off_m;      // show above on_m, efficient below off_m
-    int dwell;              // frames either holds before it may change
-    float hit_s;            // their hits a second each, for the margin
-    float hold_s;           // and the seconds the show's holding fire adds, all of them shooting
-    int reserve;            // energy kept back: what's over it counts
-    float fb_odds;          // the share of fights with a flyby: one target met without a shot, passing fb_side beside us
-    int fb_side, fb_start;  // (from fb_start out)
-    int fb_speed;           // our speed in the flyby's last 2500
-    float weave_deg, weave_s;   // hold-fire weave: this far off it, circling every weave_s (0 off)
-    float follow_s, extend_s;   // after a flyby: follow it in whichever view has it; fly straight on first
-    float empty_x;          // an empty screen spends the time budget this many times as fast
-    int bomb_ws;            // the bomb in witchspace, Thargoids about (Thargons die)
-    int glance_pred;
-    float ws_on_m, ws_off_m;
-    float weave_stop;       // the weave stops at this share of the firing size
-    int budget_nmax;
-    int cam;
-    int tail_rear;
-    int ws_group, group_d;      // witchspace: target the nearest group (enemies within group_d of it)
-    float finish_s, finish_px;  // the budget's last finish_s: fire from finish_px
-    float weave_fac;            // no weave on a target whose nose is further off us than this (cos; -2: always weave)
-    int pass_knife, pass_cpa;
-    int fire_recede;            // fire at a target opening on us whatever its size
-    float weave_t;
-    float toy_px, toy_s;        // hold it toy_s seconds at toy_px or more before the kill (0: off)
-    int follow_d;
-    float bore_s;
-    int frugal;                 // no show under this many credits (0: off); no bombs under three times it
-    int pursue;
+    // MODE: show or efficient, moment by moment
+    float on_m, off_m;          // the superiority margin: show above on_m, efficient below off_m
+    float ws_on_m, ws_off_m;    // ... in witchspace
+    int dwell;                  // frames either holds before it may change (no flapping)
+    float hit_s, hold_s;        // the margin's model: their hits a second each; the seconds our held fire adds
+    int reserve;                // energy kept back: what's over it counts
+    int min_laser;              // the kit floor: 1 a beam laser or better ahead, 2 a military laser
+    int frugal;                 // no show under this many credits; no bombs under three times it
+    int budget_base;            // the show's time a fight (seconds), then efficient finishes it
+    float empty_x;              // an empty screen spends the budget this many times as fast
+    float bore_s;               // a stretch this long with nothing new on screen hands the fight over
+
+    // CLOSING IN: speed and aim until it's near
+    int close_speed, far;       // full speed (close_speed) while the target is further than far...
+    float close_d;              // ... or ahead of us and further than close_d
+    int intercept;              // ahead beyond close_d: aim at where we'd meet it (lead pursuit)
+    int near_pref;              // normal space: a target's worth by its nearness too
+    float run_value;            // one over 2000 out and opening the range is worth this much
+    int rear_all;               // the rear laser only within rear_close, the show off too
+    float rear_close;           // the rear laser only for a target this close behind (else turn and face it)
+
+    // FIRING: hold for a kill that's seen
+    float fire_px, ws_fire_px;  // hold fire until it's this big on screen (px across its hit radius); in witchspace
+    float stall_s, stall_px;    // no kill for stall_s: fire from stall_px (a joust never reaches fire_px)
+    float eff_px; int eff_e;    // the show off: no shot at one drawn under eff_px while our energy's over eff_e
+    float eff_close;            // ... and it's closing faster than this a game loop (else it's shot)
+    float slow_s;               // the show on: under the firing size and not closing that fast for this long, it's shot
     int col_fire;               // shoot a target about to pass within col_r in col_t game loops, whatever its size
     float col_t; int col_r;
-    float ram_iters;
+
+    // TOY / FOLLOW: big time on the target before the kill
+    float toy_px, toy_s;        // hold it toy_s seconds at toy_px or more
+    float follow_px; int follow_d;   // sit where it's drawn follow_px (250-900 out); follow_d if follow_px is 0
     float toy_safe;             // no toying or follow speed inside this of a target coming nose-first
-    int strafe;                 // toying: short laser bursts now and then (0.3-0.8 s, every 1.5-4 s), near misses and grazes
+    int strafe;                 // bursts while toying and while closing to the firing size: near misses and grazes
     float strafe_miss;          // the share of bursts that are near misses (aimed strafe_off radii beside it)
-    float strafe_off, strafe_k; // a near miss: aimed this many radii beside; fired while it's within strafe_k radii of the line
-    int strafe_temp, strafe_e;
-    float strafe_px;            // strafe 2: also while closing to the firing size, from this size on  // no burst with the laser this hot; a grazing hit only while its energy is over strafe_e
-    int noplan;                 // curious mode without the acquisition planner (the stopgap for its cost on the Presto; off)            // the ram dodge looks this far ahead while the show is on (0: efficient's 5)                 // on boredom, chase it down first (1), then hand over               // hand over after this long with nothing new on screen (0: off; the time budget instead)               // and sit this far behind it meanwhile              // stop the weave this many game loops before the firing range (0: by size only)   // the knife-edge on any close pass of the target (within pass_cpa)          // after the budget: no rear laser beyond this (0 off)                // the camera: 1 in witchspace, 2 everywhere (0 off)        // the budget counts at most this many enemies (0: all)    // the margin's thresholds in witchspace (0: on_m, off_m)        // glances on where it will be, and an empty one ends at once
-    int min_laser;          // the kit floor: 0 none, 1 a beam laser or better ahead, 2 a military laser
-    int novel_look;         // a flyby at a rare type, or one met for the first time, whatever the draw
-    int knife_d;            // inside this, roll it to 3 or 9 o'clock (0: no knife-edge)
-    int finish_e;           // (0 off) wound it at range down to this energy, then hold the last shots until it is close
+    float strafe_off, strafe_k; // ... fired while it's within strafe_k radii of the line
+    float nm_lo, nm_hi;         // a near miss fires only with the sights this far outside its drawn outline (x its drawn radius; nm_hi 0: off)
+    int nm_side;                // aimed off on the side it's moving towards on screen (0: along its own side, either way)
+    int strafe_temp, strafe_e;  // no burst with the laser this hot; a graze only while its energy is over strafe_e
+    float strafe_px;            // closing: bursts from this size on
+    int strafe_gap0, strafe_gapr;   // frames between bursts: gap0 + up to gapr more (near-continuous: fire on a big ship)
+
+    // FLYBY: one target a fight met without a shot, passing beside us, glanced at
+    float fb_odds;              // the share of fights with one
+    int fb_side, fb_start, fb_speed;   // aimed fb_side beside it from fb_start out; our speed in its last 2500
+    int novel_look;             // and at a rare type, or one met for the first time
+    int knife_d;                // inside this, roll it to 3 or 9 o'clock (the knife-edge)
+    int pass_knife, pass_cpa;   // ... on any close pass of the target (within pass_cpa)
+    float follow_s, extend_s;   // after it: follow it in whichever view has it; fly straight on first
+    int glance, glance_d;       // a look left or right at an enemy going past within glance_d...
+    float glance_max, glance_gap, glance_px;   // ... for up to glance_max s, glance_gap s apart, at glance_px or more
+
+    // SHOWPIECES: the missile, the energy bomb
+    float msl_odds; int msl_near, msl_far;     // the share of fights with a missile, at one between msl_near and msl_far
+    float bomb_odds; int bomb_n, bomb_dist;    // the share with the bomb, bomb_n of them within bomb_dist
+    int bomb_ws;                // the bomb in witchspace, Thargoids about (their Thargons die)
+
+    // WITCHSPACE: the swarm
+    int ws_group, group_d;      // target the nearest group (enemies within group_d of it)
+    int thg_first;              // the Thargons first while a Thargoid lives...
+    float thg_d, thg_px;        // ... those within thg_d, shot once drawn thg_px
+
+    // EVADE: the collision evasion (the show on or off)
+    int ev; float ev_t, ev_r, ev_out;   // a ship passing within its radius + ev_r inside ev_t game loops; held to ev_out x
 } show_params_t;
 extern show_params_t g_sp;
 extern int g_show;
 int show_set_param(const char *name, double v);
-int show_ready(void);       // the show is on now
-void show_begin(void);      // a fight starts
-void show_frame(const ship_t *sh, int n);   // once a frame in a fight: show or efficient, now (the margin)
-extern int g_show_mode, g_show_spent;     // 1 show, 0 efficient, -1 neither (not curious, not fighting)
+
+// mode
+void show_begin(void);                      // a fight starts
+void show_frame(const ship_t *sh, int n);   // once a frame in a fight: show or efficient, now
 int show_on(void);
-int show_fire(const ship_t *t, double dist, int fire);
+extern int g_show_mode, g_show_spent;       // 1 show, 0 efficient, -1 neither (not curious, not fighting)
+// the decisions, in combat.c's order
+double show_value(const ship_t *s, double v, const ship_t *const *th, int nt);   // a target's worth
+void show_aim(const ship_t *t, double *ax, double *ay, double *az);   // the aim point (intercept, strafe, flyby)
+int show_extend(const ship_t *t);           // straight on after a flyby (1: the aim is overridden)
+int show_flyby(void);                       // a flyby on (the planner stands down: it would aim at the ship itself)
+void show_knife(const ship_t *t, keyset_t *keys);   // the knife-edge roll on a close pass
+const ship_t *show_evade(const ship_t *s, int n, vec_t *miss);   // a collision coming (any ship), or NULL
 int show_speed(const ship_t *t, double dist, int want);
-int show_view(int view, const ship_t *sh, int n, const ship_t *t);     // the view to show (a glance at a pass)
-int show_novel(int type);   // a rare type, or (in a career) one not met before
-extern int g_show_lab;
-int show_flyby(void);
-int show_rear_ok(double dist);
-double show_ram_iters(double iters);
-int show_noplan(void);      // curious: no acquisition planner     // the ram dodge's look-ahead
-double show_value(const ship_t *s, double v, const ship_t *const *th, int nt);   // the target's worth (witchspace groups)     // the rear laser allowed at this range (the tail rule)
-int show_weave(const ship_t *t, int rear, double *ax, double *ay, double *az);   // the hold-fire weave, the post-flyby extend (1: on)       // a flyby on (the planner stands down: it would aim at the ship itself)
-void show_knife(const ship_t *t, keyset_t *keys);     // the flyby's knife-edge roll (left / right pass)
-void show_aim(const ship_t *t, double *ax, double *ay, double *az);   // the flyby's aim point
+int show_fire(const ship_t *t, double dist, int fire);
+int show_rear_ok(double dist);              // the rear laser allowed at this range
 int show_key(const ship_t *sh, int n, const ship_t *const *th, int nt, const ship_t *t, double off);   // a special key, or 0
+int show_view(int view, const ship_t *sh, int n, const ship_t *t);     // the view to show
+int show_novel(int type);                   // a rare type, or (in a career) one not met before
+// the lab's and the sim's counters
+extern int g_show_lab;
+extern long g_ev_frames, g_ev_starts;

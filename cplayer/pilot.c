@@ -45,6 +45,10 @@ double g_coast = 1.5;
 double g_up_hyst = 0.35;     // radians of hysteresis in the above/below choice (joystick aiming bench: time on target 11.8 -> 12.3%)
 double g_nose_hold = 0;      // (test)
 double g_roll_db = 0;        // (test)        // (test: radians of hysteresis in the above/below choice)
+// the show on (curious): roll only as far as the hit needs (g_roll_db's rule, this many hit radii of sideways miss allowed).
+// The user: "an unnecessary amount of rolling ... don't keep rolling for no reason"; pitch does the rest
+double g_cur_roll_db = 1;
+double g_stk_k = 0.5, g_stk_near = 4;       // the stick's dynamic smoothing (below, steer): its step near the aim, and how near
 int g_coast_min = 112;      // (only slewing, the stick near full: tracking a mover needs the easing)
 
 double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyset_t *keys) {
@@ -69,8 +73,10 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     // (or roll only as far as the hit needs: the sideways miss, off * sin(roll_err), inside g_roll_db hit
     // radii; test)
     { extern double g_aim_tol;
-      if (g_roll_db > 0 && g_aim_tol > 0 && off > 1e-6) {
-          double allow = asin(fmin(1.0, g_roll_db * g_aim_tol / off));
+      extern int show_on(void);
+      double db = g_roll_db > 0 ? g_roll_db : show_on() ? g_cur_roll_db : 0;     // (the show on: efficient mode's aim is its own)
+      if (db > 0 && g_aim_tol > 0 && off > 1e-6) {
+          double allow = asin(fmin(1.0, db * g_aim_tol / off));
           roll_err = fabs(roll_err) <= allow ? 0 : roll_err - copysign(allow, roll_err);
       } }
     double roll_w = fmin(1.0, fmin(off / 0.06, (M_PI - off) / 0.5));
@@ -78,6 +84,14 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     double pw = fmax(0.0, cos(roll_err));
     double beta = off * 256 / pitch_iters * pw * pw * pw * (up ? 1 : -1);
     int tx = jstx_for(alpha), ty = jsty_for(beta);
+    // the stick, dynamically smooth (curious, the show on; the user: "dynamic smooth though, can break out of smooth if
+    // needed, just dont oscillate"): within g_stk_near hit radii of the aim the stick goes g_stk_k of the way a frame,
+    // ironing out the small corrections; further off it goes straight there
+    { extern int g_curious, show_on(void); extern double g_aim_tol;
+      if (g_stk_k > 0 && g_stk_k < 1 && g_curious && show_on() && g_aim_tol > 0 && off < g_stk_near * g_aim_tol) {
+          tx = jx + (int) lround((tx - jx) * g_stk_k);
+          ty = jy + (int) lround((ty - jy) * g_stk_k);
+      } }
     { extern int g_want_jx, g_want_jy; g_want_jx = tx, g_want_jy = ty; }     // (the joystick goes straight there)
     // preload (test): with the pitch error too small for a rate (the stick inside the dead zone, |J| <= 28),
     // park the stick at the dead zone's edge on the error's side: still no turn, but the next correction is
@@ -202,6 +216,21 @@ static double plan_rates(double x, double y, double z, double vx, double vy, dou
 // (2) at most g_plan_cap steps a call (pf_step's), keeping the best found by then (the candidates go small rates
 // first, so the cap cuts the big ones)
 int g_plan_f = 3;               // bit 0: float, bit 1: prune
+// smooth planning (curious, the show on; combat.c sets g_plan_smooth): a candidate's score is its loops to the sights
+// plus the cost of the change from the last plan: g_ps_w loops for a full stick swing (roll and pitch each), g_ps_rev
+// more for reversing the roll, g_ps_keep less for flying the same plan on. Re-planned every loop, it holds a move
+// unless another is clearly better. (The user: "occasional hard rolls for purposeful moves are great"; unnecessary
+// rolling is not)
+int g_plan_smooth;
+double g_ps_w = 0.5, g_ps_rev = 1.5, g_ps_keep = 0.3;
+static int s_ps_a = 0, s_ps_b = 0;
+static float ps_pen(int a, int b) {
+    if (!g_plan_smooth) return 0;
+    float p = (float) (g_ps_w * (abs(a - s_ps_a) / 31.0 + abs(b - s_ps_b) / 8.0));
+    if (a * s_ps_a < 0) p += (float) g_ps_rev;
+    if (a == s_ps_a && b == s_ps_b) p -= (float) g_ps_keep;
+    return p;
+}
 int g_plan_cap = 8000;          // steps a call (0: no cap): ~11 ms on the Presto (1.4 us a step in RAM)
 long g_plan_steps, g_plan_calls, g_plan_capped, g_plan_maxsteps;       // (counters: the sim's timing report)
 // (PF_HOT: on the Presto, in RAM (the SDK's .time_critical sections): from flash, through the XIP cache the emulator
@@ -287,16 +316,18 @@ static double plan_rates_f(double x, double y, double z, double vx, double vy, d
     int prune = g_plan_f & 2;
     s_pf_steps = 0;
     { pf_t q = p0; pf_step(&q, a0, b0, fs); pf_policy(&q, aout, bout); }
-    float best = pf_roll(p0, a0, b0, 99, 0, 0, fs, fr2, 1e9f);
+    float best = pf_roll(p0, a0, b0, 99, 0, 0, fs, fr2, 1e9f) + ps_pen(*aout, *bout);
     int na = sizeof PL_A / sizeof *PL_A, nb = sizeof PL_B / sizeof *PL_B, capped = 0;
     // (small rates first, both axes together: the order the cap cuts in)
     for (int s = 0; s < na + nb && !capped; s++) for (int i = 0; i < na; i++) {
         int j = s - i;
         if (j < 0 || j >= nb) continue;
         if (g_plan_cap && s_pf_steps >= g_plan_cap) { capped = 1; break; }
-        float sc = pf_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, fs, fr2, prune ? best : 1e9f);
+        float pen = ps_pen(PL_A[i], PL_B[j]);
+        float sc = pf_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, fs, fr2, prune ? best - pen : 1e9f) + pen;
         if (sc < best) best = sc, *aout = PL_A[i], *bout = PL_B[j];
     }
+    s_ps_a = *aout, s_ps_b = *bout;
     g_plan_steps += s_pf_steps, g_plan_calls++, g_plan_capped += capped;
     if (s_pf_steps > g_plan_maxsteps) g_plan_maxsteps = s_pf_steps;
     return best;
@@ -370,6 +401,27 @@ void apply_flight(keyset_t *keys) {
 }
 
 int g_jump_log;             // (JLOG: why no in-system jump on the way to the station)
+// the dull cruise (curious; the Presto fast-forwards it in turbo): flying in to the station, 20 s and more into it,
+// no ship about but junk, not yet in the station's safe zone. (The round-7 review: 30% of a viewer's time was the
+// planet sliding past for 1.5-2.5 minutes after every jump)
+static uint32_t s_cruise_last, s_cruise_since;
+static void cruise_tick(void) {
+    if (now() - s_cruise_last > 2) s_cruise_since = now();
+    s_cruise_last = now();
+}
+int g_turbo_ui_fix = 1;     // (TURBOUI=0: the old rule, for the comparison)
+int player_dull_cruise(void) {
+    extern int g_curious;
+    // (only in a space view, no hyperspace countdown, and a second since the last of either: the Presto's screen rolled
+    // at the hyperspace selection, turbo on through the chart, Data on System and the countdown)
+    static uint32_t s_ui_last;
+    if (view() != 0 || hyperspace_count()) s_ui_last = now();
+    if (g_turbo_ui_fix && (view() != 0 || hyperspace_count() || now() - s_ui_last < 50)) return 0;
+    if (!g_curious || now() - s_cruise_last > 2 || now() - s_cruise_since < 20 * 50) return 0;
+    if (is_docked() || witchspace() || R(A_SSPR)) return 0;
+    if (R(A_FRIN + 2 + R(A_JUNK)) != 0) return 0;      // (a ship about: no)
+    return 1;
+}
 static int jump_allowed(const ship_t *sh, int n) {
     if (witchspace() || R(A_SSPR)) return 0;
     if (!(g_fair & FAIR_DASH) && R(A_FRIN + 2 + R(A_JUNK)) != 0) return 0;     // (fair: press J and see)
@@ -574,6 +626,10 @@ PT_THREAD(to_station(float seconds)) {
                     }
                 }
             }
+            // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
+            // empty starfield on the way to the station)
+            { extern int g_curious; if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
+            cruise_tick();
             apply_flight(&keys);
         }
     }
@@ -585,6 +641,8 @@ static struct {
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
+int g_dock_dash = 1;         // (curious: the powered run in, braking late; DOCKDASH=0 off)
+double g_dd_k = 1.5, g_dd_m = 150;
 PT_THREAD(dock(float seconds)) {
     CO_BEGIN(c_dk);
     c_dk.end = deadline(seconds);
@@ -653,7 +711,7 @@ PT_THREAD(dock(float seconds)) {
                 if (off > 60 && want > 8) want = 8;
             } else {
                 // (with the joystick none of this: the stick sits where it's put, damping or not)
-                if (!c_dk.final && R(A_DAMP) && !(IO->analogue && R(0x2C5C))) {
+                if (!c_dk.final && R(A_DAMP) && !(IO->analogue && R(A_JSTK))) {
                     // damping on for the final, as the game's own docking computer flies it: the roll stick
                     // then eases back 2 a loop when let go, the only way to hold it at the station's spin
                     // (alpha 16, J 66). Off (after launch, for the fights) it can only sit at 63 or 70 or
@@ -734,11 +792,23 @@ PT_THREAD(dock(float seconds)) {
                 // the last 400; and holding back while the slot isn't level near it
                 double rl = fabs(fmod(atan2(st->roofv[1], st->roofv[0]) + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2) * 180 / M_PI;
                 want = dist > 2500 ? 22 : dist > 1000 ? 14 : dist > 400 ? 9 : 4;
+                // (curious, the user: "dock with style. hard accelerate, only slow down in time"): lined up (the nose
+                // within 5 deg, the slot level within 10, near the axis), the fastest speed that still brakes to 4 by 400
+                // out: a speed key changes it 1 a game loop and a loop covers ~1.1 x the speed, so braking from v takes
+                // ~1.1 (v^2 - 16) / 2; with g_dd_k of that and g_dd_m to spare. The last 400 at 4, as ever
+                if (g_curious && g_dock_dash && dist > 400 && off < 5 && rl < 10 && lat < fmax(60.0, dist * 0.05)) {
+                    double room = dist - 400 - g_dd_m;
+                    int vmax = room > 0 ? (int) sqrt(2 * room / (1.1 * g_dd_k) + 16) : 4;
+                    if (vmax > want) want = vmax > 40 ? 40 : vmax;
+                }
                 if (dist < 600 && rl > 20) want = 1;
                 if (off > 8 && want > 4) want = 4;
                 c_dk.final = 1;
             }
             speed_keys(speed(), want, &keys);
+            // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
+            // empty starfield on the way to the station)
+            { extern int g_curious; if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
             apply_flight(&keys);
             if (g_dock_log) {     // the approach frame by frame: range, along the slot axis and off it, the angle to
                                   // the station's centre, the slot's roll off level (deg), stick, speed, shields
@@ -761,4 +831,16 @@ PT_THREAD(dock(float seconds)) {
         CO_CALL(c_dk, to_station(c_dk.left / 50.0f));
     }
     CO_END(c_dk);
+}
+
+// curious mode's steering numbers from the environment (run_sim and the lab): the show's roll deadband (CROLLDB), the
+// stick smoothing near the aim (STKK, STKNEAR), smooth planning's weights (PSW, PSREV, PSKEEP)
+void curious_env(void) {
+#define E(v, name) if (getenv(name)) v = atof(getenv(name))
+    E(g_cur_roll_db, "CROLLDB");
+    E(g_stk_k, "STKK"); E(g_stk_near, "STKNEAR");
+    E(g_ps_w, "PSW"); E(g_ps_rev, "PSREV"); E(g_ps_keep, "PSKEEP");
+    if (getenv("DOCKDASH")) g_dock_dash = atoi(getenv("DOCKDASH"));
+    E(g_dd_k, "DDK"); E(g_dd_m, "DDM");
+#undef E
 }

@@ -2,9 +2,7 @@
 // Plain C99, no allocation, no stdio.
 #include "ships.h"
 
-#define NI 37               // bytes per K% ship block
-#define K_BASE 0x0400       // K%: slot i at K_BASE + i * NI
-#define FRIN 0x0E41         // slot -> type; 0 = empty (the first 0 ends the list)
+#include "elite_ram.h"     // K% (slot i at A_K_PC + i * NI%) and FRIN (slot -> type; 0 = empty: the first 0 ends the list)
 #define UNIT 24576.0        // 0x6000: orientation vectors' 1.0
 
 // id: name, max energy, max speed, laser power, missiles, bounty (Cr/10), targetable area,
@@ -47,9 +45,18 @@ static const shiptype_t SHIP_TYPES[34] = {
     T("Dodo station", 240, 0, 0, 0, 0, 180 * 180, 0, 0, 0x00),  // only via XX21 swap (type 2)
 };
 
+// The disc version's ships (its ship files, elite-ships-a.asm to -p): the same but for the Viper's energy (100,
+// not 140), no rock hermit, Cougar or Dodo station, and every kill a point (it counts kills, not points)
+static shiptype_t s_disc[34];
 const shiptype_t *ship_type(int type)
 {
-    return (type >= 1 && type <= 33) ? &SHIP_TYPES[type] : 0;
+    if (type < 1 || type > 33) return 0;
+    if (g_ev.kills_by_type) return &SHIP_TYPES[type];
+    if (!s_disc[1].name) {
+        for (int i = 1; i <= 33; i++) s_disc[i] = SHIP_TYPES[i], s_disc[i].kill_points = 1.0f;
+        s_disc[16].max_energy = 100;
+    }
+    return &s_disc[type];
 }
 
 // 24-bit sign-magnitude coordinate: 23-bit magnitude, sign in bit 7 of the top byte
@@ -97,10 +104,10 @@ int ships_read(const uint8_t *ram, ship_t out[NOSH])
 {
     int i;
     for (i = 0; i < NOSH; i++) {
-        uint8_t t = ram[FRIN + i];
+        uint8_t t = ram[A_FRIN + i];
         if (t == 0)
             break;
-        parse_block(ram + K_BASE + i * NI, i, t, &out[i]);
+        parse_block(ram + A_K_PC + i * g_ev.ni, i, t, &out[i]);
     }
     return i;
 }

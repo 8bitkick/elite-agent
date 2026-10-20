@@ -35,7 +35,8 @@ static inline int cargo(int i) { return R(A_QQ20 + i); }
 static inline int cargo_bay(void) { return R(A_CRGO); }
 static inline int laser(int v) { return R(A_LASER + v); }
 static inline int missiles(void) { return R(A_NOMSL); }
-static inline double tally(void) { return R16(A_TALLY) + R(A_TALLYL) / 256.0; }
+// (the Master scores a kill by its type, the fraction in TALLYL; the disc version 1 a kill)
+static inline double tally(void) { return R16(A_TALLY) + (A_TALLYL ? R(A_TALLYL) / 256.0 : 0); }
 static inline int legal(void) { return R(A_FIST); }
 static inline int mission(void) { return R(A_TP); }
 // (fair mode: as the bars show them: the energy banks to 4, the shields to 16)
@@ -57,6 +58,10 @@ static inline int has_hyperdrive(void) { return R(A_GHYP) != 0; }
 static inline int has_escape_pod(void) { return R(A_ESCP) != 0; }
 static inline int title(void) {               // 1 or 2 on the title screens, else 0
     if (R(A_QQ12) && R(A_QQ11) == 0) {
+        if (g_ev.title_type[0]) {         // (the disc version: TITLE's ship, a Cobra Mk III then a Krait)
+            int t = R(A_TYPE);
+            return t == g_ev.title_type[0] ? 1 : t == g_ev.title_type[1] ? 2 : 0;
+        }
         int d = R(A_distaway);
         return d == 200 ? 1 : d == 100 ? 2 : 0;
     }
@@ -74,5 +79,5 @@ static inline int briefing(void) {            // a mission briefing's pages, bef
     if (R(A_ENERGY) != 255 || R(A_FSH) != 255 || R(A_ASH) != 255) return 0;
     return (R(A_QQ11) == 13 || R(A_QQ11) == 1) && t != 128 && t != 130;
 }
-static inline int cursor_x(void) { return R(0x10); }    // XC, YC: the text cursor
-static inline int cursor_y(void) { return R(0x12); }
+static inline int cursor_x(void) { return R(A_XC); }    // XC, YC: the text cursor
+static inline int cursor_y(void) { return R(A_YC); }

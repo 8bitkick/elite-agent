@@ -16,7 +16,7 @@ PT_THREAD(set_damping(int on));
 static struct { CO; uint32_t until; } c_la;
 PT_THREAD(launch(void)) {
     CO_BEGIN(c_la);
-    CO_CALL(c_la, hold_until(K_F0, is_space_front, 5, "launch"));
+    CO_CALL(c_la, hold_until(K_F0, is_space_front, ev_disc_wait(5), "launch"));
     CO_CALL(c_la, wait_for(is_space_front, 15, "in space"));
     g_in_flight = 1;
     // clear the slot: ships launching after us come out along its axis, and idling there through a
@@ -101,9 +101,10 @@ extern int g_steer_log;
 int g_pausing;                  // (in the pause now: the lab doesn't count these frames)
 static int damping_is_(int on) { return (R(A_DAMP) == 0) == on; }
 // and joystick mode (JSTK &2C5C, K in the pause): wanted when the platform has an analogue port
-// and g_joystick says so (then the stick goes to the ADC, drv.c's hold)
+// and g_joystick says so (then the stick goes to the ADC, drv.c's hold), and the A key still fires with the
+// joystick on (the Master's; the disc version's joystick mode fires only from the stick's button: keys there)
 int g_joystick = 1;
-static int joystick_ok(void) { return (R(0x2C5C) != 0) == (g_joystick && IO->analogue != NULL); }
+static int joystick_ok(void) { return (R(A_JSTK) != 0) == (g_joystick && IO->analogue != NULL && g_ev.joy_fire_key); }
 static int damping_is(int on) { return damping_is_(on) && joystick_ok(); }
 static struct { CO; int on, tries, rep; uint32_t until; keyset_t held; } c_ud;
 PT_THREAD(set_damping(int on)) {
@@ -189,7 +190,18 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
         g_phase = 3;
         // (test) the stronger shield towards them: a dead front shield and a full aft one (a mis-jump straight
         // out of a fight) means run, showing them the aft, rather than joust on the bare front
-        if (witchspace() && g_bail_energy && g_ws_fight && !(g_ws_shield && fsh() * 2 < ash())) {
+        // (curious: only with someone to fight, and not when engage() would bail out at once, below g_bail_energy
+        // before the count: it started and ended a fight every other frame, "Fight over: +0.00" 35 times through
+        // a countdown; run instead)
+        int fightable = 1;
+        extern int g_curious;
+        if (g_curious && witchspace() && g_bail_energy) {
+            static ship_t sh[NOSH];
+            const ship_t *t[1];
+            int n = see_ships(sh);
+            fightable = threats(sh, n, 60000, t, 1) && !(energy() < g_bail_energy && !hyperspace_count());
+        }
+        if (witchspace() && g_bail_energy && g_ws_fight && !(g_ws_shield && fsh() * 2 < ash()) && fightable) {
             g_phase = 4;
             CO_CALL(c_hy, engage(3));       // (fighting through the countdown: they fly faster than we can run)
         } else if (witchspace() && g_bail_energy) {
@@ -260,7 +272,7 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
             c_cur.key = abs(dx) >= abs(dy) ? (dx > 0 ? K_RIGHT : K_LEFT) : (dy > 0 ? K_DOWN : K_UP);
         }
         dbgf_("cursor: target %d,%d -> %s at %d,%d key %02x view %d", target_x(), target_y(), c_cur.dest->name, c_cur.dest->x, c_cur.dest->y, c_cur.key, view());
-        if (IO->analogue && R(0x2C5C)) {
+        if (IO->analogue && R(A_JSTK)) {
             // joystick mode: the chart's cursor follows the stick, not the cursor keys. Lean it towards the
             // system, less as it nears; which way the stick moves it is learnt from how it moves (a push
             // that takes it further away flips that axis)
@@ -288,7 +300,7 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
             CO_CALL(c_cur, press(c_cur.key, 2, 1));
         }
     }
-    if (IO->analogue && R(0x2C5C)) { keyset_t none = {{0}, 0}; g_want_jx = g_want_jy = 128; hold(&none); }     // (the stick back to the middle)
+    if (IO->analogue && R(A_JSTK)) { keyset_t none = {{0}, 0}; g_want_jx = g_want_jy = 128; hold(&none); }     // (the stick back to the middle)
     CO_CALL(c_cur, press(K_D, 3, 4));
     CO_CALL(c_cur, idle(10));
     CO_END(c_cur);

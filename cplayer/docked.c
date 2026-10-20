@@ -28,6 +28,8 @@ static int is_not_sell(void) { return view() != V_SELL; }
 static int is_docked_status(void) { return is_docked() && view() == V_STATUS; }
 static int is_title1(void) { return title() == 1; }
 static int is_title2(void) { return title() == 2; }
+// (the disc version's second title takes any key, so a second tap of N can go straight through it)
+static int is_title2_or_on(void) { return title() == 2 || is_docked_status(); }
 static int is_title_or_docked(void) { return title() || (is_docked() && view()); }
 
 // ---- Buy Cargo (f1): item by item (QQ29) for those in stock: the quantity and RETURN, or RETURN
@@ -144,8 +146,12 @@ PT_THREAD(equip(int item, int lview)) {
     if (view() != V_STATUS) {
         CO_CALL(c_eq, idle(30));
         CO_CALL(c_eq, settle(is_equip, 8, 8, "equip again"));
-        CO_CALL(c_eq, press(K_RETURN, 3, 4));
-        CO_CALL(c_eq, wait_for(is_status, 5, "status"));
+        // (the disc version can take the first RETURN after a purchase as nothing: until it's out)
+        if (ev_disc()) CO_CALL(c_eq, hold_until(K_RETURN, is_status, 5, "status"));
+        else {
+            CO_CALL(c_eq, press(K_RETURN, 3, 4));
+            CO_CALL(c_eq, wait_for(is_status, 5, "status"));
+        }
     }
     logf_("equip %d: %s, cash %ld.%ld", c_eq.item, g_bought ? "bought" : "no", (long) cash() / 10, (long) cash() % 10);
     CO_END(c_eq);
@@ -200,7 +206,7 @@ PT_THREAD(from_title(void)) {
     CO_CALL(c_ft, wait_for(is_title_or_docked, 30, "title or docked"));
     if (title() == 1) {
         CO_CALL(c_ft, idle(10));
-        CO_CALL(c_ft, hold_until(K_N, is_title2, 8, "title 2"));
+        CO_CALL(c_ft, hold_until(K_N, is_title2_or_on, 8, "title 2"));
     }
     if (title() == 2) {
         CO_CALL(c_ft, idle(10));
@@ -238,7 +244,7 @@ PT_THREAD(save_commander(const char *name)) {
         CO_CALL(c_save, wait_for(is_status, 10, "out of the disc menu"));
     }
     // the game copies the commander to NA% (what a death restores) before the disc write
-    if (memcmp(IO->ram + A_NA_PC + 8, IO->ram + A_TP, 73)) logf_("save: the copy doesn't match");
+    if (memcmp(IO->ram + A_NA_PC + 8, IO->ram + A_TP, g_ev.save_cmp)) logf_("save: the copy doesn't match");
     note("{\"event\": \"save\", \"tally\": %.2f, \"cash\": %.1f}", tally(), cash() / 10.0);
     fair_saved();
     CO_END(c_save);

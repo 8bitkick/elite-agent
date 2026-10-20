@@ -1,4 +1,4 @@
-// The Elite player: plays Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build) by looking
+// The Elite player: plays Acornsoft Elite (the BBC Master's or the Model B's disc version: elite_ver.h) by looking
 // at the machine's RAM and pressing keys. Nothing else: the platform gives it read-only RAM and a
 // keyboard, and calls player_frame() once per emulated frame, between frames.
 //
@@ -28,7 +28,11 @@ typedef struct {
     // its next conversion (optional: NULL where the platform has none)
     void (*analogue)(void *ctx, int channel, uint16_t value);
     void *ctx;
+    // the machine (machine_hook.h's model: 1 Model B, 3 Master 128; 0 not said): with what's in its RAM,
+    // which Elite this is (elite_ver.h)
+    int machine;
 } player_io_t;
 
 void player_init(player_io_t *io);
 void player_frame(void);
+int player_dull_cruise(void);   // (curious) a cruise with nothing to see: the platform may fast-forward it

@@ -830,6 +830,76 @@ hours to Elite unchanged within noise.
 (A first try ran efficient `run_sim` from the stuck curious snapshot, but efficient mode starts a new Jameson
 commander there instead of continuing, so it didn't reach the state.)
 
+## Round 6: the board, and what the user saw watching it
+
+All of this round came from watching curious mode live on the Presto. Each change is curious-only; a 180-minute
+efficient career gives a journal byte-identical to master after every one.
+
+### Frame cost (the juddering)
+
+In Thargoid fights the frame hook averaged 8-25 ms with a 207 ms worst case: the acquisition planner's search
+(316 rollouts of up to 50 game loops) in double precision, which the RP2350's FPU can't do. Now it runs in
+single precision, with a polynomial atan2, rollouts cut once they can't beat the best plan, the hot code in RAM
+(about 1.4 us a step on the board) and at most 8,000 steps a call. On the board: 0.1-2.5 ms a minute on average,
+12-14 ms at worst, speed 100%. A separate 136 ms frame at mis-jumps was the jump-range table (131,072 integer
+square roots); it now takes one root a system, exactly the same table. Efficient mode uses the same planner:
+all 9,327 fights 15.45 -> 15.37 points a minute, deaths 80 -> 78.
+
+### Rams
+
+Tagging each lab collision with the show's state showed held fire wasn't the cause (3 of 220). The toy follow
+had parked us in the target's path, or the ram dodge came too late. The ram shot now looks 25 game loops ahead
+within 600 (was 10 within 300), and there's no toying close to a ship coming at us nose-first (that distance is
+400 since the user said an occasional accident is fine).
+
+### Strafing, and Thargons first
+
+- Strafing: while toying and while closing to the firing size, a burst of 0.3-0.8 s every 1.5-4 s: near misses
+  aimed beside the target, or grazes while its energy is high enough to survive them. Bursts in about two thirds
+  of show fights; rams and deaths no worse.
+- Thargons first (the user: "kill the little Thargons fast, for fun, then toy with the Thargoid"): while a
+  Thargoid lives, the Thargons within 4,000 are worth ten times as much and are shot on sight; then the Thargoid
+  gets the show. Its Thargons go dead when it dies, so they have to come first. Witchspace hold-out (263 fights):
+  Thargons killed 6.98 -> 7.46 a fight, the last at 34.7 -> 31.4 s, a Thargoid drawn 20 px+ 2.8 -> 3.8 s a fight,
+  deaths 1 -> 0. `docs/img/curious-thargons-first.mp4` is one such fight, uncut (66 s, 10 kills, all on screen):
+  honest rather than pretty, as Thargons are small and much of it is empty space.
+
+### Running away, rolling, hanging back
+
+The user: "a lot of time speeding away from the enemy with them in the rear view; also an unnecessary amount of
+rolling", and later "in pursuit but hangs too far back". Measured on three Deadly careers in the sim (RRLOG=1,
+`tools/rrstats.py`):
+
+| | before | after |
+|---|---|---|
+| running away (every enemy behind, speed 30+, range opening) | 11.1% of fight time | 3.1% |
+| roll | 56 deg/s | 35 deg/s |
+| game loops with roll on | 87% | 59% |
+| the target in the toy follow, drawn | median 16 px | median 24 px (24 px+ half the time) |
+
+Causes and fixes:
+- The running was the show fighting on the rear laser: its speed rule went full speed for any target over
+  2,500 out, behind us too. With the show on, no rear-laser fight beyond 1,500 (turn and face it), and no
+  speeding up for a target behind.
+- The rolling was the weave, circling the target 12 deg off: the steering rolled all the way round after it. It
+  now weaves by pitch only, and the show rolls only as far as the shot needs (1 hit radius).
+- Hanging back: between 1,000 and 2,500 efficient mode's slow speeds ran, and the toy follow sat 600 behind
+  whatever the ship. Now full speed to a target ahead until 900, lead pursuit to the intercept point, and the
+  follow sits where the target is drawn 35 px.
+
+Hold-out (4,232 fights), from round 5's defaults to now: size-time 398 -> 492 px.s a minute, kills drawn 20 px+
+6 -> 12%, close kills (one ship) 0.11 -> 0.21 a fight, rams 24 -> 68 per 1000, deaths 5.4 -> 7.3 per 1000 (0.7%).
+The user asked for closer and bigger over ram safety. With the target ahead the median range barely moved
+(about 1,800): beyond 1,000 we already fly at 37 of 40, and much of that time is approach to ships as fast as us.
+
+### Dead-centre docking (tried, off)
+
+Rolling with the station to keep the slot level, the slot's sideways offset is fixed in our view, and the final
+approach corrects only in pitch, so the offset is never taken out. Aiming at a point on the axis ahead, tighter
+line-ups, tilting the slot a little, and steering onto the axis before the roll match all cut the worst offset
+further out (median 93 -> 36 inside 2,000) but not the offset at entry (13.5 -> 14), and some bumped or re-lined
+up. Off (`DOCKAX=1` to try); measured with `tools/dockstats.py` on DOCKLOG runs.
+
 ## Artefacts
 
 - `docs/img/showcase-flyby.gif` (21 s) and `showcase-flyby.png` (a frame a second): one showcase fight, a
@@ -840,6 +910,7 @@ commander there instead of continuing, so it didn't reach the state.)
   than a dot.
 - `docs/img/showcase-thargoids.gif` (15 s): a witchspace fight (`corpus/s132/fights/00648`, defaults).
   Thargoids pass large, with a right-view glance at one.
+- `docs/img/curious-thargons-first.mp4` (66 s): a witchspace fight, uncut, Thargons first (round 6).
 - Films: the lab writes raw frames with `SHOTRAW=file` (768×640 RGB24, 50 a second); `ffmpeg -f rawvideo
   -pix_fmt rgb24 -s 768x640 -r 50 -i file out.mp4` (on the macbox: `source ~/work/viz/env.sh` first).
 
