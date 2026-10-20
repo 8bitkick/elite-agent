@@ -254,8 +254,15 @@ PT_THREAD(save_commander(const char *name)) {
 // a career put on the Presto's save disc, "agent load <name>", or run_sim LOAD=name)
 char g_load_name[8];
 static struct { CO; } c_load;
+static char c_load_was[8];                 // (the commander's name before the load)
+static long c_load_cash; static double c_load_tally; static int c_load_x, c_load_y, c_load_g;
+static int commander_changed(void) {
+    return cash() != c_load_cash || tally() != c_load_tally || here_x() != c_load_x || here_y() != c_load_y || galaxy() != c_load_g;
+}
 PT_THREAD(load_commander(const char *name)) {
     CO_BEGIN(c_load);
+    memcpy(c_load_was, IO->ram + A_NAME, 7), c_load_was[7] = 0;
+    c_load_cash = cash(), c_load_tally = tally(), c_load_x = here_x(), c_load_y = here_y(), c_load_g = galaxy();
     CO_CALL(c_load, hold_until(K_AT, is_menu, 3, "disc menu"));
     CO_CALL(c_load, settle(is_menu, 8, 8, "disc menu"));
     CO_CALL(c_load, press(K_1, 3, 4));
@@ -265,13 +272,16 @@ PT_THREAD(load_commander(const char *name)) {
     CO_CALL(c_load, idle(6));
     CO_CALL(c_load, press(K_0, 3, 4));              // WHICH DRIVE?
     {
+        // (loaded: the commander's name is the one asked for, or, when it already was (a new game is JAMESON), its
+        // tally, cash or place changed; the screen is the Status page, though the game's view byte doesn't say so
+        // yet. Not found: the menu waits for a key; out of it)
         static uint32_t until;
         until = deadline(6);
-        CO_WAIT(c_load, !memcmp(IO->ram + A_NAME, name, strlen(name)) || expired(until));
+        CO_WAIT(c_load, (memcmp(c_load_was, name, strlen(name)) ? !memcmp(IO->ram + A_NAME, name, strlen(name)) : commander_changed()) ||
+                        expired(until));
     }
-    // (loaded: the commander's name is the one asked for; the screen is the Status page, though the game's
-    // view byte doesn't say so yet. Not found: the menu waits for a key; out of it)
-    if (memcmp(IO->ram + A_NAME, name, strlen(name))) {
+    CO_CALL(c_load, idle(25));                      // (the game copies the commander in a byte at a time: all of it)
+    if (memcmp(IO->ram + A_NAME, name, strlen(name)) || (!memcmp(c_load_was, name, strlen(name)) && !commander_changed())) {
         CO_CALL(c_load, press(K_SPACE, 3, 4));
         CO_CALL(c_load, idle(20));
         CO_CALL(c_load, settle(is_menu, 8, 8, "disc menu again"));

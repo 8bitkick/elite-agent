@@ -346,6 +346,7 @@ int main(int argc, char **argv) {
     // (the machine's ROMs and its Elite: the Master's (libbeeb.c) or the Model B's (libbeebjit.c, run_sim_b))
     snprintf(roms, sizeof roms, "%s/roms/%s", beeb_emu_dir(), beeb_model() == 1 ? "" : "mos3.20");
     snprintf(disc, sizeof disc, "%s/discs/%s", beeb_emu_dir(), beeb_model() == 1 ? "elite-disc-flicker-free-sth.ssd" : "elite-master-flicker-free-sng47.ssd");
+    if (getenv("DISC")) snprintf(disc, sizeof disc, "%s", getenv("DISC"));      // (DISC=file.ssd: another copy of the disc, a career saved on it)
     B = beeb_new(roms, argc > 2 && *argv[2] ? argv[2] : disc);
     if (!B) { fprintf(stderr, "beeb_new failed\n"); return 1; }
     journal = fopen(argc > 3 ? argv[3] : "/dev/null", "w");

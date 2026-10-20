@@ -222,7 +222,13 @@ static void elite_frame(const struct machine_hook_io *io)
         static uint32_t ready_since;
         ++s_boot_frames;
         if (s_boot_frames % 25 == 0) { if (!game_ready(io)) ready_since = 0; else if (!ready_since) ready_since = s_boot_frames; }
-        if (s_boot_frames == ELITE_AUTOSTART || (ready_since && s_boot_frames - ready_since >= 250)) s_boot_frames = ELITE_AUTOSTART, ready_since = 0, set_on(true);
+        if (s_boot_frames == ELITE_AUTOSTART || (ready_since && s_boot_frames - ready_since >= 250)) {
+            s_boot_frames = ELITE_AUTOSTART, ready_since = 0;
+            set_on(true);
+            // (its own commander from the save disc at the first dock, so a career goes on through a power-off or a
+            // reset; none there, and the new game plays on)
+            memcpy(g_load_name, s_tot.name, sizeof g_load_name - 1), g_load_name[sizeof g_load_name - 1] = 0;
+        }
     }
     if (!s_on) return;
     // (a reset: the frame count starts again, and the keys it held went with the old machine)
