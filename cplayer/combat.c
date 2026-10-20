@@ -262,17 +262,19 @@ static int s_force_rear;
 // 1 rear: with a rear laser, a target behind is fought from the rear view, where our turns look
 // mirrored: the rolls swap, and so do climb and dive)
 int g_rr_log;                // (RRLOG, the sim: a line a fight frame: running away and rolling, and what was flying)
-static int s_rr_plan, s_rr_weave, s_rr_rear, s_rr_fire;
+static int s_rr_plan, s_rr_weave, s_rr_rear, s_rr_fire, s_rr_cam, s_rr_cb;    // (s_rr_cam: -1 not the camera, else cfly's mode)
 int g_fire_now;              // (the lab's meter: our laser keyed on the target this frame; it clears it)
 static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *keys, int *view_out) {
     cp_select();
-    s_rr_plan = s_rr_weave = s_rr_rear = 0;
+    s_rr_plan = s_rr_weave = s_rr_rear = 0, s_rr_cam = -1;
     const combat_params_t *P = g_cpa;
     double dist = dist_of(sh);
     double sp = 1.5 * sh->speed, k = P->lead;
     // per iteration, the target moves along its nose at its speed and we fly on at ours
     vec_t vel = {sh->nosev[0] * sp, sh->nosev[1] * sp, sh->nosev[2] * sp - speed()};
+    { extern int g_curious; extern double cfly_lead(const ship_t *, vec_t); if (g_curious && show_on()) k = cfly_lead(sh, vel); }   // (the show: where it'll be when our nose gets there)
     vec_t aim = {sh->x + vel.x * k, sh->y + vel.y * k, sh->z + vel.z * k};
+    { extern int g_curious; extern vec_t cfly_predict(const ship_t *, double); if (g_curious && show_on()) aim = cfly_predict(sh, k); }   // (the show: along its arc)
     show_aim(sh, &aim.x, &aim.y, &aim.z);       // (curious mode's show: the flyby)
     vec_t v = {sh->x, sh->y, sh->z};
     // (the rear laser means facing away: further than rear_max, it's a chase we never close)
@@ -291,9 +293,31 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int jx_ = jstx(), jy_ = jsty();
     if (rear) jx_ = 256 - jx_, jy_ = 256 - jy_;
     { extern double g_aim_tol; const shiptype_t *tt = ship_type(sh->type); g_aim_tol = atan2(tt && tt->area ? sqrt((double) tt->area) : 80, dist + 1); }
-    double off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
+    extern int g_curious;
+    double off;
+    // (curious, the show on, the target in the picture: cfly.c, the camera operator. Out of the picture nobody's
+    // watching the turn: efficient's steer() and the planner below find it soonest; and in trouble the show's off and
+    // the fight's efficient's, built to win)
+    // (handed over with hysteresis and a dwell: at the picture's edge the two took turns every few frames, the planner
+    // pulling one way and the camera the other, the stick end to end: the pitch "oscillation")
+    static int s_cam, s_cam_since;
+    int well_in = v.z > 0 && fabs(v.x) < v.z * 0.4 && fabs(v.y) < v.z * 0.3;
+    int well_out = v.z <= 0 || fabs(v.x) > v.z * 0.6 || fabs(v.y) > v.z * 0.45;
+    if (now() - s_cam_since > 25) {
+        if (!s_cam && well_in) s_cam = 1, s_cam_since = now();
+        else if (s_cam && well_out) s_cam = 0, s_cam_since = now();
+    }
+    int cam = g_curious && show_on() && s_cam;
+    if (cam) {
+        extern double g_aim_tol, cfly_steer(vec_t, int, int, double, keyset_t *);
+        static int ctype = -1, cslot = -1;
+        extern void cfly_reset(void);
+        if (sh->type != ctype || sh->slot != cslot) cfly_reset(), ctype = sh->type, cslot = sh->slot;
+        off = cfly_steer(aim, jx_, jy_, g_aim_tol, keys);
+        { extern int g_cf_mode, g_cf_b; s_rr_cam = g_cf_mode; s_rr_cb = g_cf_b; }
+    } else off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
     { extern int g_want_jx, g_want_jy;
-      if (g_plan && g_want_jx >= 0 && IO->analogue && R(A_JSTK) && !show_flyby() && !weave) {     // (not in a flyby: it aims beside)
+      if (!cam && g_plan && g_want_jx >= 0 && IO->analogue && R(A_JSTK) && !show_flyby() && !weave) {     // (not in a flyby: it aims beside)
           const shiptype_t *tt = ship_type(sh->type);
           double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
           double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
@@ -304,15 +328,20 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
           if (in_crosshairs(sh, rear)) got = 1;
           if (offa > 10) got = 0;
           if (!got && offa > fmax(g_plan_hand, 3 * atan2(r, d) * 180 / M_PI)) {
-              static int last_mc = -1, pa, pb;
-              if (mcnt() != last_mc) {          // (once a game loop)
+              static int last_mc = -1, seen_mc = -1, pa, pb, since;
+              // (once a game loop; curious's show every g_cf_plan_every loops, the turn flown between: off the
+              // picture with only specks about, the loop-by-loop plan was most of the judder, 138 pitch changes and
+              // 109 roll starts and stops a minute)
+              extern int g_cf_plan_every;
+              int every = g_curious && show_on() ? g_cf_plan_every : 1;
+              if (mcnt() != seen_mc) seen_mc = mcnt(), since++;
+              if (mcnt() != last_mc && (since >= every || last_mc < 0)) {
+                  since = 0;
                   last_mc = mcnt();
                   double tvx = sh->nosev[0] * sp, tvy = sh->nosev[1] * sp, tvz = sh->nosev[2] * sp;
                   if (rear) tvx = -tvx, tvz = -tvz;
                   vec_t tp = {v.x, v.y, v.z}, tv = {tvx, tvy, tvz};
-                  { extern int g_plan_smooth, g_curious; g_plan_smooth = g_curious && show_on(); }      // (curious: smooth planning in the show)
                   plan_stick(tp, tv, rear ? -speed() : speed(), r, jx_, jy_, &pa, &pb);
-                  { extern int g_plan_smooth; g_plan_smooth = 0; }
               }
               g_want_jx = pa, g_want_jy = pb;
               s_rr_plan = 1;
@@ -344,6 +373,9 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         want = 40;
         g_en_mode = 5;
         rc = ev;
+        // (junk about to hit us, a canister, alloys, a pod, rock: shot if it's in the sights as well as ducked)
+        if (ev->type >= 3 && ev->type <= 8 && in_crosshairs(ev, space_view()) && laser_temp() <= P->hot &&
+            laser_power(space_view(), ev->type) > 0) ks_add(keys, K_FIRE);
     } else if (rc) {
         double m = hypot(q.x, q.y);
         double mx = m > 1 ? q.x / m : 0, my = m > 1 ? q.y / m : 1;
@@ -664,8 +696,10 @@ PT_THREAD(engage(float seconds)) {
                 extern int g_show_toyspd, show_fb_state(void);
                 const shiptype_t *tty = t ? ship_type(t->type) : NULL;
                 double td = t ? dist_of(t) : 0, tpx = t ? 256 * (tty && tty->area ? sqrt((double) tty->area) : 80) / (td + 1) : 0;
-                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f", now(), mcnt(), behind, nd, rr, speed(), jstx() - 128,
+                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d be%d al%d cm%d cb%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f", now(), mcnt(), behind, nd, rr, speed(), (R(A_BETA) & 0x80) ? -(R(A_BETA) & 0x7F) : R(A_BETA), (int) IO->ram[0x47], s_rr_cam, s_rr_cb, jstx() - 128,      /* (ALP1, the Master's roll rate) */
                       jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0);
+                if (t) dbgf_("RT %d n%.4f,%.4f,%.4f r%.4f,%.4f,%.4f s%.4f,%.4f,%.4f ro%d pi%d sp%d", mcnt(), t->nosev[0], t->nosev[1], t->nosev[2],
+                             t->roofv[0], t->roofv[1], t->roofv[2], t->sidev[0], t->sidev[1], t->sidev[2], t->roll, t->pitch, t->speed);   // (the target's heading: cfly's model of its arc)
                 s_rr_fire = 0;
             }
             // outnumbered and hurting: the energy bomb destroys every ship about but Thargoids and

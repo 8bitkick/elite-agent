@@ -49,9 +49,10 @@ drawn, ending a fight that hadn't started.
 
 Curious mode's fights are for the camera, and it's tuned on how big the enemy is on screen and for how long: a ship
 drawn 64 to 160 pixels counts a whole second, less as it gets smaller or too big to fit (`tools/show.py`'s BIG SHIPS).
-Over 300 recorded fights of a well-off commander that's about 5 seconds of every fight minute, with the stick
-smoothed near the target but free to break out, and specks that are getting away shot rather than chased. Efficient
-mode kills from as far out as it can.
+Its steering in a fight is a camera operator's (`cplayer/cfly.c`): with the enemy in the picture the pitch eases on
+and off and never flips for a small error, a roll is one deliberate move when the ship is out to the side, and a
+speck far off is flown in a few big moves rather than re-aimed every frame; out of the picture it comes round as fast
+as it can. Specks that are getting away are shot rather than chased. Efficient mode kills from as far out as it can.
 
 **Where efficient's time goes** (seed 13): witchspace farming of Thargoids, by a forced mis-jump, is
 55% of the time and 81% of the points, about 5 a game minute; bounty hunting at anarchies makes a

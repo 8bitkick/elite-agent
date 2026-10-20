@@ -45,10 +45,6 @@ double g_coast = 1.5;
 double g_up_hyst = 0.35;     // radians of hysteresis in the above/below choice (joystick aiming bench: time on target 11.8 -> 12.3%)
 double g_nose_hold = 0;      // (test)
 double g_roll_db = 0;        // (test)        // (test: radians of hysteresis in the above/below choice)
-// the show on (curious): roll only as far as the hit needs (g_roll_db's rule, this many hit radii of sideways miss allowed).
-// The user: "an unnecessary amount of rolling ... don't keep rolling for no reason"; pitch does the rest
-double g_cur_roll_db = 1;
-double g_stk_k = 0.5, g_stk_near = 4;       // the stick's dynamic smoothing (below, steer): its step near the aim, and how near
 int g_coast_min = 112;      // (only slewing, the stick near full: tracking a mover needs the easing)
 
 double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyset_t *keys) {
@@ -74,7 +70,7 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     // radii; test)
     { extern double g_aim_tol;
       extern int show_on(void);
-      double db = g_roll_db > 0 ? g_roll_db : show_on() ? g_cur_roll_db : 0;     // (the show on: efficient mode's aim is its own)
+      double db = g_roll_db;
       if (db > 0 && g_aim_tol > 0 && off > 1e-6) {
           double allow = asin(fmin(1.0, db * g_aim_tol / off));
           roll_err = fabs(roll_err) <= allow ? 0 : roll_err - copysign(allow, roll_err);
@@ -84,14 +80,6 @@ double steer(vec_t v, int jx, int jy, float roll_iters, float pitch_iters, keyse
     double pw = fmax(0.0, cos(roll_err));
     double beta = off * 256 / pitch_iters * pw * pw * pw * (up ? 1 : -1);
     int tx = jstx_for(alpha), ty = jsty_for(beta);
-    // the stick, dynamically smooth (curious, the show on; the user: "dynamic smooth though, can break out of smooth if
-    // needed, just dont oscillate"): within g_stk_near hit radii of the aim the stick goes g_stk_k of the way a frame,
-    // ironing out the small corrections; further off it goes straight there
-    { extern int g_curious, show_on(void); extern double g_aim_tol;
-      if (g_stk_k > 0 && g_stk_k < 1 && g_curious && show_on() && g_aim_tol > 0 && off < g_stk_near * g_aim_tol) {
-          tx = jx + (int) lround((tx - jx) * g_stk_k);
-          ty = jy + (int) lround((ty - jy) * g_stk_k);
-      } }
     { extern int g_want_jx, g_want_jy; g_want_jx = tx, g_want_jy = ty; }     // (the joystick goes straight there)
     // preload (test): with the pitch error too small for a rate (the stick inside the dead zone, |J| <= 28),
     // park the stick at the dead zone's edge on the error's side: still no turn, but the next correction is
@@ -216,21 +204,6 @@ static double plan_rates(double x, double y, double z, double vx, double vy, dou
 // (2) at most g_plan_cap steps a call (pf_step's), keeping the best found by then (the candidates go small rates
 // first, so the cap cuts the big ones)
 int g_plan_f = 3;               // bit 0: float, bit 1: prune
-// smooth planning (curious, the show on; combat.c sets g_plan_smooth): a candidate's score is its loops to the sights
-// plus the cost of the change from the last plan: g_ps_w loops for a full stick swing (roll and pitch each), g_ps_rev
-// more for reversing the roll, g_ps_keep less for flying the same plan on. Re-planned every loop, it holds a move
-// unless another is clearly better. (The user: "occasional hard rolls for purposeful moves are great"; unnecessary
-// rolling is not)
-int g_plan_smooth;
-double g_ps_w = 0.5, g_ps_rev = 1.5, g_ps_keep = 0.3;
-static int s_ps_a = 0, s_ps_b = 0;
-static float ps_pen(int a, int b) {
-    if (!g_plan_smooth) return 0;
-    float p = (float) (g_ps_w * (abs(a - s_ps_a) / 31.0 + abs(b - s_ps_b) / 8.0));
-    if (a * s_ps_a < 0) p += (float) g_ps_rev;
-    if (a == s_ps_a && b == s_ps_b) p -= (float) g_ps_keep;
-    return p;
-}
 int g_plan_cap = 8000;          // steps a call (0: no cap): ~11 ms on the Presto (1.4 us a step in RAM)
 long g_plan_steps, g_plan_calls, g_plan_capped, g_plan_maxsteps;       // (counters: the sim's timing report)
 // (PF_HOT: on the Presto, in RAM (the SDK's .time_critical sections): from flash, through the XIP cache the emulator
@@ -316,18 +289,16 @@ static double plan_rates_f(double x, double y, double z, double vx, double vy, d
     int prune = g_plan_f & 2;
     s_pf_steps = 0;
     { pf_t q = p0; pf_step(&q, a0, b0, fs); pf_policy(&q, aout, bout); }
-    float best = pf_roll(p0, a0, b0, 99, 0, 0, fs, fr2, 1e9f) + ps_pen(*aout, *bout);
+    float best = pf_roll(p0, a0, b0, 99, 0, 0, fs, fr2, 1e9f);
     int na = sizeof PL_A / sizeof *PL_A, nb = sizeof PL_B / sizeof *PL_B, capped = 0;
     // (small rates first, both axes together: the order the cap cuts in)
     for (int s = 0; s < na + nb && !capped; s++) for (int i = 0; i < na; i++) {
         int j = s - i;
         if (j < 0 || j >= nb) continue;
         if (g_plan_cap && s_pf_steps >= g_plan_cap) { capped = 1; break; }
-        float pen = ps_pen(PL_A[i], PL_B[j]);
-        float sc = pf_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, fs, fr2, prune ? best - pen : 1e9f) + pen;
+        float sc = pf_roll(p0, a0, b0, PL_A[i], PL_B[j], 1, fs, fr2, prune ? best : 1e9f);
         if (sc < best) best = sc, *aout = PL_A[i], *bout = PL_B[j];
     }
-    s_ps_a = *aout, s_ps_b = *bout;
     g_plan_steps += s_pf_steps, g_plan_calls++, g_plan_capped += capped;
     if (s_pf_steps > g_plan_maxsteps) g_plan_maxsteps = s_pf_steps;
     return best;
@@ -837,9 +808,7 @@ PT_THREAD(dock(float seconds)) {
 // stick smoothing near the aim (STKK, STKNEAR), smooth planning's weights (PSW, PSREV, PSKEEP)
 void curious_env(void) {
 #define E(v, name) if (getenv(name)) v = atof(getenv(name))
-    E(g_cur_roll_db, "CROLLDB");
-    E(g_stk_k, "STKK"); E(g_stk_near, "STKNEAR");
-    E(g_ps_w, "PSW"); E(g_ps_rev, "PSREV"); E(g_ps_keep, "PSKEEP");
+    { extern void cfly_env(void); cfly_env(); }     // (cfly.c's numbers: CF_*)
     if (getenv("DOCKDASH")) g_dock_dash = atoi(getenv("DOCKDASH"));
     E(g_dd_k, "DDK"); E(g_dd_m, "DDM");
 #undef E

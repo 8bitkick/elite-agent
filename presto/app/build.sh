@@ -34,7 +34,7 @@ CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wal
   -DELITE_DISC=\"$(basename "${DISC:-}")\" -include $HERE/app_libc.h -I$TOP/cplayer -I$API_DIR"
 OBJS=
 for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
-         "$TOP"/cplayer/{keyq,agent,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show}.c; do
+         "$TOP"/cplayer/{keyq,agent,cfly,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show}.c; do
     o="$OUT/$(basename "${f%.c}").o"
     [ "$o" -nt "$f" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
     OBJS="$OBJS $o"

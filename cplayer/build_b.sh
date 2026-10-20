@@ -27,7 +27,7 @@ for f in os_embedded.c beebjit_embedded.c; do
     OBJS="$OBJS $o"
 done
 wait
-SRC="keyq.c agent.c combat.c docked.c drv.c elite_ver.c fair.c flight.c galaxy.c pilot.c ships.c show.c"
+SRC="keyq.c agent.c cfly.c combat.c docked.c drv.c elite_ver.c fair.c flight.c galaxy.c pilot.c ships.c show.c"
 gcc -O2 -Wall -fwrapv -DPLAYER_TIMING -o run_sim_b run_sim.c $SRC ../sim/libbeebjit.c $OBJS -I$BJ -I$MB -lm 2>&1 \
     | grep -E "error|agent|combat|docked|drv|elite_ver|fair|flight|galaxy|pilot|ships|run_sim|libbeebjit" | grep -v "^In file" | head -30
 ls -la run_sim_b

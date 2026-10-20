@@ -269,6 +269,9 @@ static int tonnes_held(void) { int t = 0; for (int i = 0; i < 13; i++) t += carg
 // the nearest canister, alloy plate or escape pod worth scooping (scoops fitted, room in the hold)
 static const ship_t *scoopable(const ship_t *sh, int n) {
     if (!has_scoops() || tonnes_held() >= cargo_bay() - 1) return NULL;
+    // (curious, well off: no scooping. The user, watching it fly into canisters: "dont just fly into cargo, duck or
+    // shoot". A poor commander still scoops: it's income)
+    { extern int g_curious; if (g_curious && cash() >= 10000) return NULL; }
     const ship_t *best = NULL;
     for (int i = 0; i < n; i++) {
         const ship_t *s = &sh[i];
