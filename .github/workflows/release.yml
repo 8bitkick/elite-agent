@@ -18,5 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd presto/app/build && sha256sum elite-agent.bin > elite-agent.bin.sha256
+          # (a tag moved to a new commit: its old release goes, the tag stays)
+          gh release delete ${{ github.ref_name }} --yes 2>/dev/null || true
           gh release create ${{ github.ref_name }} elite-agent.bin elite-agent.bin.sha256 --title "elite-agent ${{ github.ref_name }}" \
             --notes "The elite-agent plugin for [rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro)'s plugin slot (BBC Master 128, curious mode, starts by itself). Install it from the web panel's Plugin section, or \`tools/presto.py app install elite-agent.bin\`. SHA-256: $(cut -d' ' -f1 elite-agent.bin.sha256)"

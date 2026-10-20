@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/make_splash.py <Comfortaa.ttf> --screen "<title>" <out.c> <symbol> [--preview <png>]
+"""tools/make_splash.py <Comfortaa.ttf> --screen "<title>" <out.c> <symbol> [--preview <png>]   ("" for no title)
 
 The loading screen, baked: the 8bitkick logo (presto/splash/8bitkick-logo.png, its left two-thirds so
 its traces read at the panel's size; the rainbow in MODE 2's eight colours, Bayer dithered; the traces
@@ -116,7 +116,7 @@ def main():
         im = Image.new('RGB', (W, FB_ROWS))
         im.putdata([PAL[c] for row in pic for c in row])
         im.resize((W, H), Image.NEAREST).save(preview)
-    if not title: sys.exit('--screen "<title>" <out.c> <symbol>')
-    write(pic, out, 'the loading screen with "%s" on it' % title, symbol, bar)
+    if out is None: sys.exit('--screen "<title>" <out.c> <symbol>')
+    write(pic, out, 'the loading screen with "%s" on it' % title if title else 'the loading screen, the logo alone', symbol, bar)
 
 main()
