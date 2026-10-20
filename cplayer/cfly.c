@@ -1,5 +1,4 @@
-// Curious mode's flying in a fight (round 10; the user: "rip up the motion planning and execution for curious and
-// start again ... think about the end effect we are looking for, be the director of a scene").
+// Curious mode's flying in a fight (round 10: the steering rebuilt from the end effect on screen).
 //
 // In the front view our nose is the camera, so the stick is the camera operator. Three ways of flying, by where the
 // target is in the picture:
@@ -70,8 +69,8 @@ double cfly_steer(vec_t v, int jx, int jy, double tol, keyset_t *keys) {
         int in_pic = v.z > 0 && fabs(v.x) < v.z / 2 && fabs(v.y) < v.z * 0.375;
         int pull = C.up ? 1 : -1, a = 0, b;
         // APPROACH: in the picture but only a speck (drawn under cf_appr_px, ~256 x the hit radius angle): nothing to
-        // watch but the stars, so no fine work (the user: "moments with no big ship in focus, no pursuit... pure
-        // judder"; 2/3 of fight time, 213 pitch changes a minute): coarse moves decided every cf_appr_every loops, held
+        // watch but the stars, so no fine work (2/3 of fight time, where re-aiming every loop made 213 pitch changes a
+        // minute of pure judder): coarse moves decided every cf_appr_every loops, held
         C.appr_n++;
         if (in_pic && 256 * tol < g_cf_appr_px) {
             g_cf_mode = 3;
@@ -114,8 +113,8 @@ double cfly_steer(vec_t v, int jx, int jy, double tol, keyset_t *keys) {
             // the pitch: eased on, damped on its own change, never reversed for a small error
             double dey = C.ev == C.ev ? ey - C.ev : 0;                  // (its change since last loop, rad)
             double want = (ey + g_cf_damp * dey) * 256 / g_cf_pan_k;      // (its change added: it closes or runs, and the rate meets it)
-            // (no nudging: the user, on the Presto, "up down judder": the pitch went on and off at its smallest rate, the
-            // nose nudged, stopped and nudged. A move starts only clearly off (cf_start hit radii), then runs until it's
+            // (no nudging: the pitch went on and off at its smallest rate, and the nose nudged, stopped and nudged up and
+            // down. A move starts only clearly off (cf_start hit radii), then runs until it's
             // on (cf_hold): one deliberate move, not a stutter)
             if (!C.pitching && fabs(ey) > g_cf_start_r * tol) C.pitching = 1;
             // (and stops only on it and not drifting: a ship crossing steadily is followed at its own rate, not caught
@@ -153,8 +152,7 @@ out:
 void cfly_reset(void) { C.mc = -1, C.rolling = C.pitching = C.dwell = 0, C.a = C.b = 0, C.ev = NAN; }
 
 
-// the lead (curious; the user: "given curious knows the exact velocity and arc of the enemy I am surprised our
-// pursuits are so shitty ... we want the effect of an experienced pilot who anticipates the enemy's moves"): its
+// the lead (curious: an experienced pilot anticipating where the enemy is going, from its exact velocity): its
 // path flown forward along its nose at 1.5 x its speed, we along ours; aimed where it'll be when our nose gets there
 // (the angle to that point at our pitch rate, BETA 8 a loop at cf_turn of that on average, worked out twice), capped
 // at cf_lead_max loops. (Tune 300: a cap of 24 loops 3.9 big-ship seconds a fight minute, 8: 3.5, 4.5: 4.3, 3 and 2:

@@ -26,7 +26,7 @@ int g_show = 1;                     // (SHOW=0 in the lab or run_sim: curious fi
 show_params_t g_sp = {
     // MODE. The margin on at 1, off at 0.5 (0.5 / 0.25 gave the same size x time with twice the deaths: 2.2% of fights
     // in a career at 1 / 0.5); witchspace 1.2 / 0.7 (lower, it bails out and half the Thargoids live). A 10-minute
-    // budget as a safety net; hand over after 12 s with nothing new on screen (the user: end fights only when they
+    // budget as a safety net; hand over after 12 s with nothing new on screen (fights end only when they
     // repeat). No show on a pulse laser (the early career deaths). No show under 1000 Cr (the round-4 poverty trap)
     .on_m = 1, .off_m = 0.5f, .ws_on_m = 1.2f, .ws_off_m = 0.7f, .dwell = 100, .hit_s = 0.5f, .hold_s = 6, .reserve = 96,
     .min_laser = 1, .frugal = 1000, .budget_base = 600, .empty_x = 2, .bore_s = 12,
@@ -35,13 +35,13 @@ show_params_t g_sp = {
     // the show had chased the best-value ship 10,000 out with the pack at 1,000); one opening far out worth a third;
     // no rear-view fight beyond 1500 (a fight on the rear laser flew away from it half the time: 17% of fight time)
     .close_speed = 40, .far = 2500, .close_d = 900, .intercept = 1, .near_pref = 1, .run_value = 0.33f, .rear_all = 1, .rear_close = 1500,
-    // FIRING. Hold to 32 px (the user's measure: how big and how long; distance shots don't count), Thargoids too;
+    // FIRING. Hold to 32 px (the measure: how big and how long; distance shots don't count), Thargoids too;
     // after 45 s with no kill, from 12 px; the show off, no shot at a speck under 8 px (kills seen 24 -> 45%); a target
     // about to pass within 600 in the next 25 game loops: shoot now, whatever its size (it can't ram us dead)
     .fire_px = 48, .ws_fire_px = 32, .stall_s = 45, .stall_px = 12, .eff_px = 8, .eff_e = 180, .eff_close = 8, .slow_s = 5, .col_fire = 1, .col_t = 25, .col_r = 600,
     // TOY / FOLLOW. 40 s at 24 px or more before the kill, sat where it's drawn 50 px; none within 400 of one coming
-    // nose-first (the follow parked us in its path: rams). Strafing near misses every 0.2-0.8 s while toying (the user:
-    // big ships fought on screen, not just followed): a big ship centred or under fire 1.40 -> 1.89 s a fight minute in
+    // nose-first (the follow parked us in its path: rams). Strafing near misses every 0.2-0.8 s while toying (big ships
+    // fought on screen, not just followed): a big ship centred or under fire 1.40 -> 1.89 s a fight minute in
     // three Deadly careers, stick and roll reversals down, deaths 9 -> 2. (Grazes too killed them early: no gain)
     .toy_px = 24, .toy_s = 40, .follow_px = 50, .follow_d = 600, .toy_safe = 400,
     .strafe = 1, .strafe_miss = 1, .strafe_off = 1.4f, .strafe_k = 5, .nm_lo = 0.3f, .nm_hi = 1, .nm_side = 1, .strafe_temp = 120, .strafe_e = 80, .strafe_px = 24, .strafe_gap0 = 10, .strafe_gapr = 30,
@@ -51,8 +51,8 @@ show_params_t g_sp = {
     .follow_s = 4, .extend_s = 1.5f, .glance = 1, .glance_d = 1200, .glance_max = 2.0f, .glance_gap = 6.0f, .glance_px = 20,
     // SHOWPIECES. A missile in 30% of fights, the bomb in half of those with a pack in close (rare by design)
     .msl_odds = 0.3f, .msl_near = 1200, .msl_far = 6000, .bomb_odds = 0.5f, .bomb_n = 3, .bomb_dist = 3000, .bomb_ws = 1,
-    // WITCHSPACE. The nearest group (side views 25 -> 31% of fights); the Thargons first (the user: "kill the little
-    // Thargons fast, for fun, then toy with the Thargoid"), shot once drawn 10 px (they home in: the rear view 11 -> 30%)
+    // WITCHSPACE. The nearest group (side views 25 -> 31% of fights); the Thargons first (cleared fast, then
+    // the Thargoid toyed with), shot once drawn 10 px (they home in: the rear view 11 -> 30%)
     .ws_group = 1, .group_d = 2500, .thg_first = 1, .thg_d = 4000, .thg_px = 10,
     // EVADE. A ship passing within its radius + 150 inside 12 game loops: rams 90 -> 35 per 1000 fights, size-time up
     .ev = 1, .ev_t = 12, .ev_r = 150, .ev_out = 1.5f,
@@ -305,8 +305,8 @@ int show_rear_ok(double dist) {
 static int toy_now(const ship_t *t, double dist) {      // toying: holding fire to keep it big on screen
     return g_sp.toy_px && t->type != 1 && !head_on(t, dist) && t->type == TY.type && size_px(t, dist) >= g_sp.toy_px && TY.frames < g_sp.toy_s * 50;
 }
-// strafing (the user: "the occasional strafe with a laser without killing, or even a near miss, is more interesting to
-// watch than just following"): bursts of 0.3-0.8 s every 1.5-4 s, while toying and while closing to the firing size
+// strafing (an occasional burst without the kill, or a near miss, is more interesting to watch than just following):
+// bursts of 0.3-0.8 s every 1.5-4 s, while toying and while closing to the firing size
 // from strafe_px: near misses (aimed beside it along its own side, fired while it's a few radii off the line) and
 // grazes (on it, only while its energy is over a floor, so the kill still comes at the big close moment); none with
 // the laser warm, so the kill isn't held up by the heat
@@ -354,7 +354,7 @@ static int sf_fire(const ship_t *t, double dist, int fire) {
     if (on && t->energy <= g_sp.strafe_e) return 0;          // (a hit now might kill it: hold)
     int shot;
     if (SF.miss && g_sp.nm_hi > 0) {
-        // (the user: "if you're gonna strafe do it near the ship, it looks lame otherwise". On screen the beam ends at
+        // (a near miss has to look near: wide misses look like nothing. On screen the beam ends at
         // the sights; the ship's centre is off/z of a radian away, its drawn radius r/z: fire only with the gap from the
         // sights to its outline between nm_lo and nm_hi of that radius)
         double gap = off / r - 1;      // (the gap over the drawn radius: both scale as 1/z)
@@ -383,7 +383,7 @@ void show_aim(const ship_t *t, double *ax, double *ay, double *az) {
     if (show_on() && t && t->type != 1) intercept_aim(t, ax, ay, az);
     if (show_on() && t && t->type != 1) sf_aim(t, ax, ay, az);
     // (no flyby at a Thargon: it's tiny, so it never looks a pass, and as a rare type every first meeting chose one: full
-    // speed in, the crawl to turn after it, again; the user: "pulsing acc decel" in witchspace. 329 witchspace fights:
+    // speed in, the crawl to turn after it, again: speed pulsing in witchspace. 329 witchspace fights:
     // big ships 5.2 -> 5.6 s a fight minute, fights 123 -> 116 s)
     if (!show_on() || FB.state == 2 || !t || t->type == 1 || t->type == 30) return;
     double d = dist_of(t);
@@ -430,8 +430,7 @@ void show_knife(const ship_t *t, keyset_t *keys) {
     else if (fabs(err) >= 3) ks_add(keys, err > 0 ? K_ROLL_LEFT : K_ROLL_RIGHT);
 }
 
-// ==== EVADE: the collision evasion (the user: "can you do a priority evasive manoeuvre if you're about to collide?"):
-// any ship, Thargons and canisters too, whose closest approach is within ev_t game loops and passes inside its radius
+// ==== EVADE: the collision evasion, a priority manoeuvre when a collision is coming: any ship, Thargons and canisters too, whose closest approach is within ev_t game loops and passes inside its radius
 // + ev_r; held, once started, until the predicted miss is ev_out times that. combat.c pitches away from the side it'll
 // pass (towards that side, as the efficient ram dodge steers, rams went 35 -> 133 per 1000)
 const ship_t *show_evade(const ship_t *s, int n, vec_t *miss) {
@@ -495,8 +494,7 @@ static int show_fire_(const ship_t *t, double dist, int fire) {
         TY.x = t->x, TY.y = t->y, TY.z = t->z;
         if (size_px(t, dist) >= g_sp.toy_px && TY.frames < g_sp.toy_s * 50) { TY.frames++; g_show_hold = 5; return 0; }
     }
-    // (the user, watching it follow a ship it wasn't catching: "if its not closing in fast enough after 5 s shoot it":
-    // under the firing size, not coming in faster than eff_close a loop for slow_s, it's shot rather than followed)
+    // (it followed ships it wasn't catching: under the firing size, not coming in faster than eff_close a loop for slow_s, it's shot rather than followed)
     static struct { int slot; uint32_t since; } SL = {-1, 0};
     if (t->slot != SL.slot || range_rate(t) < -g_sp.eff_close) SL.slot = t->slot, SL.since = now();
     if (g_sp.slow_s && now() - SL.since >= (uint32_t) (g_sp.slow_s * 50)) { g_show_why[4]++; g_show_hold = 6; return fire; }

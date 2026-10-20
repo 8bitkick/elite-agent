@@ -157,7 +157,7 @@ def summary(name, F):
     n = len(F)
     m = lambda xs: sum(xs) / max(1, len(xs))
     print('== %s: %d fights' % (name, n))
-    # the primary measure (user, round 3): how big and how long. Per fight: seconds with an enemy drawn 20 px or more,
+    # the primary measure (round 3): how big and how long. Per fight: seconds with an enemy drawn 20 px or more,
     # 40 px or more; and the size-time integral (the largest enemy's drawn px, capped at 100, summed over frames) per
     # minute of fight, in px-seconds
     mins = max(1e-9, sum(f['frames'] for f in F) / 3000)
@@ -182,7 +182,7 @@ def summary(name, F):
         print('  STRAFE: bursts in %.0f%% of fights, %.2f a fight, %.1f frames fired a burst' % (
             100 * sum(1 for b, s in sf if b) / max(1, n), sum(b for b, s in sf) / max(1, n), sum(s for b, s in sf) / max(1, sum(b for b, s in sf))))
     print('  CAPPED: %d fights of %d ran 239 s or more' % (sum(1 for f in F if f['frames'] >= 239 * 50), n))
-    # (round 8, the user: "calibrate how big for how long": showmeter.c's big_value, 0 under 16 px, 1 at 64-160 px, 0 at 256)
+    # (round 8, how big for how long: showmeter.c's big_value, 0 under 16 px, 1 at 64-160 px, 0 at 256)
     print('  BIG SHIPS: %.1f s a fight minute (a ship drawn 64-160 px a whole second, less below or above), %.1f s a fight' % (
         sum(f['bigv'] for f in F) / 50 / mins, sum(f['bigv'] for f in F) / 50 / max(1, n)))
     fr = max(1, sum(f['frames'] for f in F))

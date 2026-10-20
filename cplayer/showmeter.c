@@ -51,9 +51,9 @@ static struct {
     double isx[NOSH + 2], isy[NOSH + 2], ipx[NOSH + 2];
     int itype[NOSH + 2], iview, imc, lively, gntmp;
     long lively_fr, static_fr, srun, static_air;
-    long s20, s40;                 // frames with an enemy drawn 20 / 40 px or more (the user's measure: how big, how long)
+    long s20, s40;                 // frames with an enemy drawn 20 / 40 px or more (the measure: how big, how long)
     double sint;                   // the largest enemy's drawn size, summed over frames (capped at 100 px)
-    double bigv;                   // big_value() of it summed over frames: how big, for how long (the user's measure, round 8)
+    double bigv;                   // big_value() of it summed over frames: how big, for how long (the measure, round 8)
     long spd_rev; int spd_last, spd_dir;   // our speed's changes of direction (speeding up, then slowing): pulsing
     long spd_sum, spd_fast;        // speed summed over frames, and frames at 30 or more: a high speed chase
     long stk_rev; int stk_lx, stk_ly, stk_dx, stk_dy;   // the stick's changes of direction (either axis): judder
@@ -89,8 +89,8 @@ static double on_screen_at(const ship_t *s, double *sx, double *sy) {
     return 256 * r / z;
 }
 
-// how much a ship drawn this big is worth on screen, a frame (the user: "64px better than 24. too close (not possible to
-// fit in screen) might be worse"): nothing for a speck under 16 px, up to 1 at 64 px (a quarter of the 256 px view),
+// how much a ship drawn this big is worth on screen, a frame (bigger is better until it no longer fits the screen):
+// nothing for a speck under 16 px, up to 1 at 64 px (a quarter of the 256 px view),
 // 1 to 160 px, down to nothing at 256 px, where it no longer fits
 static double big_value(double px) {
     if (px < 16) return 0;

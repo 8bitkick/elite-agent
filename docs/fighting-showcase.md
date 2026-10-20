@@ -11,8 +11,7 @@ checks `g_curious`.
 
 ## The primary measure: size × time (round 3 on)
 
-The user: "a lot of this is literally how big and for how long you can get enemies on screen. Distance shots
-don't do it." From round 3 every change is judged first on these, from the meter (`showmeter.c`, the largest
+Most of it is how big and for how long the enemies are on screen; distance shots don't do it. From round 3 every change is judged first on these, from the meter (`showmeter.c`, the largest
 enemy drawn in the view on screen, each frame):
 
 - **seconds with an enemy drawn 20 px or more**, and **40 px or more** (on the 256-px-wide space view), per
@@ -142,16 +141,16 @@ fight with a bootstrap CI; `tools/showkills.py` gives kill distances by scenario
 
 1. **Size thresholds.** At first close saturated at 24 px and a close kill took 12 px. On film those kills
    were still small (a tenth of the screen's width), so they went to 48 and 20.
-2. **Any view.** On the user's steer, screen presence counts whichever view is shown. View variety (side
+2. **Any view.** Screen presence counts whichever view is shown. View variety (side
    glances, rear) went into the techniques, with the flick factor against overuse.
-3. **Novelty.** Added on the user's mission statement.
+3. **Novelty.** Part of curious mode's purpose: seeing new things.
 4. **Re-scoring.** All the numbers on this page are re-scored with the final `show.py`. Runs from before the
    novelty meter score 0 on that part, so those runs are slightly understated.
 
 ## When to show off: the superiority margin
 
 The first gate was fixed: a military laser, ECM and an energy unit fitted, energy ≥ 200 and both shields
-≥ 160 at the fight's start, and off for good once a shield fell under 96. On the user's steer it is now
+≥ 160 at the fight's start, and off for good once a shield fell under 96. It is now
 **dynamic**: a margin recomputed every frame.
 
 **margin = what we can lose ÷ what they'll do to us before they're all dead**
@@ -191,7 +190,7 @@ second margin (weaker shield, a reserve, the show's own exposure) brought that t
 | margin v2, on 4 / off 2 | 32.4 | 1.7 | 58% | 68% |
 | margin v2, on 8 / off 4 | 25.1 | 1.7 | 38% | 40% |
 
-**Death budget.** The user's death budget is up to ~5% of showcase fights. The chosen margin loses 3.3
+**Death budget.** Up to ~5% of showcase fights may end in a death. The chosen margin loses 3.3
 per 1000 on the tune set and 6.5 per 1000 on the hold-out (efficient: 3.0), about an eighth of the budget.
 Looser margins buy little show (on 1 / off 0.5: +0.4, deaths 11.7 per 1000).
 
@@ -285,7 +284,7 @@ deaths 57.
 
 The show more than doubles the score. Nearly every fight now has enemies on screen at some point, and the
 lone-pirate duels end with a close kill a third of the time. Our deaths double, from 0.3% to 0.65% of
-fights, an eighth of the user's budget. Points per fight are unchanged: the show takes longer, not less.
+fights, an eighth of the budget. Points per fight are unchanged: the show takes longer, not less.
 
 ### Where the show still falls short
 
@@ -463,7 +462,7 @@ merge), deaths 3.
 | Witchspace (529) | | 38.8, 2 deaths |
 
 Lone pirates take most of the deaths (31): toying sits a ship behind a single pirate for 12 s, and some turn
-and fight. The deaths are inside the budget, and the reason to accept them is the user's: big on screen, for
+and fight. The deaths are inside the budget, and the reason to accept them is the brief: big on screen, for
 long.
 
 ### Films (round 3, the same fights; size × time from the lab)
@@ -503,10 +502,10 @@ In witchspace, 87% of kills come after the hand-over. So **the small kills are e
 show hands over**. The show's own kills are mostly big; the show just isn't on when most kills happen. In
 packs the margin starts under its threshold, and the show's held fire costs shields until the margin drops.
 
-### Risk for style, and ending on repetition (the user's steer)
+### Risk for style, and ending on repetition
 
-The user's steer: "take risks for style up to 5%. Don't worry about ending fights unless they are repetitive
-(e.g. chasing in a straight line for a long time)." So:
+Risks for style are allowed up to 5% of fights, and a fight need only end early when it turns repetitive (a long
+chase in a straight line, say). So:
 
 - **The margin:** on at 1, off at 0.5 (was 2 and 1). At 0.5 / 0.25 the show gained nothing more on screen and deaths doubled: 4.3% in the lab, and a filmed career reached 5.7% of its fights (stopped at 88 h). The gain came from ending on repetition, not from risk. Witchspace keeps 1.2 / 0.7: at 0.6 / 0.3 the ship bails
   out of witchspace on low energy and completion halves (0.86 → 0.48).
@@ -580,7 +579,7 @@ was that same dead end: it reloaded for 80 game hours.
 
 The no-trade fallback fired 149 times. The career became a bounty hunter (103 game hours hunting) and
 witchspace almost stopped: the one-in-three rule can't keep up with that many hunt sessions. That is slower
-to Elite, but the user said career hours don't matter here, and a curious career that hunts is mostly
+to Elite, but career hours don't matter here, and a curious career that hunts is mostly
 fighting on screen.
 
 ### Round 2 careers: the stall, and setting out hurt
@@ -655,7 +654,7 @@ game hours**, the fastest curious career so far:
 | Stuck reloads | 10 |
 
 The guard fired 197 times, so two-system shuttles are common in curious careers; it turns each into a hunt.
-Deaths doubled with the closer show (no shot under 32 px, 12 s of toying), and are still inside the user's
+Deaths doubled with the closer show (no shot under 32 px, 12 s of toying), and are still inside the
 5% budget.
 
 **The showreel:** `docs/img/curious-show-reel.mp4` (3:02, 2.9 MB). It is built from the filmed career by
@@ -672,10 +671,10 @@ DISC=rp2350-bbc-micro/discs/elite-master-flicker-free-sng47.ssd NOMISSIONS=1 NBA
 Big wireframes at close range, Thargoids under laser fans, rear-view work and explosions. The last clip (the
 Elite kill) is mostly an empty rear view: that kill was an efficient-mode chase.
 
-### One whole fight, uncut (the user's pick of format)
+### One whole fight, uncut
 
 The 12 s best-stretch reel didn't work: its captions counted the whole battle's kills ("9 kills") over a clip
-showing one. The user asked instead for one continuous sequence: uncut, at real speed, from first contact to
+showing one. The format chosen instead is one continuous sequence: uncut, at real speed, from first contact to
 the last kill, with every kill on screen and close, and a caption true for what's shown.
 
 **The tool.** `tools/onefight.py` ranks every fight of the filmed career with 4 or more kills (805 of them).
@@ -815,7 +814,7 @@ The curious career hit it with ~700 Cr just after a replacement energy bomb. Eff
 that poor once fitted, which may be why it hasn't shown, but a lost energy unit plus a death's reload could
 do it.
 
-**Proposed efficient fix** (needs the user's approval: it changes efficient careers): on "nowhere to go",
+**Proposed efficient fix** (not applied: it changes efficient careers): on "nowhere to go",
 before the reload:
 - If this is an anarchy, hunt with what we have (the curious fix).
 - Else fly one hop toward the nearest anarchy or the cheapest-fuel neighbour.
@@ -830,7 +829,7 @@ hours to Elite unchanged within noise.
 (A first try ran efficient `run_sim` from the stuck curious snapshot, but efficient mode starts a new Jameson
 commander there instead of continuing, so it didn't reach the state.)
 
-## Round 6: the board, and what the user saw watching it
+## Round 6: the board, and what watching it showed
 
 All of this round came from watching curious mode live on the Presto. Each change is curious-only; a 180-minute
 efficient career gives a journal byte-identical to master after every one.
@@ -850,14 +849,14 @@ all 9,327 fights 15.45 -> 15.37 points a minute, deaths 80 -> 78.
 Tagging each lab collision with the show's state showed held fire wasn't the cause (3 of 220). The toy follow
 had parked us in the target's path, or the ram dodge came too late. The ram shot now looks 25 game loops ahead
 within 600 (was 10 within 300), and there's no toying close to a ship coming at us nose-first (that distance is
-400 since the user said an occasional accident is fine).
+400, since an occasional accident is fine).
 
 ### Strafing, and Thargons first
 
 - Strafing: while toying and while closing to the firing size, a burst of 0.3-0.8 s every 1.5-4 s: near misses
   aimed beside the target, or grazes while its energy is high enough to survive them. Bursts in about two thirds
   of show fights; rams and deaths no worse.
-- Thargons first (the user: "kill the little Thargons fast, for fun, then toy with the Thargoid"): while a
+- Thargons first (the little ones cleared fast, then the Thargoid toyed with): while a
   Thargoid lives, the Thargons within 4,000 are worth ten times as much and are shot on sight; then the Thargoid
   gets the show. Its Thargons go dead when it dies, so they have to come first. Witchspace hold-out (263 fights):
   Thargons killed 6.98 -> 7.46 a fight, the last at 34.7 -> 31.4 s, a Thargoid drawn 20 px+ 2.8 -> 3.8 s a fight,
@@ -866,8 +865,8 @@ within 600 (was 10 within 300), and there's no toying close to a ship coming at 
 
 ### Running away, rolling, hanging back
 
-The user: "a lot of time speeding away from the enemy with them in the rear view; also an unnecessary amount of
-rolling", and later "in pursuit but hangs too far back". Measured on three Deadly careers in the sim (RRLOG=1,
+Watching it showed a lot of time speeding away from the enemy with it in the rear view, an unnecessary amount of
+rolling, and pursuits that hung too far back. Measured on three Deadly careers in the sim (RRLOG=1,
 `tools/rrstats.py`):
 
 | | before | after |
@@ -889,7 +888,7 @@ Causes and fixes:
 
 Hold-out (4,232 fights), from round 5's defaults to now: size-time 398 -> 492 px.s a minute, kills drawn 20 px+
 6 -> 12%, close kills (one ship) 0.11 -> 0.21 a fight, rams 24 -> 68 per 1000, deaths 5.4 -> 7.3 per 1000 (0.7%).
-The user asked for closer and bigger over ram safety. With the target ahead the median range barely moved
+Closer and bigger comes before ram safety. With the target ahead the median range barely moved
 (about 1,800): beyond 1,000 we already fly at 37 of 40, and much of that time is approach to ships as fast as us.
 
 ### Dead-centre docking (tried, off)

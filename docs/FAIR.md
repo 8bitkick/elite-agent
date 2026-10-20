@@ -69,7 +69,7 @@ least 4 frames down and 3 up. On top of the information limits they cost about 5
 in the lab (§4); on their own, nothing visible in a 4-hour career (§3).
 
 **No reaction delay.** An earlier version saw everything 200 ms late and predicted over the delay with its own
-stick. The user dropped it: fair mode is about what the player knows, not when. It's gone from the code (bit 4
+stick. It was dropped: fair mode is about what the player knows, not when. It's gone from the code (bit 4
 of `g_fair` is unused). On the 300-fight screen it had cost about a fifth of the points a fight minute.
 
 **Game options a human would play with.**

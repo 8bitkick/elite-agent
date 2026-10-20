@@ -763,7 +763,7 @@ PT_THREAD(dock(float seconds)) {
                 // the last 400; and holding back while the slot isn't level near it
                 double rl = fabs(fmod(atan2(st->roofv[1], st->roofv[0]) + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2) * 180 / M_PI;
                 want = dist > 2500 ? 22 : dist > 1000 ? 14 : dist > 400 ? 9 : 4;
-                // (curious, the user: "dock with style. hard accelerate, only slow down in time"): lined up (the nose
+                // (curious, docking with style: hard acceleration, slowing only in time): lined up (the nose
                 // within 5 deg, the slot level within 10, near the axis), the fastest speed that still brakes to 4 by 400
                 // out: a speed key changes it 1 a game loop and a loop covers ~1.1 x the speed, so braking from v takes
                 // ~1.1 (v^2 - 16) / 2; with g_dd_k of that and g_dd_m to spare. The last 400 at 4, as ever

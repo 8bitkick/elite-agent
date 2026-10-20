@@ -117,7 +117,7 @@ big/small, 60 witchspace) to screen; **all** = the 9327 to confirm; **careers** 
 | all fights: damage taken | 114 | 100 |
 | all fights: deaths | 27 | 20 (80 with no break-off, the efficient default now: the lab's hurt starts) |
 
-Deaths are a cost, not a limit (user, 2026-10-18): a death costs the trip since the last dock save and a reload,
+Deaths are a cost, not a limit: a death costs the trip since the last dock save and a reload,
 and that is already in the hours to Elite. Changes are judged on those hours.
 
 (Seeds 13, 101, 37, 71, 149, in that order. The fight numbers are the lab's; the travel reach doesn't show

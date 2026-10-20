@@ -216,9 +216,8 @@ static void elite_frame(const struct machine_hook_io *io)
         s_resets_seen = io->resets;
         if (s_on) { set_on(false); s_boot_frames = 0; }
     }
-    // (started as soon as Elite's ready: its code in RAM and a title screen or docked, ~12 s from boot, not a fixed 50 s;
-    // the user: "you dont need to wait so long for presto to boot". Another program never looks ready: it waits on)
-    // (and the user: "let the elite screen play for 5 seconds before starting": ready for 5 s on end)
+    // (started once Elite's ready, its code in RAM and a title screen or docked, ~12 s from boot, not a fixed 50 s, and
+    // after its screen has played for 5 s on end. Another program never looks ready: it waits on)
     if (!s_on && s_boot_frames < ELITE_AUTOSTART) {
         static uint32_t ready_since;
         ++s_boot_frames;
@@ -233,7 +232,7 @@ static void elite_frame(const struct machine_hook_io *io)
     player_frame();
     uint32_t us = s_api->time_us() - t0;
     // (curious: the dull cruise to the station fast-forwarded in turbo, back to real speed the moment a ship's about,
-    // the station's near or we're docked; a turbo the user set themselves is left alone)
+    // the station's near or we're docked; a turbo set by hand is left alone)
     {
         static bool ours;
         bool want = player_dull_cruise() != 0;
