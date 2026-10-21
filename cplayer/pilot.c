@@ -26,6 +26,17 @@ static int jstx_for(double alpha) {
     return 128 + (a > 0 ? d : -d);
 }
 
+// the stick for a pitch of u (1/256 rad a game loop, + nose up) as the game gives it (beta_from_jsty): 0 under
+// |J| 32, 1 to 47, then J / 16; so 0, 1 (J 40), 3 (48), ... 8 (128), the nearest without overshooting 2 to 3
+static int jsty_nose_up(double u) {
+    double a = fabs(u);
+    int k = a < 0.5 ? 0 : a < 2.5 ? 1 : a > 8 ? 8 : (int) lround(a);
+    int mag = k == 0 ? 0 : k == 1 ? 40 : 16 * k;
+    if (mag > 127) mag = 127;
+    return 128 + (u > 0 ? -mag : mag);         // (JSTY under 128: BETA +, the nose up)
+}
+static int g_want_jy_on(void) { extern int g_want_jy; return g_want_jy >= 0; }
+
 static int jsty_for(double beta) {
     int b = (int) lround(beta);
     if (b > 8) b = 8;
@@ -608,10 +619,14 @@ PT_THREAD(to_station(float seconds)) {
 }
 
 static struct {
-    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc; double spin, spin_psi; int spin_jx; int32_t left;
+    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
+int g_dock_fast = 1;         // (DOCKFAST=0: the braking profile always)
+int g_dock_trig = 1;         // (DOCKTRIG=0: the old pitch, the centre held level with the nose, for comparison)
+double g_dk_xon = 2;         // (DKXON: the sideways offset that starts the hold)
+double g_dk_g = 0.15;        // (DKG: the share of the sideways offset closed a loop)
 int g_dock_dash = 1;         // (curious: the powered run in, braking late; DOCKDASH=0 off)
 double g_dd_k = 1.5, g_dd_m = 150;
 PT_THREAD(dock(float seconds)) {
@@ -620,6 +635,8 @@ PT_THREAD(dock(float seconds)) {
     c_dk.final = 0;
     c_dk.have_spin = 0;
     c_dk.spin_mc = -1;
+    c_dk.commit = 0;
+    c_dk.xhold = 0;
     c_dk.last_log = now();
     for (;;) {
         CO_YIELD(c_dk);
@@ -731,6 +748,30 @@ PT_THREAD(dock(float seconds)) {
                     // alpha there, steady, and close the slot's remaining angle with a small, capped
                     // trim; J at the middle of its band, so alpha doesn't flicker between steps
                     double err = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
+                    // the slot's centre onto the nose, both ways, with the slot level. Elite moves what we see each
+                    // loop by our roll a and pitch b (MVEIT): K2 = y - a x; z += b K2; y = K2 - b z; x += a y. Rolling
+                    // with the station (a about 16/256), the pitch sets y, and x changes only by a y: holding the
+                    // centre level with the nose (y 0, as every pitch rule did) kept x as it was all the way in (16
+                    // to the side at entry, the median: the face beside the slot). So hold it at y = -g x / a, where
+                    // x shrinks by g a loop, and y with it: b = (K2 - y) / z, the nearest rate the stick gives
+                    // (the joystick; the station's centre under 460 out, in line with the slot's)
+                    if (g_dock_trig && g_want_jy_on() && aimp.z > 100) {
+                        double a = alpha_from_jstx(jx) / 256.0;
+                        if (fabs(a) > 0.03) {
+                            double x = aimp.x, y = aimp.y, z = aimp.z, lim = z * tan(3 * M_PI / 180);
+                            // (in whole units, though: MVEIT works out a y as (y ALPHA) / 256 and drops the fraction, so
+                            // with ALPHA 16 nothing moves under |y| 16. Asked for 5 to 9, x stayed 2-4 off and drifted.
+                            // So the law's y, or 20 if that's less (x moving a unit a loop), while it's over 2 off, until
+                            // it's under 1; then 0 (20 alone took 60 loops for a 60 off, more than the approach has). And
+                            // the height let go over 700 to 300 out: held to the end it's the miss across the slot)
+                            c_dk.xhold = c_dk.xhold ? fabs(x) >= 1 : fabs(x) > g_dk_xon;
+                            double ys = c_dk.xhold ? -copysign(fmax(fabs(g_dk_g * x / a), 20.0), x / a) : 0;
+                            ys = fmax(-lim, fmin(lim, ys)) * fmax(0.0, fmin(1.0, (z - 300) / 400));
+                            double b = ((y - a * x) - ys) / z;            // (rad a loop, + nose up)
+                            { extern int g_want_jy; g_want_jy = jsty_nose_up(b * 256); }
+                            if (g_dock_log) dbgf_("DM x %.1f y %.1f z %.0f a %.3f ys %.1f b %.2f", x, y, z, a * 256, ys, b * 256);
+                        }
+                    }
                     double trim = fmax(-8.0, fmin(8.0, err * 256 / 25 / 0.20));
                     double alpha = (st->roll < 0 ? -16.0 : 16.0) + trim;
                     int a8 = (int) lround(fabs(alpha));
@@ -772,8 +813,42 @@ PT_THREAD(dock(float seconds)) {
                     int vmax = room > 0 ? (int) sqrt(2 * room / (1.1 * g_dd_k) + 16) : 4;
                     if (vmax > want) want = vmax > 40 ? 40 : vmax;
                 }
+                // flat out into the slot. The game docks at any speed: what it checks (main flight loop part 9) is the
+                // approach within 26 deg of the slot's axis, the station's centre within 22 deg of the nose and the
+                // slot within 36.6 deg of level; speed only decides what a failed docking costs (under 5 a bump, else
+                // death). So with all three inside a fifth of their limits and nothing on the way in (a ship leaving
+                // the slot: a collision costs shields), 40 to the end. Inside 1800 out it's committed: braking from
+                // 40 to under 5 takes ~36 loops, as far as that
+                if (g_dock_fast) {
+                    double appr = acos(fmin(1.0, -nv.z)) * 180 / M_PI, cen = atan2(hypot(S.x, S.y), S.z) * 180 / M_PI;
+                    int clear = 1;
+                    for (int i = 0; i < n; i++) {
+                        const ship_t *q = &sh[i];
+                        if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128) continue;
+                        vec_t p = pos_of(q);
+                        if (p.z > 0 && p.z < dist + 400 && hypot(p.x, p.y) < 250) clear = 0;
+                    }
+                    // (and both shields at 160 or more: the station's own shuttles and transporters, coming out of the slot
+                    // as we go in, still meet us head-on, 2 dockings in 100, 145 off the shields; that never reaches energy
+                    // or cargo while the shields can take it)
+                    int ok = appr < 5 && cen < 4.4 && rl < 7 && clear && fsh() >= 160 && ash() >= 160;
+                    if (g_dock_log) {
+                        char tb[120]; int k = 0;
+                        for (int i = 0; i < n && k < 100; i++) {
+                            const ship_t *q = &sh[i];
+                            if (q == st || !ship_in_space(q) || q->type >= 128) continue;
+                            vec_t p = pos_of(q);
+                            if (vlen(p) < 3000) k += snprintf(tb + k, sizeof tb - k, " t%d %.0f,%.0f,%.0f", q->type, p.x, p.y, p.z);
+                        }
+                        tb[k] = 0;
+                        dbgf_("DF appr %.1f cen %.1f rl %.1f clear %d commit %d near%s", appr, cen, rl, clear, c_dk.commit, tb);
+                    }
+                    if (!ok && (dist > 1800 || !clear)) c_dk.commit = 0;
+                    else if (ok) c_dk.commit = 1;
+                    if (c_dk.commit) want = 40;
+                }
                 if (dist < 600 && rl > 20) want = 1;
-                if (off > 8 && want > 4) want = 4;
+                if (off > 8 && want > 4 && !c_dk.commit) want = 4;
                 c_dk.final = 1;
             }
             speed_keys(speed(), want, &keys);
@@ -786,8 +861,10 @@ PT_THREAD(dock(float seconds)) {
                 double psi = atan2(st->roofv[1], st->roofv[0]);
                 double err = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
                 vec_t sc = vadd(S, nv, 160);      // the slot's centre: where it's drawn, deg right and up of the sights
-                dbgf_("DK %s fr %u S %.0f %.0f %.0f mc %d slot %.2f %.2f dist %.0f along %.0f lat %.0f off %.1f roll %.1f nvz %.2f jx %d jy %d spd %d E %d F %d A %d",
-                      c_dk.final ? "F" : "L", now(), S.x, S.y, S.z, mcnt(), atan2(sc.x, sc.z) * 180 / M_PI, atan2(sc.y, sc.z) * 180 / M_PI, dist, along, lat, off, err * 180 / M_PI, nv.z, jx - 128, jy - 128, speed(), energy(), fsh(), ash());
+                vec_t lv = vadd(rel, nv, -along);         // (and the offset across the slot and along it)
+                dbgf_("DK %s fr %u S %.0f %.0f %.0f mc %d slot %.2f %.2f dist %.0f along %.0f lat %.0f off %.1f roll %.1f nvz %.2f jx %d jy %d spd %d E %d F %d A %d sd %.0f up %.0f",
+                      c_dk.final ? "F" : "L", now(), S.x, S.y, S.z, mcnt(), atan2(sc.x, sc.z) * 180 / M_PI, atan2(sc.y, sc.z) * 180 / M_PI, dist, along, lat, off, err * 180 / M_PI, nv.z, jx - 128, jy - 128, speed(), energy(), fsh(), ash(),
+                      vdot(lv, vnorm(fvec(st->sidev))), vdot(lv, vnorm(fvec(st->roofv))));
             }
             if (now() - c_dk.last_log > 50) {
                 c_dk.last_log = now();

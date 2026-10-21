@@ -81,6 +81,23 @@ hours and pay for themselves: without them it reaches Elite 4.7 hours later.
 
 ![Points per fight minute, deaths and time in the sights over 9,327 recorded fights, for keys and joystick with and without lead](docs/img/aim.svg)
 
+**Which Elites.** Mark Moxon's flicker-free SNG47 on the Master, Eben Upton's
+[Solid Elite](https://github.com/ebenupton/solid-elite-bbc-master) on the Master (filled, sunlit ships;
+the same game with its workspace and code moved), and Moxon's flicker-free disc version on the Model B.
+The player finds which is loaded from signatures in RAM and reads each one's addresses from its own
+table (`cplayer/elite_ver.c`). Solid Elite's renderer borrows some of zero page while it draws (energy
+and the shields among it) and zeroes the view byte while it draws the mission briefing's ship; the player
+reads both as the game has them. Run it with `DISC=` its disc (`5-compiled-game-discs/elite-master-sng47.ssd`
+in its repository): six 5-hour efficient careers reached Dangerous, past the Constrictor mission.
+
+**Docking** is at full speed, on the slot's centre. Elite's docking test checks only angles (the approach
+within 26 deg of the slot's axis, the station's centre within 22 deg, the slot within 36.6 deg of level),
+never speed, so with the angles well inside those and both shields at 160 or more it flies in at 40. It
+rolls with the station to hold the slot level, and holds the slot's centre just enough above or below the
+nose that the roll carries it across onto the nose (Elite's own rotation step, in its whole units;
+`cplayer/pilot.c`). Over 24 two-hour careers: 9 dockings in 10 within 4 across and 8 along the slot's
++-10 by +-30, 4 in 732 outside it, 9 in 10 at full speed, none hurt beyond the shields.
+
 ## The player (`cplayer/`)
 
 | File | What it does |

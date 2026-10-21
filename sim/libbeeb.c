@@ -178,6 +178,10 @@ int beeb_shot(beeb_t *b, uint8_t *out, int frames)
         render_init(&s_render, s_canvas);
     }
     memset(&s_stream, 0, sizeof s_stream);
+    // (the renderer learns the palette and the mode only from writes it sees: a game that set them once,
+    // before the stream was on, as Solid Elite does, would come out black)
+    for (int i = 0; i < 16; i++) render_word(&s_render, VS_EV(VS_ULAPAL, (i << 4) | m->ula_pal[i]));
+    render_word(&s_render, VS_EV(VS_ULACTRL, m->ula_ctrl));
     m->vs = &s_stream;
     for (int i = 0; i < frames; i++) {
         uint64_t until = m->cpu.cycles + 40000;

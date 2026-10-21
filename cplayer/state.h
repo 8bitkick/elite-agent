@@ -5,16 +5,27 @@
 #include "elite_ram.h"
 
 extern player_io_t *IO;
+extern int g_zp_held;               // Solid Elite caught drawing: the zero page it borrows as it last was (elite_zp_frame)
+extern uint8_t g_zp_keep[50];       // (&06-&27, then &D2-&E1)
+extern int g_view_latch;            // Solid Elite's briefing view (13, 1) while it zeroes QQ11 to draw its ship, or -1
+static inline uint8_t ram_(uint16_t a) {
+    if (g_view_latch >= 0 && a == A_QQ11) return (uint8_t) g_view_latch;
+    if (g_zp_held && a < 0x100) {
+        if (a >= 0x06 && a <= 0x27) return g_zp_keep[a - 0x06];
+        if (a >= 0xD2 && a <= 0xE1) return g_zp_keep[34 + a - 0xD2];
+    }
+    return IO->ram[a];
+}
 extern int g_fair;                  // (fair.h: FAIR_DASH 2 the dashboard as drawn; any bit: our own stick from our hand)
 extern int g_own_jx, g_own_jy;
 #ifdef READ_AUDIT          // (the fair-mode leak audit: every read the player makes, by address and call site)
 void read_audit(uint16_t a, const char *file, int line);
-static inline uint8_t R_(uint16_t a, const char *f, int l) { read_audit(a, f, l); return IO->ram[a]; }
+static inline uint8_t R_(uint16_t a, const char *f, int l) { read_audit(a, f, l); return ram_(a); }
 #define R(a) R_((uint16_t) (a), __FILE__, __LINE__)
 #define R16(a) ((uint16_t) (R(a) | R((a) + 1) << 8))
 #else
-static inline uint8_t R(uint16_t a) { return IO->ram[a]; }
-static inline uint16_t R16(uint16_t a) { return (uint16_t)(IO->ram[a] | IO->ram[a + 1] << 8); }
+static inline uint8_t R(uint16_t a) { return ram_(a); }
+static inline uint16_t R16(uint16_t a) { return (uint16_t)(R(a) | R(a + 1) << 8); }
 #endif
 
 static inline int view(void) { return R(A_QQ11); }              // 0 space; screens otherwise

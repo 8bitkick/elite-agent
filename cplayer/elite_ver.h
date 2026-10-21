@@ -1,13 +1,14 @@
 // Which Elite the player is on, and where that Elite keeps things (docs/DUAL.md).
 //
-// Two versions, one build: the BBC Master's (Mark Moxon's flicker-free SNG47) and the BBC Micro disc
-// version on the Model B (Moxon's flicker-free disc, the Stairway to Hell image). Every address the
+// Three versions, one build: the BBC Master's (Mark Moxon's flicker-free SNG47), Eben Upton's Solid Elite on
+// the Master (SNG47's game logic, moved about), and the BBC Micro disc version on the Model B (Moxon's
+// flicker-free disc, the Stairway to Hell image). Every address the
 // player reads is a field of g_ev, which elite_detect() fills from the version's table once it has
 // found that version's code in RAM; the A_ names (elite_ram.h) read through it.
 #pragma once
 #include <stdint.h>
 
-enum { EV_NONE = 0, EV_MASTER = 1, EV_BBC_DISC = 2 };
+enum { EV_NONE = 0, EV_MASTER = 1, EV_BBC_DISC = 2, EV_SOLID = 3 };
 // the machine, as the platform says (machine_hook.h's enum machine_model; 0: not said)
 enum { EV_MODEL_UNKNOWN = 0, EV_MODEL_BBC_B = 1, EV_MODEL_BBC_B_PLUS = 2, EV_MODEL_MASTER_128 = 3 };
 
@@ -37,9 +38,14 @@ extern elite_ver_t g_ev;        // the version being played (id EV_NONE until de
 // know: it isn't played). Once found, it stays found (elite_forget: the machine was reset).
 int elite_detect(int model, const uint8_t *ram);
 void elite_forget(void);
+// Once a frame, before the player reads: zero page as the game has it (state.h's R()). Solid Elite's renderer
+// borrows &06-&27 and &D2-&E1 (ENERGY, the shields, QQ8-QQ10, the text cursor) while it draws, its
+// bank paged; caught mid-draw, those bytes are kept from the last frame that wasn't.
+void elite_zp_frame(const uint8_t *ram);
 // (the Master's table, as the build had it fixed: run_sim and lab before a machine is up)
 void elite_assume_master(void);
-static inline int ev_master(void) { return g_ev.id == EV_MASTER; }
+// (the Master's game: SNG47 or Solid Elite, which plays the same game at other addresses)
+static inline int ev_master(void) { return g_ev.id == EV_MASTER || g_ev.id == EV_SOLID; }
 static inline int ev_disc(void) { return g_ev.id == EV_BBC_DISC; }
 // a wait that a disc load can be part of (the disc version loads its flight code at a launch, its docked
 // code at a dock or a death, a ship file at a hyperspace arrival: ~5 s each from the 8271)

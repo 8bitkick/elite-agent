@@ -385,6 +385,10 @@ int main(int argc, char **argv) {
     { extern int g_jump_log; g_jump_log = getenv("JLOG") != NULL; }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
+    { extern int g_dock_trig; if (getenv("DOCKTRIG")) g_dock_trig = atoi(getenv("DOCKTRIG")); }
+    { extern int g_dock_fast; if (getenv("DOCKFAST")) g_dock_fast = atoi(getenv("DOCKFAST")); }
+    { extern double g_dk_g; if (getenv("DKG")) g_dk_g = atof(getenv("DKG")); }
+    { extern double g_dk_xon; if (getenv("DKXON")) g_dk_xon = atof(getenv("DKXON")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
     {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 the information limits; FAIRHANDS=1 the hand limits too; FAIRMASK=bits (1 see, 2 dashboard, 8 stick, 16 keys)
         extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
@@ -433,6 +437,7 @@ int main(int argc, char **argv) {
         if (!s_fight_index) { fprintf(stderr, "can't write %s\n", p); return 1; }
     }
     beeb_frames(B, 700);                 // (the boot to the title screen)
+    for (int i = 0; i < 40 && !getenv("START") && !elite_detect(beeb_model(), beeb_ram(B)); i++) beeb_frames(B, 50);    // (Solid Elite loads for ~22 s)
     if (getenv("START")) {               // start from a recorded fight's machine (a .fight file)
         FILE *f = fopen(getenv("START"), "rb");
         uint32_t hdr[4];

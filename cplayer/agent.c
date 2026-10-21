@@ -722,6 +722,7 @@ void player_frame(void) {
         if (IO->frame - told >= 500 || !told) { told = IO->frame | 1; logf_("no Elite this player knows in RAM (machine %d): waiting", IO->machine); }
         return;
     }
+    elite_zp_frame(IO->ram);
     fair_begin_frame();         // (fair mode: what the player sees, and when)
     drv_frame_start();          // (a death sets g_fail)
     if (g_fail) {

@@ -30,6 +30,16 @@ PT_THREAD(launch(void)) {
             apply_flight(&k);
             CO_YIELD(c_la);
         }
+        // and the stick back to the middle: a joystick stays where it's put, and letting go of the keys left it at
+        // full climb while we chose the jump on the chart: the ship looped over, 1.8 deg a loop, back into the
+        // station (on Solid Elite, more loops a second, into its side; on the Master, at times, a dock again)
+        {
+            extern int g_want_jx, g_want_jy;
+            keyset_t k = {{0}, 0};
+            g_want_jx = g_want_jy = 128;
+            apply_flight(&k);
+            CO_YIELD(c_la);
+        }
         hold_none();
     }
     // damping off for the fights to come (it stays as set: once a career). Here, by the station, nothing's at us

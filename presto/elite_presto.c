@@ -108,7 +108,7 @@ static bool cmdr_name(char out[8])
     return i > 0 && (i == 7 || s_hook->ram[A_NAME + i] == 13);
 }
 #define LOGN 8
-static char s_log[LOGN][96];
+static char s_log[LOGN][92];
 static int s_logn;
 static void remember(const char *s)
 {
