@@ -758,7 +758,7 @@ PT_THREAD(dock(float seconds)) {
                     if (g_dock_trig && g_want_jy_on() && aimp.z > 100) {
                         double a = alpha_from_jstx(jx) / 256.0;
                         if (fabs(a) > 0.03) {
-                            double x = aimp.x, y = aimp.y, z = aimp.z, lim = z * tan(3 * M_PI / 180);
+                            double x = aimp.x, y = aimp.y, z = aimp.z, lim = z * 0.0524077793;    // (tan 3 deg)
                             // (in whole units, though: MVEIT works out a y as (y ALPHA) / 256 and drops the fraction, so
                             // with ALPHA 16 nothing moves under |y| 16. Asked for 5 to 9, x stayed 2-4 off and drifted.
                             // So the law's y, or 20 if that's less (x moving a unit a loop), while it's over 2 off, until
@@ -820,7 +820,7 @@ PT_THREAD(dock(float seconds)) {
                 // the slot: a collision costs shields), 40 to the end. Inside 1800 out it's committed: braking from
                 // 40 to under 5 takes ~36 loops, as far as that
                 if (g_dock_fast) {
-                    double appr = acos(fmin(1.0, -nv.z)) * 180 / M_PI, cen = atan2(hypot(S.x, S.y), S.z) * 180 / M_PI;
+                    double cosappr = -nv.z, cen = atan2(hypot(S.x, S.y), S.z) * 180 / M_PI;     // (no acos: libm's differs by machine)
                     int clear = 1;
                     for (int i = 0; i < n; i++) {
                         const ship_t *q = &sh[i];
@@ -831,7 +831,7 @@ PT_THREAD(dock(float seconds)) {
                     // (and both shields at 160 or more: the station's own shuttles and transporters, coming out of the slot
                     // as we go in, still meet us head-on, 2 dockings in 100, 145 off the shields; that never reaches energy
                     // or cargo while the shields can take it)
-                    int ok = appr < 5 && cen < 4.4 && rl < 7 && clear && fsh() >= 160 && ash() >= 160;
+                    int ok = cosappr > 0.9961947 && cen < 4.4 && rl < 7 && clear && fsh() >= 160 && ash() >= 160;
                     if (g_dock_log) {
                         char tb[120]; int k = 0;
                         for (int i = 0; i < n && k < 100; i++) {
@@ -841,7 +841,7 @@ PT_THREAD(dock(float seconds)) {
                             if (vlen(p) < 3000) k += snprintf(tb + k, sizeof tb - k, " t%d %.0f,%.0f,%.0f", q->type, p.x, p.y, p.z);
                         }
                         tb[k] = 0;
-                        dbgf_("DF appr %.1f cen %.1f rl %.1f clear %d commit %d near%s", appr, cen, rl, clear, c_dk.commit, tb);
+                        dbgf_("DF cosappr %.4f cen %.1f rl %.1f clear %d commit %d near%s", cosappr, cen, rl, clear, c_dk.commit, tb);
                     }
                     if (!ok && (dist > 1800 || !clear)) c_dk.commit = 0;
                     else if (ok) c_dk.commit = 1;

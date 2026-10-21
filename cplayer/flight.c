@@ -262,7 +262,7 @@ PT_THREAD(hyperspace_fighting(const sys_t *dest)) {
     CO_END(c_hf);
 }
 
-static struct { CO; const sys_t *dest; uint32_t until; uint8_t key; int x0, y0; } c_cur;
+static struct { CO; const sys_t *dest; uint32_t until; uint8_t key; int x0, y0, dx, dy, px, py; } c_cur;
 PT_THREAD(select_by_cursor(const sys_t *dest)) {
     CO_BEGIN(c_cur);
     c_cur.dest = dest;
@@ -287,24 +287,28 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
             // system, less as it nears; which way the stick moves it is learnt from how it moves (a push
             // that takes it further away flips that axis)
             static int sx = -1, sy = -1;      // (measured: the stick right moves the cursor left)
-            int dx = c_cur.dest->x - target_x(), dy = c_cur.dest->y - target_y();
-            int px = dx ? (dx > 0 ? 1 : -1) * (abs(dx) > 8 ? 90 : 40) : 0, py = dy ? (dy > 0 ? 1 : -1) * (abs(dy) > 8 ? 90 : 40) : 0;
+            // (in c_cur, not locals: they're read again after the idle, and a protothread's locals don't survive a
+            // yield. As locals they were whatever the stack held by then: the stick flipped at random, and gcc 12,
+            // 13 and 14 played the same career differently)
+            c_cur.dx = c_cur.dest->x - target_x(), c_cur.dy = c_cur.dest->y - target_y();
+            c_cur.px = c_cur.dx ? (c_cur.dx > 0 ? 1 : -1) * (abs(c_cur.dx) > 8 ? 90 : 40) : 0;
+            c_cur.py = c_cur.dy ? (c_cur.dy > 0 ? 1 : -1) * (abs(c_cur.dy) > 8 ? 90 : 40) : 0;
             c_cur.x0 = target_x(), c_cur.y0 = target_y();
             {
                 keyset_t none = {{0}, 0};
-                g_want_jx = 128 + sx * px, g_want_jy = 128 + sy * py;
+                g_want_jx = 128 + sx * c_cur.px, g_want_jy = 128 + sy * c_cur.py;
                 hold(&none);
             }
             CO_CALL(c_cur, idle(4));
             if (g_fair & FAIR_STICK) CO_CALL(c_cur, idle(4));     // (a hand: the stick takes a few frames to get there)
             {
                 int ndx = c_cur.dest->x - target_x(), ndy = c_cur.dest->y - target_y();
-                if (px && abs(ndx) > abs(dx) && target_x() != c_cur.x0) sx = -sx;
-                if (py && abs(ndy) > abs(dy) && target_y() != c_cur.y0) sy = -sy;
+                if (c_cur.px && abs(ndx) > abs(c_cur.dx) && target_x() != c_cur.x0) sx = -sx;
+                if (c_cur.py && abs(ndy) > abs(c_cur.dy) && target_y() != c_cur.y0) sy = -sy;
                 // (fair mode: and pushed against the chart's edge, it doesn't move at all: the other way. A noisy stick
                 // once taught it the wrong way and it sat at x 255 until the career gave up on it)
-                if (g_fair && px && target_x() == c_cur.x0 && (target_x() <= 1 || target_x() >= 254)) sx = -sx;
-                if (g_fair && py && target_y() == c_cur.y0 && (target_y() <= 1 || target_y() >= 254)) sy = -sy;
+                if (g_fair && c_cur.px && target_x() == c_cur.x0 && (target_x() <= 1 || target_x() >= 254)) sx = -sx;
+                if (g_fair && c_cur.py && target_y() == c_cur.y0 && (target_y() <= 1 || target_y() >= 254)) sy = -sy;
             }
         } else {
             CO_CALL(c_cur, press(c_cur.key, 2, 1));

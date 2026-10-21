@@ -36,8 +36,17 @@ static beeb_t *B;
 static player_io_t io;
 static FILE *journal;
 
-static void p_hold(void *ctx, const uint8_t *c, int n) { (void) ctx; keyq_hold(io.frame, c, n); }
-static void p_tap(void *ctx, uint8_t c, int down, int up) { (void) ctx; keyq_tap(io.frame, c, down, up); }
+// INLOG=1: every input (held keys, taps, the joystick) and a hash of RAM each frame: where two builds part
+static void p_hold(void *ctx, const uint8_t *c, int n) {
+    (void) ctx;
+    { static int on = -1; if (on < 0) on = getenv("INLOG") != NULL; if (on) { printf("IN %u h", io.frame); for (int i = 0; i < n; i++) printf(" %d", c[i]); printf("\n"); } }
+    keyq_hold(io.frame, c, n);
+}
+static void p_tap(void *ctx, uint8_t c, int down, int up) {
+    (void) ctx;
+    { static int on = -1; if (on < 0) on = getenv("INLOG") != NULL; if (on) printf("IN %u t %d %d %d\n", io.frame, c, down, up); }
+    keyq_tap(io.frame, c, down, up);
+}
 // ---- fight recordings (FIGHTS=dir): the machine at the start of each fight and every key change
 // after it, so the fight replays exactly in the sim (sim/replay_fight.py); an index of them all
 static const char *s_fight_dir;
@@ -133,6 +142,7 @@ static void add_name(char *list, size_t cap, const char *name) {
 static int32_t s_adc[4] = {-1, -1, -1, -1};     // the joystick values we last set (-1: never); the core keeps them outside the machine
 static void p_analogue(void *c, int ch, uint16_t v) {
     (void) c;
+    { static int on = -1; if (on < 0) on = getenv("INLOG") != NULL; if (on && s_adc[ch & 3] != v) printf("IN %u a%d %u\n", io.frame, ch, v); }
     beeb_analogue(B, ch, v);
     if (s_adc[ch & 3] != v) film_input(1, (uint8_t) ch, v);
     s_adc[ch & 3] = v;
@@ -280,6 +290,8 @@ static void shoot(void) {
 }
 
 static void step(void) {
+    { static int on = -1; if (on < 0) on = getenv("INLOG") != NULL;
+      if (on) { uint32_t h = 2166136261u; for (int i = 0; i < 0x8000; i++) h = (h ^ io.ram[i]) * 16777619u; printf("RAM %u %08x\n", io.frame, h); } }
     io.taps_done += (uint32_t) keyq_step(io.frame, key);
     if (s_shot_step && io.frame >= s_shot_from && io.frame <= s_shot_to && (io.frame - s_shot_from) % s_shot_step == 0) shoot();
     else beeb_frames(B, 1);
