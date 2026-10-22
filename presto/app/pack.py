@@ -10,9 +10,9 @@ with the CRC field as 0). The firmware checks all of them before it runs the app
 import struct, sys, zlib
 
 SLOT_XIP = 0x10e00000
-MAGIC, API = 0x50504142, 1
-# struct app_header (API 1): the offsets of what's filled in here
-HEADER_SIZE, IMAGE_SIZE, CRC, DISC_HASH, DISC_LOAD, DISC_SIZE = 148, 60, 64, 116, 120, 124
+MAGIC, API = 0x50504142, 2
+# struct app_header (API 2): the offsets of what's filled in here
+HEADER_SIZE, IMAGE_SIZE, CRC, DISC_HASH, DISC_LOAD, DISC_SIZE = 152, 60, 64, 116, 120, 124
 
 def fnv(data):
     h = 2166136261

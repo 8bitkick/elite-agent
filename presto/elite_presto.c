@@ -314,6 +314,10 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
         else { snprintf(reply, reply_size, "AGENT mode efficient|curious"); return true; }
         snprintf(reply, reply_size, "AGENT mode %s (from its next decision)", g_curious ? "curious" : "efficient");
     } else if (!strncmp(a, "fair", 4) && (!a[4] || a[4] == ' ')) {
+#if NO_FAIR
+        snprintf(reply, reply_size, "AGENT fair: not in this build (presto/app/build.sh --fair)");
+        return true;
+#endif
         const char *v = a[4] ? a + 5 : "";
         if (!strcmp(v, "on")) g_fair = 3;
         else if (!strcmp(v, "off")) g_fair = 0;
@@ -347,7 +351,11 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
                  s_tot.name, s_on ? "on" : "off", g_curious ? "curious" : "efficient", g_fair ? " fair" : "", rank_of(ty), ty, t,
                  (unsigned long) s_tot.car.kills, (unsigned long) s_tot.car.deaths, (unsigned long) s_tot.car.pods);
     } else {
-        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, fair on|off|hands, name <NAME>, log 0|1|2, status, save");
+        snprintf(reply, reply_size, "AGENT commands: start, stop, mode efficient|curious, "
+#if !NO_FAIR
+                 "fair on|off|hands, "
+#endif
+                 "name <NAME>, log 0|1|2, status, save");
     }
     return true;
 }
@@ -389,15 +397,22 @@ static const char *elite_program_json(void)
         "\"progress\":{\"label\":\"To Elite: %.1f of 6400\",\"value\":%.1f,\"max\":6400},"
         "\"actions\":[{\"label\":\"%s\",\"cmd\":\"agent %s\",\"on\":%s},"
         "{\"label\":\"Efficient\",\"cmd\":\"agent mode efficient\",\"on\":%s},"
-        "{\"label\":\"Curious\",\"cmd\":\"agent mode curious\",\"on\":%s},"
-        "{\"label\":\"Fair\",\"cmd\":\"agent fair %s\",\"on\":%s}],\"log\":[",
+        "{\"label\":\"Curious\",\"cmd\":\"agent mode curious\",\"on\":%s}"
+#if !NO_FAIR
+        ",{\"label\":\"Fair\",\"cmd\":\"agent fair %s\",\"on\":%s}"
+#endif
+        "],\"log\":[",
         s_tot.name, in_game ? s_tot.cmdr : "-", rank_of(ty), ty, cr, where, doing, g_curious ? (g_fair ? "curious, fair" : "curious") : (g_fair ? "efficient, fair" : "efficient"), t,
         (unsigned long) s_tot.car.kills, (unsigned long) s_tot.car.deaths, (unsigned long) s_tot.car.pods,
         (unsigned long) s_tot.car.fights, (unsigned long) s_tot.car.docks,
         (unsigned long) s_tot.careers, tl, (unsigned long) s_tot.life.kills, (unsigned long) s_tot.life.deaths,
         (unsigned long) s_tot.resets, ty, ty,
         s_on ? "Stop" : "Start", s_on ? "stop" : "start", s_on ? "true" : "false",
-        g_curious ? "false" : "true", g_curious ? "true" : "false", g_fair ? "off" : "on", g_fair ? "true" : "false");
+        g_curious ? "false" : "true", g_curious ? "true" : "false"
+#if !NO_FAIR
+        , g_fair ? "off" : "on", g_fair ? "true" : "false"
+#endif
+        );
     for (int i = s_logn - 1, k = 0; i >= 0 && k < LOGN && n < (int) sizeof j - 220; i--, k++) {
         jstr(q, sizeof q, s_log[i % LOGN]);
         n += snprintf(j + n, sizeof j - n, "%s%s", k ? "," : "", q);

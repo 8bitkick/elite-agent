@@ -1,12 +1,13 @@
 /* The agent as an app (rp2350-bbc-micro's src/common/app_api.h): linked at the app slot, where
    it runs from the flash (execute in place), its header first; its .data and .bss in the app RAM
-   area, the loader copying .data in from after the code and zeroing .bss. build.sh sets
-   APP_SLOT_XIP, APP_RAM_BASE and APP_RAM_SIZE (from app_api.h) with --defsym. */
+   at the top of the SRAM, as much as they take (the loader copying .data in from after the code and
+   zeroing .bss): build.sh links twice, the second time with APP_RAM_BASE at app_api.h's APP_RAM_TOP
+   less what the first took. It sets APP_SLOT_XIP, APP_RAM_BASE and APP_RAM_SIZE with --defsym. */
 
 MEMORY
 {
-    SLOT(rx) : ORIGIN = 0x10e00000, LENGTH = 1M
-    RAM(rwx) : ORIGIN = 0x2006e000, LENGTH = 72K
+    SLOT(rx) : ORIGIN = APP_SLOT_XIP, LENGTH = 1M
+    RAM(rwx) : ORIGIN = APP_RAM_BASE, LENGTH = APP_RAM_SIZE
 }
 
 SECTIONS
@@ -14,7 +15,7 @@ SECTIONS
     .text : {
         KEEP(*(.app_header))
         *(EXCLUDE_FILE(*libgcc.a: *libm.a: *libc.a:) .text*)
-        *libc.a:libc_a-strstr.o(.text*)     /* (no frame calls it: from the flash, the 72 KB is full) */
+        *libc.a:libc_a-strstr.o(.text*)     /* (no frame calls it: from the flash) */
         *(.rodata*)
         . = ALIGN(4);
     } > SLOT
@@ -38,7 +39,6 @@ SECTIONS
     } > RAM
     __app_bss_size = SIZEOF(.bss);
     __app_end = LOADADDR(.data) + SIZEOF(.data);
+    __app_ram_base = ORIGIN(RAM);
     /DISCARD/ : { *(.init) *(.fini) *(.init_array*) *(.fini_array*) *(.preinit_array*) *(.comment) }
 }
-ASSERT(ORIGIN(SLOT) == APP_SLOT_XIP && ORIGIN(RAM) == APP_RAM_BASE && LENGTH(RAM) == APP_RAM_SIZE,
-       "app.ld's slot or RAM isn't app_api.h's")

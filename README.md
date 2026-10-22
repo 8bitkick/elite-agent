@@ -161,13 +161,14 @@ career; `tools/climb_chart.py` draws the chart above from career journals.
 
 ## On the Presto
 
-The plugin: `presto/app/build.sh` (`--efficient` for efficient mode; curious by default) builds
+The plugin: `presto/app/build.sh` (`--efficient` for efficient mode; curious by default; fair mode only with
+`--fair`, its 17 KB of RAM left out otherwise) builds
 `presto/app/build/elite-agent.bin` against the plugin interface in `presto/api/` (no Pico SDK but its
 maths). Install it on a Presto running rp2350-bbc-micro from the web panel's Plugin section, or with
 its `tools/presto.py app install elite-agent.bin`. A tag `v*` releases it (`.github/workflows/release.yml`).
 The agent starts a little after boot.
 
-Or built into the firmware: `presto/build.sh` (`--curious` for curious mode, the Pico SDK and
+Or built into the firmware: `presto/build.sh` (`--curious` for curious mode, `--fair` as above, the Pico SDK and
 `scripts/fetch-emulator.sh` first) builds `presto/build/presto_master.uf2`. Hold BOOT, tap RESET,
 copy it to the RP2350 drive.
 

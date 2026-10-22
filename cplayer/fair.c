@@ -12,7 +12,9 @@ int g_fair_misjump = 1;
 int g_fair_stick_rate = 32;
 double g_fair_noise = 0.04;
 int g_fair_key_cap = 4, g_fair_key_gap = 4;
+#if !NO_FAIR
 long g_fair_chk[10][4];
+#endif
 int g_fair_check;            // (the lab: count perception against the truth)
 double g_fair_q = 1;         // the tracks' process noise (variance of a ship's own change of motion a loop, units^2)
 double g_fair_lv = 1, g_fair_rv = 1, g_fair_sv = 1;     // measurement errors as modelled, x these (quantisation is correlated: a dot sits on a pixel)
@@ -35,6 +37,20 @@ int fair_set_param(const char *name, double v) {
     return 0;
 }
 
+#if NO_FAIR
+// Built without fair mode (the Presto's app: its RAM is the firmware's, set aside for it): g_fair stays 0,
+// and this is what fair mode off does
+void fair_note_out(int jx, int jy, int fire) { (void) jx, (void) jy, (void) fire; }
+void fair_reset(void) {}
+double tally_seen(void) { return tally(); }
+void fair_saved(void) {}
+void fair_reloaded(void) {}
+void fair_missile_fired(void) {}
+int fair_lock_slot(void) { return -1; }
+int see_ships(ship_t out[NOSH]) { return ships_read(IO->ram, out); }
+void fair_begin_frame(void) {}
+void fair_end_frame(void) {}
+#else
 // our own controls, per frame (we know what our hands did): the fire key
 static uint8_t s_ofire[64];
 void fair_note_out(int jx, int jy, int fire) { (void) jx, (void) jy; s_ofire[IO->frame & 63] = (uint8_t) fire; }
@@ -644,3 +660,4 @@ void fair_begin_frame(void) {
 void fair_end_frame(void) {
     if (g_fair) drv_fair_pump();
 }
+#endif

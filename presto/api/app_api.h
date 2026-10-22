@@ -10,8 +10,9 @@
 //   (and the machine_hook_io in it), so the firmware can change underneath it;
 // - it brings its own libm and string functions (statically linked, -ffreestanding);
 // - it is linked at APP_SLOT_XIP and runs from there (execute in place, through the XIP cache);
-//   its .data and .bss are linked at APP_RAM_BASE, the fixed app RAM area: the loader copies
-//   .data in and zeroes .bss before anything is called;
+//   its .data and .bss are linked at the top of the SRAM, ending at APP_RAM_TOP (its header's
+//   ram_base: the build links it twice, to know its size): the loader copies .data in and zeroes
+//   .bss before anything is called;
 // - its entry points are all called on core 0 between frames, on the firmware's stack
 //   (APP_STACK_SIZE of it at least), never at the same time;
 // - the versions are checked both ways: the loader refuses an app built for another
@@ -28,7 +29,7 @@
 
 #include "machine_hook.h"
 
-#define APP_API_VERSION 1
+#define APP_API_VERSION 2
 #define APP_MAGIC 0x50504142u           // "BAPP"
 
 // The app slot: partition 2 of src/launcher/partitions.json, 1 MB at 14 MB. The machine running
@@ -39,11 +40,12 @@
 #define APP_SLOT_SIZE   0x00100000u
 #define APP_SLOT_XIP    (0x10000000u + APP_SLOT_OFFSET)
 
-// The app RAM area: the top of the SRAM's main 512 KB, kept out of the firmware's heap. A machine
-// that has none (the Model B: its JIT wants the SRAM) says so in app_api.ram_size, 0, and refuses
-// an app that needs RAM.
-#define APP_RAM_SIZE (72 * 1024)
-#define APP_RAM_BASE (0x20080000u - APP_RAM_SIZE)
+// The app's RAM: the top of the SRAM's main 512 KB, as much as the app in the slot needs (from its
+// ram_base to APP_RAM_TOP, at most APP_RAM_MAX), kept out of the firmware's heap from the first
+// allocation; with no app, or one refused, the heap has it all. A machine that has none (the Model
+// B: its JIT wants the SRAM) says so in app_api.ram_size, 0, and refuses an app that needs RAM.
+#define APP_RAM_TOP 0x20080000u
+#define APP_RAM_MAX (72 * 1024)
 // the stack an app's entry points can count on (core 0's, in SCRATCH_Y)
 #define APP_STACK_SIZE 3072
 
@@ -56,7 +58,7 @@ struct app_api {
     uint32_t (*time_us)(void);          // microseconds since boot, wrapping
     bool (*turbo_get)(void);            // the machine running as fast as it can
     void (*turbo_set)(bool on);
-    void *ram; uint32_t ram_size;       // the app RAM area (APP_RAM_BASE, APP_RAM_SIZE; 0: none)
+    void *ram; uint32_t ram_size;       // the app's RAM (its ram_base, up to APP_RAM_TOP; 0: none)
 };
 
 // What the app gives the firmware: at the start of the slot (or compiled in).
@@ -70,7 +72,7 @@ struct app_header {
     // the image in the slot: this header, the code and constants, .data's first values, the disc
     uint32_t image_size;                // its bytes from here on
     uint32_t crc;                       // their CRC-32, taken with this as 0 (0: none, built in)
-    // its RAM, at APP_RAM_BASE: .data (copied from data_load), then .bss (zeroed)
+    // its RAM, at ram_base (below): .data (copied from data_load), then .bss (zeroed)
     uint32_t data_load, data_size, bss_size;
     uint32_t stack_size;                // the stack it needs, at most APP_STACK_SIZE
     // the disc it needs in drive 0 ("" none): by name (shown) and by hash (FNV-1a over the image,
@@ -89,19 +91,20 @@ struct app_header {
     void (*frame)(const struct machine_hook_io *io);
     bool (*command)(const char *cmd, char *reply, uint32_t reply_size);
     const char *(*program_json)(void);
+    uint32_t ram_base;                  // where its RAM starts: the .data and .bss, up to APP_RAM_TOP
 };
 
-// (a header's layout is the API's: the same for the firmware and an app built apart, 148 bytes)
-_Static_assert(sizeof (void *) != 4 || sizeof (struct app_header) == 148, "struct app_header's layout changed");
+// (a header's layout is the API's: the same for the firmware and an app built apart, 152 bytes)
+_Static_assert(sizeof (void *) != 4 || sizeof (struct app_header) == 152, "struct app_header's layout changed");
 
 // An app's header: APP_HEADER(.name = "...", .machine = ..., .init = ..., ...). Built as a loaded
 // app (APP_LOADED, by its own build) it goes first in the image, with its RAM from the linker
 // script (the symbols below) and the image's size, CRC and disc from the build's packer; compiled
 // into the firmware it is just a constant the loader finds (app_header).
 #if APP_LOADED
-extern char __app_data_load[], __app_data_size[], __app_bss_size[];
+extern char __app_data_load[], __app_data_size[], __app_bss_size[], __app_ram_base[];
 #define APP_HEADER_RAM .data_load = (uint32_t) __app_data_load, .data_size = (uint32_t) __app_data_size, \
-                       .bss_size = (uint32_t) __app_bss_size,
+                       .bss_size = (uint32_t) __app_bss_size, .ram_base = (uint32_t) __app_ram_base,
 #define APP_HEADER_AT __attribute__((section(".app_header"), used))
 #else
 #define APP_HEADER_RAM

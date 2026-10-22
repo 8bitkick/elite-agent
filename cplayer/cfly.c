@@ -18,7 +18,7 @@
 #include "state.h"
 #include "keyq.h"
 
-// the numbers (CF_* in the environment: cfly_env; the Presto's app: constants in the flash, its RAM is 72 KB)
+// the numbers (CF_* in the environment: cfly_env; the Presto's app: constants in the flash, its RAM at most 72 KB)
 #if APP_LOADED
 #define CFP const
 #else

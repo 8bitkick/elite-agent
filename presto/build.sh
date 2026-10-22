@@ -1,5 +1,6 @@
 #!/bin/bash
-# presto/build.sh [--curious] [--autostart=FRAMES]: the Presto firmware with the player built in
+# presto/build.sh [--curious] [--fair] [--autostart=FRAMES]: the Presto firmware with the player built in
+# (fair mode, docs/FAIR.md, only with --fair: its 17 KB of RAM)
 # (rp2350-bbc-micro's firmware, from scripts/fetch-emulator.sh, plus presto/elite_presto.c and cplayer/).
 # Needs the Pico SDK and the Arm toolchain: rp2350-bbc-micro/scripts/setup.sh fetches both (its
 # deps/env.sh is used if there), or set PICO_SDK_PATH and put arm-none-eabi-gcc on the PATH.
@@ -8,14 +9,14 @@
 # Writes presto/build/presto_master.uf2: hold BOOT, tap RESET, copy it to the RP2350 drive.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"; TOP="$(dirname "$HERE")"; EMU="$TOP/rp2350-bbc-micro"
-CURIOUS=0; AUTO=2500
-for a in "$@"; do case $a in --curious) CURIOUS=1;; --autostart=*) AUTO=${a#*=};; *) echo "unknown: $a"; exit 1;; esac; done
+CURIOUS=0; AUTO=2500; NOFAIR=1
+for a in "$@"; do case $a in --curious) CURIOUS=1;; --fair) NOFAIR=0;; --autostart=*) AUTO=${a#*=};; *) echo "unknown: $a"; exit 1;; esac; done
 [ -f "$EMU/deps/env.sh" ] && . "$EMU/deps/env.sh"
 [ -n "$PICO_SDK_PATH" ] || { echo "PICO_SDK_PATH not set (run rp2350-bbc-micro/scripts/setup.sh)"; exit 1; }
 SRC="$HERE/elite_presto.c;$HERE/elite_splash.c"
 for f in keyq agent cfly combat docked drv elite_ver fair flight galaxy pilot ships show; do SRC="$SRC;$TOP/cplayer/$f.c"; done
 cmake -S "$EMU" -B "$HERE/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DPICO_SDK_PATH="$PICO_SDK_PATH" \
       -DMACHINE_EXTRA_SOURCES="$SRC" -DMACHINE_EXTRA_INCLUDES="$TOP/cplayer" \
-      -DMACHINE_EXTRA_DEFINES="PLAYER_CURIOUS=$CURIOUS;ELITE_AUTOSTART=$AUTO" > "$HERE/build.log" 2>&1 || { tail "$HERE/build.log"; exit 1; }
+      -DMACHINE_EXTRA_DEFINES="PLAYER_CURIOUS=$CURIOUS;ELITE_AUTOSTART=$AUTO;NO_FAIR=$NOFAIR" > "$HERE/build.log" 2>&1 || { tail "$HERE/build.log"; exit 1; }
 ninja -C "$HERE/build" >> "$HERE/build.log" 2>&1 || { grep -E "error" "$HERE/build.log" | head; exit 1; }
 ls -la "$HERE/build/presto_master.uf2"

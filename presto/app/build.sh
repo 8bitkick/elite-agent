@@ -1,5 +1,5 @@
 #!/bin/bash
-# presto/app/build.sh [--efficient] [--autostart=FRAMES] [--disc=FILE] [--out=DIR]: the agent as an
+# presto/app/build.sh [--efficient] [--fair] [--autostart=FRAMES] [--disc=FILE] [--out=DIR]: the agent as an
 # app of rp2350-bbc-micro's (its src/common/app_api.h), built on its own: no Pico SDK, linked at
 # the app slot (app.ld), with newlib's static libc and libm for the string functions and the
 # maths and app_libc.c for the rest. Writes <out>/elite-agent.bin, the app slot's image (pack.py):
@@ -13,32 +13,35 @@
 #                  six times slower (PLAYER time ~800 us a frame, not ~130)
 # The disc (default: none) goes in the image: the firmware boots it as its built-in disc, its
 # saved games in the save disc. Curious mode unless
-# --efficient; the agent starts by itself ELITE_AUTOSTART frames after boot (2500).
+# --efficient; the agent starts by itself ELITE_AUTOSTART frames after boot (2500). Fair mode (docs/FAIR.md)
+# only with --fair: its perception's 17 KB of RAM out of the app RAM area, which the firmware sets aside.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"; TOP="$(cd "$HERE/../.." && pwd)"
 API_DIR=${API_DIR:-$TOP/presto/api}; OUT=$HERE/build
-CURIOUS=1; AUTO=2500; DISC=
-for a in "$@"; do case $a in --efficient) CURIOUS=0;; --autostart=*) AUTO=${a#*=};; --disc=*) DISC=${a#*=};;
+CURIOUS=1; AUTO=2500; DISC=; NOFAIR=1
+for a in "$@"; do case $a in --efficient) CURIOUS=0;; --fair) NOFAIR=0;; --autostart=*) AUTO=${a#*=};; --disc=*) DISC=${a#*=};;
     --out=*) OUT=${a#*=};; *) echo "unknown: $a"; exit 1;; esac; done
 API="$API_DIR/app_api.h"
 [ -f "$API" ] || { echo "no $API (API_DIR: app_api.h's directory)"; exit 1; }
 mkdir -p "$OUT"
 VERSION=${ELITE_VERSION:-$(git -C "$TOP" describe --always --dirty 2>/dev/null || echo dev)}
-# the slot and the RAM area, from app_api.h (app.ld checks it agrees)
+# the slot and the RAM's top and most, from app_api.h
 OFF=$(sed -n 's/^#define APP_SLOT_OFFSET \(0x[0-9a-f]*\)u.*/\1/p' "$API")
-KB=$(sed -n 's/^#define APP_RAM_SIZE (\([0-9]*\) \* 1024).*/\1/p' "$API")
-[ -n "$OFF" ] && [ -n "$KB" ] || { echo "$API: no APP_SLOT_OFFSET / APP_RAM_SIZE"; exit 1; }
+RAM_TOP=$(sed -n 's/^#define APP_RAM_TOP \(0x[0-9a-f]*\)u.*/\1/p' "$API")
+KB=$(sed -n 's/^#define APP_RAM_MAX (\([0-9]*\) \* 1024).*/\1/p' "$API")
+[ -n "$OFF" ] && [ -n "$RAM_TOP" ] && [ -n "$KB" ] || { echo "$API: no APP_SLOT_OFFSET / APP_RAM_TOP / APP_RAM_MAX"; exit 1; }
 CPU="-mcpu=cortex-m33 -mthumb -march=armv8-m.main+fp+dsp -mfloat-abi=softfp"
 CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wall -Wno-unused-function
-  -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
+  -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DNO_FAIR=$NOFAIR -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
   -DELITE_DISC=\"$(basename "${DISC:-}")\" -include $HERE/app_libc.h -I$TOP/cplayer -I$API_DIR"
 OBJS=
 for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
          "$TOP"/cplayer/{keyq,agent,cfly,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show}.c; do
     o="$OUT/$(basename "${f%.c}").o"
-    [ "$o" -nt "$f" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
+    [ "$o" -nt "$f" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
     OBJS="$OBJS $o"
 done
+echo "$NOFAIR" > "$OUT/.flags"
 # the SDK's maths: compiled with its headers (a stub for the two a configured build would make)
 WRAP=
 if [ -n "$PICO_SDK_PATH" ]; then
@@ -65,10 +68,20 @@ else
     echo "no PICO_SDK_PATH: libgcc's and newlib's maths, much slower"
 fi
 lib() { arm-none-eabi-gcc $CPU -print-file-name=$1; }
-arm-none-eabi-gcc $CPU -nostdlib -nostartfiles -T "$HERE/app.ld" -Wl,--gc-sections -Wl,-Map="$OUT/elite-agent.map" $WRAP \
-    -Wl,--defsym=APP_SLOT_XIP=$((0x10000000 + OFF)) -Wl,--defsym=APP_RAM_BASE=$((0x20080000 - KB * 1024)) \
-    -Wl,--defsym=APP_RAM_SIZE=$((KB * 1024)) -o "$OUT/elite-agent.elf" $OBJS \
-    "$(lib libm.a)" "$(lib libc.a)" -lgcc
+# linked at the top of the SRAM, as much RAM as it takes: once at the most the firmware gives (APP_RAM_MAX), to
+# see how much that is, then again ending at APP_RAM_TOP (rounded down to 64 bytes)
+link() {
+    arm-none-eabi-gcc $CPU -nostdlib -nostartfiles -T "$HERE/app.ld" -Wl,--gc-sections -Wl,-Map="$OUT/elite-agent.map" $WRAP \
+        -Wl,--defsym=APP_SLOT_XIP=$((0x10000000 + OFF)) -Wl,--defsym=APP_RAM_BASE=$(($RAM_TOP - $1)) \
+        -Wl,--defsym=APP_RAM_SIZE=$1 -o "$OUT/elite-agent.elf" $OBJS \
+        "$(lib libm.a)" "$(lib libc.a)" -lgcc
+}
+ram() { arm-none-eabi-size -A "$OUT/elite-agent.elf" | awk '/^\.(data|bss) /{n += $2} END{print n}'; }
+link $((KB * 1024))
+NEED=$(( ($(ram) + 63) / 64 * 64 ))
+link $NEED
+[ "$(ram)" -le "$NEED" ] || { echo "the RAM changed between the links: $(ram) > $NEED"; exit 1; }
+echo "RAM: $NEED bytes of the $((KB * 1024)) the firmware can give, at $(printf %x $(($RAM_TOP - NEED)))"
 arm-none-eabi-size -A "$OUT/elite-agent.elf" | grep -E "^\.(text|data|bss|ARM)"
 arm-none-eabi-objcopy -O binary "$OUT/elite-agent.elf" "$OUT/elite-agent.elf.bin"
 python3 "$HERE/pack.py" "$OUT/elite-agent.elf.bin" "${DISC:--}" "$OUT/elite-agent.bin"
