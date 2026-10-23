@@ -19,30 +19,30 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
-| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (22.6-24.1 on five careers, no deaths) |
+| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (23.4-24.2 on five careers, 1 death in all) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers, on an earlier build; every RAM read audited) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, but for style: **146.4 game hours** (139.2-155.3 on six careers) |
+| **Curious** | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, but for style: **146.4 game hours** (139.2-155.3 on six careers, on v0.4) |
 
 All modes save at each dock (about 4 seconds; on the Presto curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 22.6 to 24.1 hours, fair 29.0 to 30.7, curious 139.2 to 155.3, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 23.4 to 24.2 hours, fair 29.0 to 30.7, curious 139.2 to 155.3, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
 | | Efficient (5) | Fair (5) | Curious (6) |
 |---|---|---|---|
 | Game hours to Elite | 23.8 | 29.8 | 146.4 |
-| Star systems visited | 62 | 67 | 228 |
+| Star systems visited | 64 | 67 | 228 |
 | Galaxies | 3 | 3 | 7 |
-| Light years flown (dock to dock) | 630 | 677 | 2,909 |
-| Docks | 348 | 366 | 1,028 |
-| Fights | 2,074 | 2,521 | 5,807 |
-| Kills | 5,458 | 5,587 | 15,929 |
-| Witchspace sessions (Thargoids) | 190 | 198 | 62 |
+| Light years flown (dock to dock) | 658 | 677 | 2,909 |
+| Docks | 346 | 366 | 1,028 |
+| Fights | 2,022 | 2,521 | 5,807 |
+| Kills | 5,438 | 5,587 | 15,929 |
+| Witchspace sessions (Thargoids) | 188 | 198 | 62 |
 | Deaths (reloaded) | 0 | 3 | 224 |
 | Escape pods used | 0 | 0 | 2 |
-| Most credits held | 30,911 Cr | 23,538 Cr | 19,118 Cr |
+| Most credits held | 32,524 Cr | 23,538 Cr | 19,118 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
@@ -89,15 +89,20 @@ the same game with its workspace and code moved), and Moxon's flicker-free disc 
 The player finds which is loaded from signatures in RAM and reads each one's addresses from its own
 table (`cplayer/elite_ver.c`). Solid Elite's renderer borrows some of zero page while it draws (energy
 and the shields among it) and zeroes the view byte while it draws the mission briefing's ship; the player
-reads both as the game has them. Run it with `DISC=` its disc (`5-compiled-game-discs/elite-master-sng47.ssd`
-in its repository): six 5-hour efficient careers reached Dangerous, past the Constrictor mission.
+reads both as the game has them; it pages its cold code into bank 7 mid-frame, borrowing more of zero page,
+which the player holds over too. It plays Solid Elite as it now is (its three-pass build, 262bfa6); run it
+with `DISC=` its disc (`5-compiled-game-discs/elite-master-sng47.ssd` in its repository). An efficient career
+(seed 13) reached Elite in 26.6 game hours, against 23.5 on SNG47, mostly lost to reloads where the player
+misses Solid Elite's docked screens.
 
 **Docking** is at full speed, on the slot's centre. Elite's docking test checks only angles (the approach
 within 26 deg of the slot's axis, the station's centre within 22 deg, the slot within 36.6 deg of level),
 never speed, so with the angles well inside those and both shields at 160 or more it flies in at 40. It
 lines up on the slot's axis by a vector field, as fixed-wing drones line up on a runway: far off the axis
 it heads in at up to 60 deg, turning onto the axis as it closes, and from behind the station it first flies
-a circle onto it, banked once and pitching round as a plane flies a steady turn, clear of the planet. On
+a circle onto it, banked once and pitching round as a plane flies a steady turn, clear of the planet.
+Nearing the axis it levels the slot while it pulls the station in, so the turn-in is one curve onto the
+nose, not a turn and then a roll, and the pitch eases off before the station reaches the sights. On
 the axis it rolls with the station to hold the slot level, and holds the slot's centre up to 6 deg above
 or below the nose so the roll carries it across onto the nose (`cplayer/pilot.c`). Over 12 two-hour
 careers: 81 s from the station's safe zone to docked (the median; 98 s on v0.3), entries within 21 of
