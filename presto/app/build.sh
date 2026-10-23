@@ -31,14 +31,14 @@ RAM_TOP=$(sed -n 's/^#define APP_RAM_TOP \(0x[0-9a-f]*\)u.*/\1/p' "$API")
 KB=$(sed -n 's/^#define APP_RAM_MAX (\([0-9]*\) \* 1024).*/\1/p' "$API")
 [ -n "$OFF" ] && [ -n "$RAM_TOP" ] && [ -n "$KB" ] || { echo "$API: no APP_SLOT_OFFSET / APP_RAM_TOP / APP_RAM_MAX"; exit 1; }
 CPU="-mcpu=cortex-m33 -mthumb -march=armv8-m.main+fp+dsp -mfloat-abi=softfp"
-CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wall -Wno-unused-function
+CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wall -Wno-unused-function -fcallgraph-info=su
   -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DNO_FAIR=$NOFAIR -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
   -DELITE_DISC=\"$(basename "${DISC:-}")\" -include $HERE/app_libc.h -I$TOP/cplayer -I$API_DIR"
 OBJS=
 for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
          "$TOP"/cplayer/{keyq,agent,cfly,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show}.c; do
     o="$OUT/$(basename "${f%.c}").o"
-    [ "$o" -nt "$f" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
+    [ "$o" -nt "$f" ] && [ -f "${o%.o}.ci" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
     OBJS="$OBJS $o"
 done
 echo "$NOFAIR" > "$OUT/.flags"
@@ -83,5 +83,8 @@ link $NEED
 [ "$(ram)" -le "$NEED" ] || { echo "the RAM changed between the links: $(ram) > $NEED"; exit 1; }
 echo "RAM: $NEED bytes of the $((KB * 1024)) the firmware can give, at $(printf %x $(($RAM_TOP - NEED)))"
 arm-none-eabi-size -A "$OUT/elite-agent.elf" | grep -E "^\.(text|data|bss|ARM)"
+# the stack: the deepest call chain from each entry point against the stack_size its header asks for (stackcheck.py)
+STACK=$(sed -n 's/.*\.stack_size = \([0-9]*\).*/\1/p' "$TOP/presto/elite_presto.c")
+python3 "$HERE/stackcheck.py" "$OUT" "$STACK" elite_boot_image elite_init elite_frame elite_command elite_program_json || { echo "the stack: over $STACK bytes"; exit 1; }
 arm-none-eabi-objcopy -O binary "$OUT/elite-agent.elf" "$OUT/elite-agent.elf.bin"
 python3 "$HERE/pack.py" "$OUT/elite-agent.elf.bin" "${DISC:--}" "$OUT/elite-agent.bin"
