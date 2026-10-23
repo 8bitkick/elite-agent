@@ -670,34 +670,11 @@ DKP double g_dk_ev_min = 1500, g_dk_ev_spd = 8;   // (DKEVMIN, DKEVSPD: no stepp
 DKP double g_dk_evade_x = 300; // (DKEVADE: the step aside from traffic leaving the slot, 0 off: heavy hits 17 -> 3 of 308)
 DKP double g_dk_arc_r = 2500, g_dk_arc_j = 4500, g_dk_arc_end = 80, g_dk_arc_kr = 8;   // (DKARCR, DKARCJ: the approach circle's radius and where it joins the axis)
 DKP double g_dk_cone5 = 4200; // (DKCONE5: the vector field's cone, 0.6 lat + this)
-DKP double g_dk_blend = 3;      // (DKBLEND: the line-up hands its aim and its stick over to the final's from this x the final's threshold)
+DKP double g_dk_blend = 3;      // (DKBLEND: the line-up hands its aim and its stick over to the final's from this x the final's threshold; 0 off)
+DKP double g_dk_ltrim = 15;     // (DKLTRIM: the line-up's slot-levelling roll, at most this ALPHA off the station's spin)
 DKP double g_dk_turn_m = 1.5;    // (DKTURNM: the margin on the room to turn in)
 int g_fight_frames;           // (frames spent in fights on the way in: the arrival-to-dock time leaves them out)
 int g_dock_begins;           // (dock() calls so far: run_sim's DOCKSNAP saves the machine at each)
-// (test DKPLAN: the turn-in onto the slot as one move. Each loop, every steady roll and pitch the stick gives (a screw:
-// rolling and pulling together), rolled out on Elite's own rotation of the view (MVEIT) for the aim g and on the slot's
-// angle off level e (rolling at the station's spin, ALPHA spin, holds it); the plan arriving soonest with the aim on the
-// nose and, weighted by ke, the slot level; a little for moving the stick from where it is (a0, b0))
-DKP double g_dk_pka = 2, g_dk_pke = 0.3, g_dk_pks = 0.05;     // (DKPKA, DKPKE, DKPKS: a loop's worth of a degree off the nose, of the slot, of stick)
-static void dk_screw(vec_t g, double e, int spin, double ke, int a0, int b0, int *aout, int *bout) {
-    static const signed char A[] = {0, 2, -2, 8, -8, 12, -12, 16, -16, 20, -20, 24, -24, 28, -28, 31, -31};
-    static const signed char B[] = {0, 1, -1, 3, -3, 4, -4, 5, -5, 6, -6, 8, -8};
-    double n = vlen(g), best = 1e30;
-    *aout = a0, *bout = b0;
-    for (unsigned i = 0; i < sizeof A; i++) for (unsigned j = 0; j < sizeof B; j++) {
-        double a = A[i] / 256.0, b = B[j] / 256.0, x = g.x / n, y = g.y / n, z = g.z / n, ee = e, c = 1e30;
-        for (int k = 0; k < 60; k++) {
-            double ck = k + g_dk_pka * atan2(hypot(x, y), z) * 180 / M_PI + ke * fabs(ee) * 180 / M_PI;
-            if (ck < c) c = ck;
-            double K2 = y - a * x; z += b * K2; y = K2 - b * z; x += a * y;
-            ee -= (A[i] - spin) / 256.0;
-            if (ee < -M_PI / 2) ee += M_PI; else if (ee >= M_PI / 2) ee -= M_PI;
-        }
-        c += g_dk_pks * (abs(A[i] - a0) + abs(B[j] - b0));
-        if (c < best) best = c, *aout = A[i], *bout = B[j];
-    }
-}
-DKP double g_dk_plan = 1;      // (DKPLAN=0: off, for comparison)
 // (a frame of the approach, out of dock()'s own stack frame, as to_station_step. 1: damping on first)
 static __attribute__((noinline)) int dock_step(void)
 {
@@ -835,8 +812,8 @@ static __attribute__((noinline)) int dock_step(void)
                         }
                     }
                 }
-                // (test DKBLEND: nearing the hand-over (lat under DKBLEND x the final's threshold), the aim slides from the
-                // line-up's goal to the slot's centre, the final's aim, reaching it at the hand-over)
+                // (the turn-in as one move: nearing the hand-over to the final (lat under g_dk_blend x its threshold), the
+                // aim slides from the line-up's goal towards the slot's centre, the final's aim, reaching it at the hand-over)
                 double bw = 0;
                 if (g_dk_blend > 1 && !on_arc && along > 1200) {
                     double thr = fmax(120, along * g_dk_lined), w = (g_dk_blend * thr - lat) / ((g_dk_blend - 1) * thr);
@@ -844,10 +821,9 @@ static __attribute__((noinline)) int dock_step(void)
                     if (w > 0) {
                         // (to within the final's sideways hold of the slot (DKYLIM, 6 deg), on the line-up's side: the aim
                         // still closing the offset from the axis, as the final's own does)
-                        vec_t sc = vnorm(vadd(S, nv, 160)), gd = vnorm(goal), o = {0, 0, 0};
-                        double th = acos(fmax(-1.0, fmin(1.0, vdot(sc, gd)))), keep = fmin(th, atan(g_dk_ylim));
+                        vec_t sc = vnorm(vadd(S, nv, 160)), gd = vnorm(goal), o = {0, 0, 0}, px = vadd(gd, sc, -vdot(sc, gd));
+                        double th = atan2(vlen(px), vdot(sc, gd)), keep = fmin(th, atan2(g_dk_ylim, 1.0));      // (no acos: libm's differs by machine)
                         double t = th - bw * (th - keep);
-                        vec_t px = vadd(gd, sc, -vdot(sc, gd));
                         if (vlen(px) > 1e-6) goal = vadd(vadd(o, sc, 2000 * cos(t)), vnorm(px), 2000 * sin(t));
                     }
                 }
@@ -866,14 +842,27 @@ static __attribute__((noinline)) int dock_step(void)
                     } else if (g_want_jx >= 0 && abs(g_want_jx - 128) > 66)
                         g_want_jx = g_want_jx > 128 ? 194 : 62;     // (a roll at ALPHA 16, the station's own spin, not the stick's end)
                 }
-                if (g_dk_plan && bw > 0 && goal.z > 0) {
+                // (and rolling and pulling together, in the same stretch: the roll slides from the turn's to the final's
+                // slot-levelling roll (the station's spin, ALPHA 16, and a trim up to g_dk_ltrim more), the pitch to the
+                // final's law on the aim: y onto -g x / a, so the roll swings a sideways aim round onto the pitch and the
+                // pitch closes it as it comes. Before, the turn rolled at the spin (the slot held where it was) and stalled
+                // with the station some 20 deg off the nose; the final then rolled the slot 70 deg level and pitched it
+                // in: two moves. Docking lab, 278 starts: the slot off level at the hand-over median 40 -> 22 deg)
+                if (bw > 0 && goal.z > 0) {
                     extern int g_want_jx, g_want_jy;
                     if (g_want_jx >= 0) {
                         double serr = fmod(atan2(st->roofv[1], st->roofv[0]) + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
-                        int al, be;
-                        dk_screw(goal, serr, st->roll < 0 ? -16 : 16, g_dk_pke * bw, alpha_from_jstx(jx), beta_from_jsty(jy), &al, &be);
-                        g_want_jx = jx_for_alpha(al), g_want_jy = jy_for_beta(be);
-                        if (g_dock_log) dbgf_("SCREW L w %.2f serr %.1f al %d be %d", bw, serr * 180 / M_PI, al, be);
+                        double am = (st->roll < 0 ? -16.0 : 16.0) + fmax(-g_dk_ltrim, fmin(g_dk_ltrim, serr * 256 / 25 / 0.20));
+                        double al = (1 - bw) * alpha_from_jstx(g_want_jx) + bw * am;
+                        g_want_jx = jstx_for(al);
+                        double a = alpha_from_jstx(jx) / 256.0, bs = beta_from_jsty(g_want_jy) / 256.0, b = bs;
+                        if (fabs(a) > 0.03) {
+                            double x = goal.x, y = goal.y, z = goal.z, lim = z * g_dk_ylim;
+                            double ys = fmax(-lim, fmin(lim, -g_dk_g * x / a));
+                            b = (1 - bw) * bs + bw * ((y - a * x) - ys) / z;
+                        }
+                        g_want_jy = jsty_nose_up(256 * b);
+                        if (g_dock_log) dbgf_("DLEAD w %.2f serr %.1f al %.1f b %.2f", bw, serr * 180 / M_PI, al, b * 256);
                     }
                 }
                 // (on the circle: bank once and hold it, the circle's centre straight above the nose, and pitch round it, as a
@@ -1016,15 +1005,6 @@ static __attribute__((noinline)) int dock_step(void)
                     else if (tx < jx - 3) { if (!ease) ks_add(&keys, K_ROLL_RIGHT); }
                     { extern int g_want_jx; if (g_want_jx >= 0) g_want_jx = tx; }      // (a joystick: exactly the spin)
                     if (g_steer_log) dbgf_("rollmatch err %.1f deg alpha %.1f tx %d jx %d", err * 180 / M_PI, alpha, tx - 128, jx - 128);
-                } else if (g_dk_plan && aimp.z > 0) {
-                    extern int g_want_jx, g_want_jy;
-                    if (g_want_jx >= 0) {
-                        double serr = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
-                        int al, be;
-                        dk_screw(aimp, serr, st->roll < 0 ? -16 : 16, g_dk_pke, alpha_from_jstx(jx), beta_from_jsty(jy), &al, &be);
-                        g_want_jx = jx_for_alpha(al), g_want_jy = jy_for_beta(be);
-                        if (g_dock_log) dbgf_("SCREW F serr %.1f al %d be %d", serr * 180 / M_PI, al, be);
-                    }
                 }
                 // steady in, slowing to a bump-safe 4 (under 5: a misaligned entry is a bump, not death) for
                 // the last 400; and holding back while the slot isn't level near it

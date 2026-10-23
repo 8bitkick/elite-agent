@@ -428,7 +428,7 @@ int main(int argc, char **argv) {
     { extern double g_dk_evade_x; if (getenv("DKEVADE")) g_dk_evade_x = atof(getenv("DKEVADE")); }
     { extern double g_dk_ev_min, g_dk_ev_spd; if (getenv("DKEVMIN")) g_dk_ev_min = atof(getenv("DKEVMIN")); if (getenv("DKEVSPD")) g_dk_ev_spd = atof(getenv("DKEVSPD")); }
     { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
-    { extern double g_dk_blend, g_dk_plan; if (getenv("DKBLEND")) g_dk_blend = atof(getenv("DKBLEND")); if (getenv("DKPLAN")) g_dk_plan = atof(getenv("DKPLAN")); }
+    { extern double g_dk_blend, g_dk_ltrim; if (getenv("DKBLEND")) g_dk_blend = atof(getenv("DKBLEND")); if (getenv("DKLTRIM")) g_dk_ltrim = atof(getenv("DKLTRIM")); }
     { extern double g_dk_clear; if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
     { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
     { extern double g_dk_ylim; if (getenv("DKYLIM")) g_dk_ylim = tan(atof(getenv("DKYLIM")) * M_PI / 180); }

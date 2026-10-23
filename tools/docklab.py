@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""docklab.py <lab stdout> <lab stderr>: the docking lab (lab LABDOCK=1 LOG=3) measured, a docking a start.
+"""docklab.py <lab stdout> <lab stderr, or - for stdin> [-v]: the docking lab (lab LABDOCK=1 LOG=3) measured, a docking a start.
 
 From the DOCKLAB lines (stdout): docked / died / timeout and the time from dock()'s start (fights left out). From the DK
 lines (stderr, a frame each): bumps, off the axis and the slot's roll at entry (as tools/dockstats.py); stick reversals a
 second (the roll and pitch sticks changing side, |J| 8 or more each way); and the turn-in, from the last time the station
-came within 30 deg of the nose to its centre within 2 deg in the final: its time, the time the station sat stalled
-off-centre in view (over 4 deg off, closing under 2 deg a second over the next half second), and the number of separate
-moves bringing it in (runs of it closing faster than that, apart by 0.3 s or more). One move is one smooth curve."""
+came within 40 deg of the nose (at most 10 s before) to within 8 deg of it for good: its time, the time the station sat
+stalled in view (closing under 2 deg a second over the next half second), and the number of separate moves bringing
+it in (runs of it closing faster than that, apart by 0.3 s or more). One move is one smooth curve. And at the
+hand-over to the final: how far off the nose the station was, and its slot off level."""
 import math, re, statistics, sys
 
 sys.path.insert(0, __import__('os').path.dirname(__file__))
@@ -17,19 +18,22 @@ SX = re.compile(r'DK [FL] fr \d+ S (-?\d+) (-?\d+) (-?\d+) .*? jx (-?\d+) jy (-?
 
 def turnin(d):
     ang = [math.degrees(math.atan2(math.hypot(x['Sx'], x['Sy']), x['Sz'])) for x in d]
-    end = next((i for i, x in enumerate(d) if x['ph'] == 'F' and ang[i] < 2), None)
-    if end is None:
+    # (the end: the station within 8 deg of the nose (the final holds it up to 6 off, closing a sideways offset) from then on)
+    end = len(d)
+    while end > 0 and ang[end - 1] < 8:
+        end -= 1
+    if end >= len(d) - 1 or end == 0:
         return None
     start = end
-    while start > 0 and ang[start - 1] < 30:
+    while start > 0 and ang[start - 1] < 40 and end - start < 500:
         start -= 1
+    h = next((i for i, x in enumerate(d) if x['ph'] == 'F'), end)
     W = 25
     closing = []
     for i in range(start, end):
-        j = min(end, i + W)
-        rate = (ang[i] - ang[j]) / max(1, j - i) * 50      # deg a second
-        closing.append(rate >= 2)
-    stall = sum(1 for k, i in enumerate(range(start, end)) if ang[i] > 4 and not closing[k]) / 50
+        j = min(len(d) - 1, i + W)
+        closing.append((ang[i] - ang[j]) / max(1, j - i) * 50 >= 2)      # (deg a second)
+    st = [i for k, i in enumerate(range(start, end)) if not closing[k]]
     moves, gap, inmove = 0, 99, False
     for c in closing:
         if c:
@@ -39,7 +43,8 @@ def turnin(d):
         else:
             inmove = False
             gap += 1
-    return dict(tt=(end - start) / 50, stall=stall, moves=max(1, moves))
+    return dict(tt=(end - start) / 50, stall=len(st) / 50, moves=max(1, moves), hang=ang[min(h, len(d) - 1)], hroll=abs(d[min(h, len(d) - 1)]['roll']),
+                stallL=sum(1 for i in st if i < h) / 50)
 
 
 def reversals(d):
@@ -57,10 +62,10 @@ def reversals(d):
     return out[0] / t, out[1] / t
 
 
-def parse(outp, errp):
-    res = [l.split() for l in open(outp) if l.startswith('DOCKLAB')]
-    docks, cur = [], []
-    for line in open(errp, errors='replace'):
+def measures(errf):
+    """the measures of each docking in the lab's stderr (a file, or - for stdin), in order"""
+    cur = []
+    for line in (sys.stdin if errf == '-' else open(errf, errors='replace')):
         m = DK.search(line)
         if m:
             g = m.groups()
@@ -69,18 +74,26 @@ def parse(outp, errp):
                             off=float(g[7]), roll=float(g[8]), spd=int(g[9]), E=int(g[10]), F=int(g[11]), A=int(g[12]),
                             Sx=int(s.group(1)), Sy=int(s.group(2)), Sz=int(s.group(3)), jx=int(s.group(4)), jy=int(s.group(5))))
         elif line.startswith('STATUS Docked') or line.startswith('died: back') or line.startswith('timeout'):
-            docks.append(cur)
+            row = {}
+            if line.startswith('STATUS') and len(cur) > 10:
+                mm = measure(cur)
+                row.update(bumps=mm['bumps'], late=mm['late'], rolle=mm['rolle'], tf=mm['tf'])
+                row['rrev'], row['prev'] = reversals(cur)
+                ti = turnin(cur)
+                if ti:
+                    row.update(ti)
+            yield row
             cur = []
+
+
+def parse(outp, errf):
+    ms = list(measures(errf))
+    res = [l.split() for l in open(outp) if l.startswith('DOCKLAB')]
     rows = []
-    for r, d in zip(res, docks):
+    for r, m in zip(res, ms):
         row = dict(name=r[1].rsplit('/', 1)[-1], how=r[2], t=(int(r[4]) - int(r[12])) / 50)
-        if r[2] == 'docked' and len(d) > 10:
-            m = measure(d)
-            row.update(bumps=m['bumps'], late=m['late'], rolle=m['rolle'], tf=m['tf'])
-            row['rrev'], row['prev'] = reversals(d)
-            ti = turnin(d)
-            if ti:
-                row.update(ti)
+        if r[2] == 'docked':
+            row.update(m)
         rows.append(row)
     return rows
 
@@ -95,8 +108,9 @@ def summary(rows, label=''):
     print('%s%d starts: docked %d, died %d, timeout %d' % (label, len(rows), len(ok), sum(r['how'] == 'died' for r in rows),
                                                          sum(r['how'] == 'timeout' for r in rows)))
     for k, name in (('t', 'docking time (s)'), ('tf', 'final (s)'), ('late', 'off the axis at entry'), ('rolle', 'slot roll at entry (deg)'),
-                    ('rrev', 'roll reversals a second'), ('prev', 'pitch reversals a second'), ('tt', 'turn-in: 30 deg to centred (s)'),
-                    ('stall', 'turn-in: station stalled off-centre (s)'), ('moves', 'turn-in: separate moves')):
+                    ('rrev', 'roll reversals a second'), ('prev', 'pitch reversals a second'), ('tt', 'turn-in: 40 to 8 deg (s)'),
+                    ('stall', 'turn-in: station stalled off-centre (s)'), ('stallL', '... of it before the hand-over (s)'), ('moves', 'turn-in: separate moves'),
+                    ('hang', 'hand-over: station off the nose (deg)'), ('hroll', 'hand-over: slot off level (deg)')):
         xs = [r[k] for r in ok if k in r]
         if xs:
             print('  %-40s mean %6.2f  median %6.2f  p90 %6.2f  max %6.1f' % (name, statistics.mean(xs), statistics.median(xs), pct(xs, 0.9), max(xs)))
