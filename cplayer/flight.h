@@ -5,6 +5,7 @@
 
 PT_THREAD(launch(void));
 extern int g_misjump;       // the next hyperspace() forces a mis-jump into witchspace (CTRL held at the jump)
+extern int g_cursor_soft, g_cursor_missed;     // (select_by_cursor: a miss returns, g_cursor_missed, instead of a stuck)
 PT_THREAD(allow_misjumps(void));
 extern uint32_t g_pause_frames;
 PT_THREAD(set_damping(int on));

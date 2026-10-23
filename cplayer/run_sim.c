@@ -411,7 +411,6 @@ int main(int argc, char **argv) {
     { extern int g_clu_ws; if (getenv("CLUWS")) g_clu_ws = atoi(getenv("CLUWS")); }
     { extern int g_chase; if (getenv("CHASE")) g_chase = atoi(getenv("CHASE")); }
     { extern int g_brk_rear; if (getenv("BRKREAR")) g_brk_rear = atoi(getenv("BRKREAR")); }
-    { extern double g_explore_ratio; if (getenv("EXPLORE")) g_explore_ratio = atof(getenv("EXPLORE")); }
     { extern int g_chain_quick; if (getenv("CHQ")) g_chain_quick = atoi(getenv("CHQ")); }
     { extern int g_brk_mode; if (getenv("BRKOFF")) g_brk_mode = atoi(getenv("BRKOFF")); }
     { extern int g_opp_fire; if (getenv("OPPFIRE")) g_opp_fire = atoi(getenv("OPPFIRE")); }

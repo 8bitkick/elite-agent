@@ -203,6 +203,7 @@ static int own_spot(int galaxy, int i)
 
 // systems the game wouldn't let us jump to (H refused twice: a near neighbour takes the selection)
 uint8_t g_unreachable[8][32];
+int g_unreachable_n;            // (systems left out so far: the farm model is made again when it grows)
 
 // the longest jump from a system that a random mis-jump (3 in 256 jumps; it drops us at (x, y XOR 31)
 // with the fuel spent) can't strand: from there, some system must be in reach of what's left. Stranded
