@@ -6,7 +6,6 @@
 typedef struct {
     uint8_t num, x, y, economy, government, tech;   // tech: internal 0-14 (shown +1)
     uint16_t population, productivity, radius;
-    uint16_t seeds[3];
     char name[12];
 } sys_t;
 

@@ -103,7 +103,6 @@ static void system_data(const uint8_t s[6], int num, sys_t *sy)
     sy->population = (uint16_t)qq6;
     sy->productivity = (uint16_t)prod;
     sy->radius = (uint16_t)(((s[5] & 0x0F) + 11) * 256 + s[3]);
-    for (int i = 0; i < 3; i++) sy->seeds[i] = (uint16_t)(s[2 * i] | (s[2 * i + 1] << 8));
     system_name(s, sy->name);
 }
 
