@@ -782,8 +782,11 @@ DKP double g_pd_xt = 600, g_pd_xtk = 0.15, g_pd_kp = 0.125;     // (PDXT, PDXTK:
 DKP double g_pd_fk = 0.15;       // (PDFK: the share of a new reading the filtered position takes: 1 no filter)
 DKP double g_pd_rolldb = 1.5;    // (PDRDB: no roll for a turn under this, 1/256 rad a loop: rolling fully for a 2/256 sideways turn chattered)
 int g_pd_late = 0;               // (PDLATE=1: hand over only at the plan's end: smoother, but 52 bumps in 234: the final needs room to roll with the slot)
-typedef struct { float x, y, kap, s; } pd_pt_t;
-static struct { int ok, near, n, type, nplans, fon, fmc; pd_pt_t pt[PD_N]; double g, fa, fl; float last[9]; } s_pd;
+// (a point: where, and how far along. Its curvature is its segment's: kap[k] from the first point of segments 1 and 2,
+// kb[0] and kb[1], the last point's 0. 12 bytes a point, not 16: the plugin's RAM is 72 KB)
+typedef struct { float x, y, s; } pd_pt_t;
+static struct { int ok, near, n, type, nplans, fon, fmc, kb[2]; float kap[3]; pd_pt_t pt[PD_N]; double g, fa, fl; float last[9]; } s_pd;
+static float pd_kap(int i) { return i >= s_pd.n - 1 ? 0 : s_pd.kap[i < s_pd.kb[0] ? 0 : i < s_pd.kb[1] ? 1 : 2]; }
 
 static double mod2pi(double x) { x = fmod(x, 2 * M_PI); return x < 0 ? x + 2 * M_PI : x; }
 
@@ -816,6 +819,7 @@ static int dubins_walk(int w, double x, double y, double th, double R, double t,
     if (out) ds = fmax(step, (seg[0] + seg[1] + seg[2]) / (PD_N - 2));
     for (int k = 0; k < 3; k++) {
         double left = seg[k], kap = TURN[w][k] / R;
+        if (out) { s_pd.kap[k] = (float) kap; if (k) s_pd.kb[k - 1] = n; }
         while (left > 1e-6) {
             double h = fmin(step, left);
             if (kap != 0) {      // (an exact arc)
@@ -825,12 +829,12 @@ static int dubins_walk(int w, double x, double y, double th, double R, double t,
             left -= h, sacc += h;
             if (hypot(x, y) < g_pd_clr || hypot(x - 49152, y) < g_pd_planet) return 0;
             if (out && sacc >= next && n < PD_N - 1) {
-                s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, (float) kap, (float) sacc};
+                s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, (float) sacc};
                 n++, next += ds;
             }
         }
     }
-    if (out) { s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, 0, (float) sacc}; s_pd.n = n + 1; }
+    if (out) { s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, (float) sacc}; s_pd.n = n + 1; }
     return 1;
 }
 
@@ -873,7 +877,7 @@ static int plan_follow(vec_t a, vec_t lh, vec_t p, double spd, double *ux, doubl
     double L2 = vdot(AB, AB), u = L2 > 0 ? fmax(0.0, fmin(1.0, vdot(vadd(p, A, -1), AB) / L2)) : 0;
     vec_t q = vadd(A, AB, u), T = vnorm(AB), Lf = {-T.y, T.x, 0};
     *dev = vlen(vadd(p, q, -1));
-    double kappa = s_pd.pt[bi].kap;
+    double kappa = pd_kap(bi);
     double e = vdot(vadd(p, q, -1), Lf);                     // (+: left of it)
     double togo = s_pd.pt[s_pd.n - 1].s - s_pd.pt[bi].s + s_pd.g;
     double xt = fmax(g_pd_xt, g_pd_xtk * togo);              // (a few hundred off 40000 out barely registers)
