@@ -390,8 +390,11 @@ void best_cargo(int here_economy, int qq26, const uint8_t avl[17], int dest_econ
     *profit = pr;
 }
 
-static const sys_t *rng_sys[256];
-static int rng_dist[256];
+// (systems in a jump's range: at most 19 within 7 LY of any point of any galaxy, counted over all 8 x 65,536; room
+// for 64, as agent.c's own lists have)
+#define RNG_N 64
+static const sys_t *rng_sys[RNG_N];
+static int rng_dist[RNG_N];
 
 int plan_trip(int galaxy, int x, int y, int here_economy, int qq26, const uint8_t avl[17], int cash, int fuel,
               int crgo, const uint8_t cargo[17], plan_t *out)
@@ -410,7 +413,7 @@ int plan_trip_seen(int galaxy, int x, int y, int here_economy, int qq26, const u
     if (room_t < 0) room_t = 0;
     const sys_t *here = nearest_system(galaxy, x, y);
     // (stuck in a trap anyway, after a pod or a way out of witchspace: one full-range jump, the risk taken)
-    int n = in_range(galaxy, x, y, here && !jump_trap(galaxy, here->num) ? jump_max(galaxy, here->num) : 70, rng_sys, rng_dist, 256);
+    int n = in_range(galaxy, x, y, here && !jump_trap(galaxy, here->num) ? jump_max(galaxy, here->num) : 70, rng_sys, rng_dist, RNG_N);
     {
         int k = 0;
         for (int i = 0; i < n; i++) if (!jump_trap(galaxy, rng_sys[i]->num)) rng_sys[k] = rng_sys[i], rng_dist[k++] = rng_dist[i];
@@ -566,7 +569,7 @@ double best_loop_part(int galaxy, int cash, int room_t, int i0, int i1, double b
     const sys_t *sys = galaxy_systems(galaxy);
     for (int i = i0; i < i1; i++) {
         if (g_loop_reach_on && g_loop_reach[i] > 12) continue;
-        int n = in_range(galaxy, sys[i].x, sys[i].y, jump_max(galaxy, i), rng_sys, rng_dist, 256);
+        int n = in_range(galaxy, sys[i].x, sys[i].y, jump_max(galaxy, i), rng_sys, rng_dist, RNG_N);
         for (int k = 0; k < n; k++) {
             if (rng_sys[k]->num <= i) continue;
             if (rng_dist[k] > jump_max(galaxy, rng_sys[k]->num)) continue;      // (the way back too)
