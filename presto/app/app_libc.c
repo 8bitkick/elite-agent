@@ -250,6 +250,30 @@ double atof(const char *s)
     return neg ? -v : v;
 }
 
+// (newlib's reaches for its reentrancy structure for errno, and that brought its stdio streams' 636 bytes of RAM and
+// its own 320 of code run from RAM: the agent's command line is all that calls it)
+unsigned long strtoul(const char *s, char **end, int base)
+{
+    const char *p = s;
+    while (*p == ' ' || (*p >= '\t' && *p <= '\r')) p++;
+    int neg = *p == '-';
+    if (*p == '-' || *p == '+') p++;
+    if ((base == 0 || base == 16) && p[0] == '0' && (p[1] == 'x' || p[1] == 'X') &&
+        ((p[2] >= '0' && p[2] <= '9') || ((p[2] | 32) >= 'a' && (p[2] | 32) <= 'f'))) p += 2, base = 16;
+    else if (base == 0) base = *p == '0' ? 8 : 10;
+    unsigned long v = 0;
+    int any = 0, over = 0;
+    for (;; p++) {
+        int d = *p >= '0' && *p <= '9' ? *p - '0' : (*p | 32) >= 'a' && (*p | 32) <= 'z' ? (*p | 32) - 'a' + 10 : 99;
+        if (d >= base) break;
+        if (v > (~0ul - (unsigned long) d) / (unsigned long) base) over = 1;
+        v = v * (unsigned long) base + (unsigned long) d, any = 1;
+    }
+    if (end) *end = (char *) (any ? p : s);
+    if (over) return ~0ul;
+    return neg ? -v : v;
+}
+
 // errno, for newlib's libm: a plain int, not its reentrancy structure's
 int *__errno(void)
 {
