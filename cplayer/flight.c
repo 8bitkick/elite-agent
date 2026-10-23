@@ -206,7 +206,7 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
         int fightable = 1;
         extern int g_curious;
         if (g_curious && witchspace() && g_bail_energy) {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             const ship_t *t[1];
             int n = see_ships(sh);
             fightable = threats(sh, n, 60000, t, 1) && !(energy() < g_bail_energy && !hyperspace_count());
@@ -218,7 +218,7 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
             g_phase = 4;
             // bailing out of witchspace: run, don't fight (engage() would give up at once and leave
             // us sitting still): full speed straight away from them, jinking
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             int n = see_ships(sh);
             vec_t away = {0, 0, 1};
             double sx = 0, sy = 0, sz = 0;
@@ -354,7 +354,7 @@ static const sys_t *chain_hop(void) {
 // anything that can hurt us near: hostile-flagged, or a Thargoid/Thargon whatever its flags (a freshly
 // launched Thargon isn't flagged yet: we chained into one and died on the chart)
 static int danger_near(void) {
-    static ship_t sh[NOSH];
+    ship_t *const sh = g_see_buf;
     int n = see_ships(sh);
     for (int i = 0; i < n; i++) {
         const ship_t *q = &sh[i];
@@ -424,7 +424,7 @@ PT_THREAD(leave_witchspace(void)) {
         CO_CALL(c_lw, select_by_cursor(c_lw.dest));
         CO_CALL(c_lw, hold_until(K_F0, is_front, 3, "front view"));
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             const ship_t *t[1];
             int n = see_ships(sh);
             g_bail_energy = thg_bail();
@@ -447,7 +447,7 @@ PT_THREAD(leave_witchspace(void)) {
         // cleared: get our strength back where we are (new arrivals: fight them, as above)
         c_lw.until = deadline(100);
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             const ship_t *t[1];
             for (;;) {
                 int n = see_ships(sh);

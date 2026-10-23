@@ -299,7 +299,7 @@ PT_THREAD(hunt(float minutes)) {
         CO_YIELD(c_hunt);
         CO_CALL(c_hunt, fight_if_needed(&c_hunt.fought));
         if (c_hunt.fought) continue;
-        static ship_t sh[NOSH];
+        ship_t *const sh = g_see_buf;
         int n = see_ships(sh);
         const ship_t *pl = find_planet(sh, n);
         keyset_t keys = {{0}, 0};
@@ -311,7 +311,7 @@ PT_THREAD(hunt(float minutes)) {
     for (;;) {
         CO_YIELD(c_hunt);
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             const ship_t *t[1];
             int n = see_ships(sh);
             if (threats(sh, n, g_cp.engage_range, t, 1)) goto fight;     // (engage's own range: further off, it'd stop at once)
@@ -754,7 +754,7 @@ uint32_t g_lab_cleared;
 uint32_t g_lab_t0 = 0xFFFFFFFF;
 int g_lab_undamped;
 static int lab_threats(int rng) {
-    static ship_t sh[NOSH];
+    ship_t *const sh = g_see_buf;
     const ship_t *t[1];
     int n = see_ships(sh);
     return threats(sh, n, rng, t, 1);

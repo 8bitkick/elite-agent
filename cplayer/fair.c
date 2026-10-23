@@ -7,7 +7,10 @@
 #include "drv.h"
 #include "keys.h"
 
+#if !NO_FAIR
 int g_fair;
+#endif
+ship_t g_see_buf[NOSH];
 int g_fair_misjump = 1;
 int g_fair_stick_rate = 32;
 double g_fair_noise = 0.04;

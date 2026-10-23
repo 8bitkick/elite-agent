@@ -16,7 +16,11 @@ static inline uint8_t ram_(uint16_t a) {
     }
     return IO->ram[a];
 }
+#if NO_FAIR
+#define g_fair 0                    // (built without fair mode: always off, and what it would do the compiler leaves out)
+#else
 extern int g_fair;                  // (fair.h: FAIR_DASH 2 the dashboard as drawn; any bit: our own stick from our hand)
+#endif
 extern int g_own_jx, g_own_jy;
 #ifdef READ_AUDIT          // (the fair-mode leak audit: every read the player makes, by address and call site)
 void read_audit(uint16_t a, const char *file, int line);

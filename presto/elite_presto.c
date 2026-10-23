@@ -49,6 +49,7 @@ struct app_api {
 #include "state.h"
 #include "galaxy.h"
 #include "docked.h"
+#include "fair.h"
 
 #ifndef ELITE_AUTOSTART
 #define ELITE_AUTOSTART 2500        // frames: at most this (50 s) after boot or a reset, if the game never looked ready
@@ -63,7 +64,6 @@ static uint32_t s_boot_frames, s_us_max, s_us_sum, s_n;
 static uint32_t s_last_frame;
 static int s_level = PLOG_INFO;
 extern int g_curious;
-extern int g_fair;
 
 // the totals, from the player's journal and status lines (it keeps playing; these only watch): for
 // this career (this commander) and since boot. In RAM only: nothing is written to flash but what
@@ -317,7 +317,7 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
 #if NO_FAIR
         snprintf(reply, reply_size, "AGENT fair: not in this build (presto/app/build.sh --fair)");
         return true;
-#endif
+#else
         const char *v = a[4] ? a + 5 : "";
         if (!strcmp(v, "on")) g_fair = 3;
         else if (!strcmp(v, "off")) g_fair = 0;
@@ -325,6 +325,7 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
         else if (!*v) g_fair = g_fair ? 0 : 3;
         else { snprintf(reply, reply_size, "AGENT fair on|off|hands"); return true; }
         snprintf(reply, reply_size, "AGENT fair %s (from the next frame)", g_fair == 27 ? "on, with the hand limits" : g_fair ? "on" : "off");
+#endif
     } else if (!strncmp(a, "log ", 4)) {
         int l = atoi(a + 4);
         s_level = l < 0 ? 0 : l > PLOG_DEBUG ? PLOG_DEBUG : l;

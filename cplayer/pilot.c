@@ -333,7 +333,7 @@ static int jy_for_beta(int b) {      // ... and BETA (opposite sign to the stick
 double plan_stick(vec_t pos, vec_t vel, double spd, double radius, int jx, int jy, int *want_jx, int *want_jy) {
     PT_START(t0);
     int a, b;
-    { extern int g_fair, g_fair_stick_rate; s_pl_lim = (g_fair & 8) ? (int) (g_fair_stick_rate / fmax(g_ipf, 0.2)) : 0; s_pl_jx = jx, s_pl_jy = jy; }
+    { s_pl_lim = (g_fair & 8) ? (int) (g_fair_stick_rate / fmax(g_ipf, 0.2)) : 0; s_pl_jx = jx, s_pl_jy = jy; }
     double t = (g_plan_f & 1 ? plan_rates_f : plan_rates)(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, spd, radius * radius, alpha_from_jstx(jx), beta_from_jsty(jy), &a, &b);
     *want_jx = jx_for_alpha(a), *want_jy = jy_for_beta(b);
     PT_ADD(0, t0);
@@ -362,7 +362,7 @@ const ship_t *find_station(const ship_t *s, int n) {
 // straight into a rock for 15 s on the way to the station.) Not the station: docking flies into it
 void apply_flight(keyset_t *keys) {
     if (!is_docked() && altitude() < 70) {
-        static ship_t sh[NOSH];
+        ship_t *const sh = g_see_buf;
         int n = see_ships(sh);
         const ship_t *pl = find_planet(sh, n);
         if (pl) {
@@ -481,7 +481,7 @@ PT_THREAD(fight_if_needed(int *fought)) {
     *fought = 0;
     c_fin.to = NULL;
     {
-        static ship_t sh[NOSH];
+        ship_t *const sh = g_see_buf;
         const ship_t *t[4];
         int n = see_ships(sh);
         if (!threats(sh, n, fight_reach(), t, 1)) CO_EXIT(c_fin);
@@ -577,7 +577,7 @@ PT_THREAD(to_station(float seconds)) {
             continue;
         }
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             int n = see_ships(sh);
             const ship_t *pl = find_planet(sh, n);
             keyset_t keys = {{0}, 0};
@@ -753,7 +753,7 @@ PT_THREAD(to_station(float seconds)) {
             { extern int g_curious; if (g_ts_view >= 1) { if (space_view() != 1) ks_add(&keys, K_F1); }
               else if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
             cruise_tick();
-            { extern int g_dock_log; if (g_dock_log) { static ship_t s2[NOSH]; int n2 = see_ships(s2); const ship_t *p2 = find_planet(s2, n2); dbgf_("TS fr %u mc %d jx %d jy %d spd %d pd %.0f ja %d jk %d", now(), mcnt(), jstx() - 128, jsty() - 128, speed(), p2 ? vlen(pos_of(p2)) : 0.0, jump_allowed(s2, n2), ks_has(&keys, K_JUMP)); } }
+            { extern int g_dock_log; if (g_dock_log) { ship_t *const s2 = g_see_buf; int n2 = see_ships(s2); const ship_t *p2 = find_planet(s2, n2); dbgf_("TS fr %u mc %d jx %d jy %d spd %d pd %.0f ja %d jk %d", now(), mcnt(), jstx() - 128, jsty() - 128, speed(), p2 ? vlen(pos_of(p2)) : 0.0, jump_allowed(s2, n2), ks_has(&keys, K_JUMP)); } }
             apply_flight(&keys);
         }
     }
@@ -1001,7 +1001,7 @@ PT_THREAD(dock(float seconds)) {
             if (c_dk.fought) { plan_reset(); continue; }      // (a plan afresh; the filter starts again from the next reading)
         }
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             int n = see_ships(sh);
             if (!find_station(sh, n)) {
                 c_dk.final = 0;
@@ -1010,7 +1010,7 @@ PT_THREAD(dock(float seconds)) {
             }
         }
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             int n = see_ships(sh);
             const ship_t *st = find_station(sh, n);
             vec_t S = pos_of(st), nv = vnorm(fvec(st->nosev)), rel = vneg(S), goal;

@@ -21,7 +21,9 @@ enum {
     FAIR_INFO = 3,      // fair mode: the information limits
     FAIR_HANDS = 24     // (optional, apart: the hand limits)
 };
-extern int g_fair;              // FAIR_* bits (0: off)
+#if !NO_FAIR
+extern int g_fair;              // FAIR_* bits (0: off; built without fair mode, state.h's constant 0)
+#endif
 extern int g_fair_misjump;      // the forced mis-jump (author credits + CTRL) allowed in fair mode
 extern int g_fair_stick_rate;   // stick units a frame (32: lock to lock in 8 frames)
 extern double g_fair_noise;     // motor noise: sd = 1 + this x the deflection (0.04)
@@ -32,6 +34,10 @@ void fair_reset(void);          // a new machine (player_init, the lab)
 void fair_begin_frame(void);    // player_frame: the perception update
 void fair_end_frame(void);      // ... and the hands
 int see_ships(ship_t out[NOSH]);    // the ships the decisions use: ships_read(), or in fair mode perceive()
+// (the buffer the decisions read them into, all of them: see_ships() gives the same ships all through a frame, the
+// RAM as the last frame left it, so a reader may share it as long as it reads before each use and holds nothing of
+// it over a yield. Fifteen of their own were 14 KB of the plugin's 72)
+extern ship_t g_see_buf[NOSH];
 double tally_seen(void);        // the kill tally as the player knows it (exact outside fair mode)
 void fair_saved(void);          // (the tally kept with a save, and back with a reload)
 void fair_reloaded(void);

@@ -520,7 +520,7 @@ PT_THREAD(engage(float seconds)) {
         }
         c_en.key = 0;
         {
-            static ship_t sh[NOSH];
+            ship_t *const sh = g_see_buf;
             const ship_t *th[NOSH];
             int n = see_ships(sh);
             announce(sh, n);
