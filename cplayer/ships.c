@@ -7,56 +7,59 @@
 
 // id: name, max energy, max speed, laser power, missiles, bounty (Cr/10), targetable area,
 //     KWH% + KWL%/256, E% (from elite-data.asm)
-#define T(name, en, sp, la, mi, bo, ar, kwh, kwl, nb) { name, en, sp, la, mi, bo, ar, (float)(kwh) + (float)(kwl) / 256.0f, nb }
+// (the list once, the tables from it: as the game has them, and the disc version's)
+#define SHIP_LIST(T, VIPER_EN) \
+    T("Missile", 2, 44, 0, 0, 0, 40 * 40, 0, 149, 0x00) \
+    T("Space station", 240, 0, 0, 6, 0, 160 * 160, 0, 0, 0x00) \
+    T("Escape pod", 17, 8, 0, 0, 0, 16 * 16, 0, 16, 0x01) \
+    T("Alloy plate", 16, 16, 0, 0, 0, 10 * 10, 0, 10, 0x00) \
+    T("Cargo canister", 17, 15, 0, 0, 0, 20 * 20, 0, 10, 0x00) \
+    T("Boulder", 20, 30, 0, 0, 1, 30 * 30, 0, 6, 0x00) \
+    T("Asteroid", 60, 30, 0, 0, 5, 80 * 80, 0, 8, 0x00) \
+    T("Splinter", 20, 10, 0, 0, 0, 16 * 16, 0, 10, 0x00) \
+    T("Shuttle", 32, 8, 0, 0, 0, 50 * 50, 0, 16, 0x21) \
+    T("Transporter", 32, 10, 0, 0, 0, 50 * 50, 0, 17, 0x61) \
+    T("Cobra Mk III", 150, 28, 2, 3, 0, 95 * 95, 0, 234, 0xA0) \
+    T("Python", 250, 20, 3, 3, 0, 80 * 80, 0, 170, 0xA0) \
+    T("Boa", 250, 24, 3, 4, 0, 70 * 70, 0, 213, 0xA0) \
+    T("Anaconda", 252, 14, 7, 7, 0, 100 * 100, 1, 0, 0xA1) \
+    T("Rock hermit", 180, 30, 0, 2, 0, 80 * 80, 0, 85, 0xA1) \
+    T("Viper", VIPER_EN, 32, 2, 1, 0, 75 * 75, 0, 26, 0xC2) \
+    T("Sidewinder", 70, 37, 2, 0, 50, 65 * 65, 0, 85, 0x0C) \
+    T("Mamba", 90, 30, 2, 2, 150, 70 * 70, 0, 128, 0x8C) \
+    T("Krait", 80, 30, 2, 0, 100, 60 * 60, 0, 85, 0x8C) \
+    T("Adder", 85, 24, 2, 0, 40, 50 * 50, 0, 90, 0x8C) \
+    T("Gecko", 70, 30, 2, 0, 55, 99 * 99, 0, 85, 0x0C) \
+    T("Cobra Mk I", 90, 26, 2, 2, 75, 99 * 99, 0, 170, 0x8C) \
+    T("Worm", 30, 23, 1, 0, 0, 99 * 99, 0, 50, 0x05) \
+    T("Cobra Mk III (pirate)", 150, 28, 2, 2, 175, 95 * 95, 1, 42, 0x8C) \
+    T("Asp Mk II", 150, 40, 5, 1, 200, 60 * 60, 1, 21, 0x8C) \
+    T("Python (pirate)", 250, 20, 3, 3, 200, 80 * 80, 1, 42, 0x8C) \
+    T("Fer-de-lance", 160, 30, 2, 2, 0, 40 * 40, 1, 64, 0x82) \
+    T("Moray", 100, 25, 2, 0, 50, 30 * 30, 0, 192, 0x0C) /* never spawned */ \
+    T("Thargoid", 240, 39, 2, 6, 500, 99 * 99, 2, 170, 0x0C) \
+    T("Thargon", 20, 30, 2, 0, 50, 40 * 40, 0, 33, 0x04) \
+    T("Constrictor", 252, 36, 6, 4, 0, 65 * 65, 5, 85, 0x04) \
+    T("Cougar", 252, 40, 6, 4, 0, 70 * 70, 5, 85, 0x20) \
+    T("Dodo station", 240, 0, 0, 0, 0, 180 * 180, 0, 0, 0x00) /* only via XX21 swap (type 2) */
+#define T(name, en, sp, la, mi, bo, ar, kwh, kwl, nb) { name, en, sp, la, mi, bo, ar, (float)(kwh) + (float)(kwl) / 256.0f, nb },
 static const shiptype_t SHIP_TYPES[34] = {
     { 0, 0, 0, 0, 0, 0, 0, 0.0f, 0 },      // unused (type 0 = empty slot)
-    T("Missile", 2, 44, 0, 0, 0, 40 * 40, 0, 149, 0x00),
-    T("Space station", 240, 0, 0, 6, 0, 160 * 160, 0, 0, 0x00),
-    T("Escape pod", 17, 8, 0, 0, 0, 16 * 16, 0, 16, 0x01),
-    T("Alloy plate", 16, 16, 0, 0, 0, 10 * 10, 0, 10, 0x00),
-    T("Cargo canister", 17, 15, 0, 0, 0, 20 * 20, 0, 10, 0x00),
-    T("Boulder", 20, 30, 0, 0, 1, 30 * 30, 0, 6, 0x00),
-    T("Asteroid", 60, 30, 0, 0, 5, 80 * 80, 0, 8, 0x00),
-    T("Splinter", 20, 10, 0, 0, 0, 16 * 16, 0, 10, 0x00),
-    T("Shuttle", 32, 8, 0, 0, 0, 50 * 50, 0, 16, 0x21),
-    T("Transporter", 32, 10, 0, 0, 0, 50 * 50, 0, 17, 0x61),
-    T("Cobra Mk III", 150, 28, 2, 3, 0, 95 * 95, 0, 234, 0xA0),
-    T("Python", 250, 20, 3, 3, 0, 80 * 80, 0, 170, 0xA0),
-    T("Boa", 250, 24, 3, 4, 0, 70 * 70, 0, 213, 0xA0),
-    T("Anaconda", 252, 14, 7, 7, 0, 100 * 100, 1, 0, 0xA1),
-    T("Rock hermit", 180, 30, 0, 2, 0, 80 * 80, 0, 85, 0xA1),
-    T("Viper", 140, 32, 2, 1, 0, 75 * 75, 0, 26, 0xC2),
-    T("Sidewinder", 70, 37, 2, 0, 50, 65 * 65, 0, 85, 0x0C),
-    T("Mamba", 90, 30, 2, 2, 150, 70 * 70, 0, 128, 0x8C),
-    T("Krait", 80, 30, 2, 0, 100, 60 * 60, 0, 85, 0x8C),
-    T("Adder", 85, 24, 2, 0, 40, 50 * 50, 0, 90, 0x8C),
-    T("Gecko", 70, 30, 2, 0, 55, 99 * 99, 0, 85, 0x0C),
-    T("Cobra Mk I", 90, 26, 2, 2, 75, 99 * 99, 0, 170, 0x8C),
-    T("Worm", 30, 23, 1, 0, 0, 99 * 99, 0, 50, 0x05),
-    T("Cobra Mk III (pirate)", 150, 28, 2, 2, 175, 95 * 95, 1, 42, 0x8C),
-    T("Asp Mk II", 150, 40, 5, 1, 200, 60 * 60, 1, 21, 0x8C),
-    T("Python (pirate)", 250, 20, 3, 3, 200, 80 * 80, 1, 42, 0x8C),
-    T("Fer-de-lance", 160, 30, 2, 2, 0, 40 * 40, 1, 64, 0x82),
-    T("Moray", 100, 25, 2, 0, 50, 30 * 30, 0, 192, 0x0C),       // never spawned
-    T("Thargoid", 240, 39, 2, 6, 500, 99 * 99, 2, 170, 0x0C),
-    T("Thargon", 20, 30, 2, 0, 50, 40 * 40, 0, 33, 0x04),
-    T("Constrictor", 252, 36, 6, 4, 0, 65 * 65, 5, 85, 0x04),
-    T("Cougar", 252, 40, 6, 4, 0, 70 * 70, 5, 85, 0x20),
-    T("Dodo station", 240, 0, 0, 0, 0, 180 * 180, 0, 0, 0x00),  // only via XX21 swap (type 2)
+    SHIP_LIST(T, 140)
 };
 
 // The disc version's ships (its ship files, elite-ships-a.asm to -p): the same but for the Viper's energy (100,
 // not 140), no rock hermit, Cougar or Dodo station, and every kill a point (it counts kills, not points)
-static shiptype_t s_disc[34];
+// (in the flash, as the other: a copy made in RAM was 1.2 KB of the plugin's)
+#define TD(name, en, sp, la, mi, bo, ar, kwh, kwl, nb) { name, en, sp, la, mi, bo, ar, 1.0f, nb },
+static const shiptype_t SHIP_TYPES_DISC[34] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0.0f, 0 },
+    SHIP_LIST(TD, 100)
+};
 const shiptype_t *ship_type(int type)
 {
     if (type < 1 || type > 33) return 0;
-    if (g_ev.kills_by_type) return &SHIP_TYPES[type];
-    if (!s_disc[1].name) {
-        for (int i = 1; i <= 33; i++) s_disc[i] = SHIP_TYPES[i], s_disc[i].kill_points = 1.0f;
-        s_disc[16].max_energy = 100;
-    }
-    return &s_disc[type];
+    return g_ev.kills_by_type ? &SHIP_TYPES[type] : &SHIP_TYPES_DISC[type];
 }
 
 // 24-bit sign-magnitude coordinate: 23-bit magnitude, sign in bit 7 of the top byte
