@@ -190,16 +190,16 @@ const sys_t *nearest_system(int galaxy, int qq9, int qq10)
 // a system the chart cursor can select: the nearest to its own spot (none nearer by (|dx|/2 + |dy|/2)). Cached
 // a galaxy at a time: jump_max's table asked it 65,536 times over, a 256-system search each, and on the Presto
 // that first visit took a frame to 136 ms (the curious career's first mis-jump)
-static uint8_t s_own[8][256], s_own_ok[8];
+static uint8_t s_own[8][32], s_own_ok[8];     // (a bit a system)
 static int own_spot(int galaxy, int i)
 {
     galaxy &= 7;
     if (!s_own_ok[galaxy]) {
         const sys_t *sys = galaxy_systems(galaxy);
-        for (int j = 0; j < 256; j++) s_own[galaxy][j] = nearest_system(galaxy, sys[j].x, sys[j].y) == &sys[j];
+        for (int j = 0; j < 256; j++) if (nearest_system(galaxy, sys[j].x, sys[j].y) == &sys[j]) s_own[galaxy][j >> 3] |= (uint8_t) (1u << (j & 7));
         s_own_ok[galaxy] = 1;
     }
-    return s_own[galaxy][i & 255];
+    return (s_own[galaxy][(i & 255) >> 3] >> (i & 7)) & 1;
 }
 
 // systems the game wouldn't let us jump to (H refused twice: a near neighbour takes the selection)
@@ -227,8 +227,7 @@ static int nearest_reach(int galaxy, int x, int y)
     }
     return best < 0 ? 999 : distance_qq8(x, y, sys[best].x, sys[best].y);
 }
-static int16_t s_jmax[8][256];
-static uint8_t s_jmax_ok[8], s_trap[8][256];
+static uint8_t s_jmax[8][256], s_jmax_ok[8], s_trap[8][32];      // (the longest is 65; a trap a bit a system)
 int jump_max(int galaxy, int num)
 {
     if (!g_safe_jumps) return 70;
@@ -239,10 +238,10 @@ int jump_max(int galaxy, int num)
         for (int i = 0; i < 256; i++) {
             int reach = nearest_reach(galaxy, sys[i].x, sys[i].y ^ 31);
             int m = 70 - reach - 5;
-            s_jmax[galaxy][i] = (int16_t) (m < 0 ? 0 : m);
+            s_jmax[galaxy][i] = (uint8_t) (m < 0 ? 0 : m);
         }
         // traps: no neighbour within that range, so no safe way on: never planned into
-        for (int i = 0; i < 256; i++) s_trap[galaxy][i] = !(nearest_reach(galaxy, sys[i].x, sys[i].y) <= s_jmax[galaxy][i]);
+        for (int i = 0; i < 256; i++) if (!(nearest_reach(galaxy, sys[i].x, sys[i].y) <= s_jmax[galaxy][i])) s_trap[galaxy][i >> 3] |= (uint8_t) (1u << (i & 7));
         s_jmax_ok[galaxy] = 1;
         PT_ADD(5, tj0);
     }
@@ -252,7 +251,7 @@ int jump_trap(int galaxy, int num)
 {
     if (!g_safe_jumps) return 0;
     jump_max(galaxy, num);
-    return s_trap[galaxy & 7][num & 255];
+    return (s_trap[galaxy & 7][(num & 255) >> 3] >> (num & 7)) & 1;
 }
 
 int in_range(int galaxy, int x, int y, int max_qq8, const sys_t **out, int *dist, int max)
