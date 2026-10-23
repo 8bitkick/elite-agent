@@ -552,9 +552,54 @@ extern const double g_dk_clear;
 #else
 extern double g_dk_clear;
 #endif
-int g_jump_plan = 0; double g_jump_to = 66000, g_jump_mid = 150000;   // (JPLAN, JTO: the jumps planned to land this far from the planet)
-int g_ts_view = 0;            // (TSVIEW: 1, the cruise looks back)
-double g_ts_aim = 0;          // (TSAIM: the cruise aims at the station-to-be's approach point this far out; 0: the planet)
+// (a frame of the run in, out of to_station's own stack frame: its locals were 816 bytes under every fight and log
+// line it calls, and the plugin ran off the bottom of the firmware's stack)
+static __attribute__((noinline)) void to_station_step(void)
+{
+        {
+            ship_t *const sh = g_see_buf;
+            int n = see_ships(sh);
+            const ship_t *pl = find_planet(sh, n);
+            keyset_t keys = {{0}, 0};
+            if (chase_blocker(sh, n, &keys)) ;
+            else if (pl) {
+                vec_t P = pos_of(pl);
+                double off;
+                int want = 40;
+                if (altitude() < 60) {
+                    off = steer(vneg(P), jstx(), jsty(), 3, 3, &keys);
+                    want = 20;
+                } else {
+                    off = steer(P, jstx(), jsty(), 3, 3, &keys);
+                }
+                speed_keys(speed(), want, &keys);
+                if (off < 10 && jump_allowed(sh, n)) ks_add(&keys, K_JUMP);
+                {        // anything on a collision course but the station (an asteroid: we flew into one for 15 s)
+                    extern const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss);
+                    vec_t q;
+                    const ship_t *obst = collision_ahead(sh, n, 452, &q);
+                    if (obst && obst->type != SHIP_SST) {      // (not the station: that's where we're going)
+                        double m = hypot(q.x, q.y);
+                        double mx = m > 1 ? q.x / m : 0, my = m > 1 ? q.y / m : 1;
+                        ks_clear(&keys);
+                        steer((vec_t){mx * 4000, my * 4000, 1500}, jstx(), jsty(), 3, 3, &keys);
+                        speed_keys(speed(), 30, &keys);
+                    }
+                }
+                if (now() - c_ts.last_log > 100) {
+                    c_ts.last_log = now();
+                    dbgf_("to station: planet %.0f, alt %d, off %.0f, spd %d", vlen(P), altitude(), off, speed());
+                    if (g_jump_log && !jump_allowed(sh, n)) log_no_jump(sh, n);      // (why no in-system jump: what's in the bubble)
+                }
+            }
+            // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
+            // empty starfield on the way to the station)
+            { extern int g_curious; if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
+            cruise_tick();
+            { extern int g_dock_log; if (g_dock_log) { ship_t *const s2 = g_see_buf; int n2 = see_ships(s2); const ship_t *p2 = find_planet(s2, n2); dbgf_("TS fr %u mc %d jx %d jy %d spd %d pd %.0f ja %d jk %d", now(), mcnt(), jstx() - 128, jsty() - 128, speed(), p2 ? vlen(pos_of(p2)) : 0.0, jump_allowed(s2, n2), ks_has(&keys, K_JUMP)); } }
+            apply_flight(&keys);
+        }
+}
 PT_THREAD(to_station(float seconds)) {
     CO_BEGIN(c_ts);
     c_ts.end = deadline(seconds);
@@ -584,180 +629,7 @@ PT_THREAD(to_station(float seconds)) {
             CO_CALL(c_ts, leave_witchspace());
             continue;
         }
-        {
-            ship_t *const sh = g_see_buf;
-            int n = see_ships(sh);
-            const ship_t *pl = find_planet(sh, n);
-            keyset_t keys = {{0}, 0};
-            if (chase_blocker(sh, n, &keys)) ;
-            else if (pl) {
-                vec_t P = pos_of(pl);
-                double off;
-                int want = 40;
-                if (altitude() < 60) {
-                    off = steer(vneg(P), jstx(), jsty(), 3, 3, &keys);
-                    want = 20;
-                } else if (g_ts_aim > 0) {
-                    // (TSAIM: straight for where the station will be. Elite puts it at the planet's centre + 2 nosev (one
-                    // radius up), its slot facing the planet, and spawns it once we're within 49152 of that point on every
-                    // axis. So aim at the approach point on its slot's axis, g_ts_aim out on the planet side, from the jump
-                    // exit on: no run at the planet's centre and no turn when the station appears. Skirt the planet by its
-                    // collision cone, as the line-up does)
-                    vec_t nvp = fvec(pl->nosev), Sp = vadd(P, nvp, 2.0 * 24576 / vlen(nvp)), u = vnorm(nvp);
-                    vec_t A = vadd(Sp, u, -g_ts_aim);
-                    // (the planet spins: Elite gives it roll and pitch both at 127, so it turns steadily about nose - side, and
-                    // the station's spawn point (2 nosev out) runs round a fixed circle: radius 49152 sin 45, centred 49152 cos 45
-                    // along that axis. The point on that circle nearest us: the spawn point comes by once a spin and the
-                    // station appears beside us)
-                    if (g_ts_aim > 0) {
-                        // (and where it will be: the approach point (8000 down the slot's axis, towards the planet) runs round
-                        // its own circle about the spin axis. The spin's phase is measured against the planet's direction, so
-                        // our own turning doesn't count; its rate from frame to frame. Then the point on that circle where we
-                        // and it arrive together, at ~9.3 units a frame at 40)
-                        static double lphi, w; static uint32_t lfr; static int have;
-                        vec_t n1 = vnorm(nvp), ax = vnorm(vadd(n1, vnorm(fvec(pl->sidev)), -1)), ph = vnorm(P);
-                        vec_t b1 = vnorm(vadd(ph, ax, -vdot(ph, ax)));
-                        vec_t b2 = {ax.y * b1.z - ax.z * b1.y, ax.z * b1.x - ax.x * b1.z, ax.x * b1.y - ax.y * b1.x};
-                        vec_t np = vadd(n1, ax, -vdot(n1, ax));
-                        double phi = atan2(vdot(np, b2), vdot(np, b1));
-                        uint32_t dt = now() - lfr;
-                        if (have && dt > 0 && dt < 20) {
-                            double dphi = fmod(phi - lphi + 3 * M_PI, 2 * M_PI) - M_PI;
-                            w = have > 8 ? 0.9 * w + 0.1 * dphi / dt : dphi / dt;
-                            have++;
-                        } else have = 1, w = 0;
-                        lphi = phi, lfr = now();
-                        double r = 49152 - g_ts_aim, rad = r * 0.70710678, vel = 9.3 * fmax(10, speed()) / 40;
-                        vec_t C0 = vadd(P, ax, r * 0.70710678), X = A;
-                        double T = vlen(A) / vel;
-                        for (int it = 0; it < 4; it++) {
-                            double pt = phi + w * T;
-                            X = vadd(C0, vadd(vadd((vec_t){0, 0, 0}, b1, cos(pt)), b2, sin(pt)), rad);
-                            T = vlen(X) / vel;
-                        }
-                        A = X;
-                        { extern int g_dock_log; if (g_dock_log && now() % 50 == 0) dbgf_("INT phi %.2f w %.5f T %.0f |X| %.0f |P| %.0f |X-P| %.0f", phi, w, T, vlen(X), vlen(P), vlen(vadd(X, P, -1))); }
-                    }
-                    double dp = vlen(P), gl = vlen(A);
-                    vec_t d = vnorm(A);
-                    double tc = fmax(0.0, fmin(gl, vdot(P, d)));
-                    vec_t cp = vadd(P, d, -tc);
-                    if (vlen(cp) < g_dk_clear) {
-                        vec_t ph = vnorm(P);
-                        double rho = asin(fmin(1.0, g_dk_clear / dp)), cg = vdot(d, ph);
-                        if (cg > cos(rho)) {
-                            vec_t w = vadd(d, ph, -cg);
-                            if (vlen(w) < 1e-6) w = vnorm(vadd(A, ph, -vdot(A, ph)));
-                            w = vnorm(w);
-                            vec_t o = {0, 0, 0};
-                            A = vadd(o, vadd(vadd(o, ph, cos(rho)), w, sin(rho)), gl);
-                        }
-                    }
-                    { extern int g_dock_log; if (g_dock_log && now() % 400 == 0) { vec_t n1 = vnorm(fvec(pl->nosev)), s1 = vnorm(fvec(pl->sidev)), r1 = vnorm(fvec(pl->roofv)), ap = vnorm(vadd(n1, s1, 1)), am = vnorm(vadd(n1, s1, -1)), an = vnorm(vadd(n1, r1, 1)), ar = vnorm(vadd(n1, r1, -1)); vec_t ph = vnorm(P); dbgf_("SPIN dot n+s %.3f n-s %.3f n+r %.3f n-r %.3f nose %.3f side %.3f roof %.3f", vdot(ap, ph), vdot(am, ph), vdot(an, ph), vdot(ar, ph), vdot(n1, ph), vdot(s1, ph), vdot(r1, ph)); } }
-                    off = steer(A, jstx(), jsty(), 3, 3, &keys);
-                } else {
-                    off = steer(P, jstx(), jsty(), 3, 3, &keys);
-                }
-                // (JPLAN: plan the in-system jumps. A jump moves the planet 65536 against the nose (measured: z 382109 to
-                // 316573), and it's refused with the planet ahead and within 131072 on its largest axis; with the planet
-                // nearer than 65536 ahead it doesn't pass it (z 43521 to -109097). So the nearest the last jump can land is
-                // 65536, where the station appears (~64000), and only from 131072-131472 out. Jumping straight at the
-                // planet, the last one landed 66000-127000 out and we cruised the rest at 40 (median 50 s). So: the jump
-                // before lands just outside that window, its heading off the planet by the law of cosines, and we cruise
-                // into the window and jump straight)
-                static int s_plan_dir;        // (its direction chosen: below)
-                static double planned;        // (a plan is kept until its jump: chosen afresh each frame, it flipped
-                                              // between straight and 81 degrees off as the distance wobbled)
-                {
-                    extern int g_dock_log; static vec_t pp; static unsigned pf;
-                    // (a jump moves the planet 65536 in z alone; a fast turn 230000 out moves it 20000 a frame too)
-                    int jumped = pf + 1 == now() && fabs(pp.z - P.z - 65536) < 3000 && fabs(pp.x - P.x) + fabs(pp.y - P.y) < 3000;
-                    if (pf + 1 != now() || jumped) planned = 0;
-                    if (g_dock_log && jumped) dbgf_("JUMPED from %.0f %.0f %.0f to %.0f %.0f %.0f", pp.x, pp.y, pp.z, P.x, P.y, P.z);
-                    pp = P; pf = now();
-                }
-                if (g_jump_plan && altitude() >= 60) {
-                    const double J = 65536, W0 = 131072, W1 = W0 + 400, T0 = W1 + 300;
-                    double D = vlen(P), S = D - J, land = 0;
-                    if (planned > 0 && planned >= S - 500 && planned <= D + J) land = planned;
-                    else if ((s_plan_dir = 0), D >= W0 && D <= W1) land = S;                             // (the last jump)
-                    else if (D > W1 + 3000) {
-                        if (S >= T0 + J || (S >= T0 && S <= T0 + 2500)) land = S;        // (straight: a jump to spare, or
-                                                                                         // a short cruise into the window)
-                        else land = S < T0 ? T0 : T0 + J;                                // (the one jump off the planet,
-                    }                                                                    // to just outside the window)
-                    planned = land < S - 500 || land > S + 500 ? land : 0;     // (straight: afresh each frame, as we
-                                                                                // cruise; kept, it needed more and more
-                                                                                // angle: off 140 degrees, a timeout)
-                    if (land > 0) {
-                        double c = (D * D + J * J - land * land) / (2 * D * J);
-                        if (c > -1.001 && c < 1.001) {
-                            double th = acos(fmax(-1, fmin(1, c)));
-                            // (which way off the planet: fixed in space for the plan, against the planet's and the sun's
-                            // directions, and chosen as the plan is made: towards where the nose already is, the least
-                            // turn, or with the nose on the planet, our roof. Taken from our own axes every frame, it
-                            // turned as we did: with the nose on the planet it fell back to our x, 90 degrees round the
-                            // clock, and we rolled after it for ever; towards our roof, we rolled after it the same way,
-                            // roll reversals 13 -> 52, and settled 9 degrees off)
-                            static double cu2, cu3;
-                            vec_t ph = vnorm(P), e2 = {0, 0, 0}, e3;
-                            for (int i = 0; i < n; i++) if (sh[i].slot == 1 && sh[i].type == 129) e2 = vnorm(pos_of(&sh[i]));
-                            e2 = vadd(e2, ph, -vdot(e2, ph));
-                            if (vlen(e2) < 0.1) e2 = (vec_t){1, 0, 0}, e2 = vadd(e2, ph, -vdot(e2, ph));   // (no sun, or
-                            e2 = vnorm(e2);                                                                 // behind the
-                            e3 = (vec_t){ph.y * e2.z - ph.z * e2.y, ph.z * e2.x - ph.x * e2.z, ph.x * e2.y - ph.y * e2.x};   // planet)
-                            if (!s_plan_dir) {
-                                vec_t z = {0, 0, 1}, y = {0, 1, 0}, u0 = vadd(z, ph, -vdot(z, ph));
-                                if (vlen(u0) < 0.05) u0 = vadd(y, ph, -vdot(y, ph));
-                                u0 = vnorm(u0), cu2 = vdot(u0, e2), cu3 = vdot(u0, e3), s_plan_dir = 1;
-                            }
-                            vec_t u = vnorm(vadd(vadd((vec_t){0, 0, 0}, e2, cu2), e3, cu3));
-                            vec_t o = {0, 0, 0}, dn = vadd(vadd(o, ph, cos(th)), u, sin(th));
-                            ks_clear(&keys);
-                            off = steer(vadd(o, dn, 20000), jstx(), jsty(), 3, 3, &keys);
-                            speed_keys(speed(), 40, &keys);
-                            // (J a frame at a time, 6 apart: Elite jumps on every pass of its loop that finds J down,
-                            // every 2-3 frames, and a second jump before we re-aimed went past the planet)
-                            static unsigned jpress;
-                            if (off < 1 && P.z > J + 1000 && (now() - jpress >= 6 || D <= W1) && jump_allowed(sh, n)) {     // (the last: held, its window
-                                                                 // is ~40 frames and a press was missed 2 times in 3; a second jump can't follow it)
-                                ks_add(&keys, K_JUMP), jpress = now();
-                                { extern int g_dock_log; if (g_dock_log) dbgf_("JPRESS D %.0f z %.0f off %.1f", D, P.z, off); }
-                            }
-                            { extern int g_dock_log; if (g_dock_log && now() % 25 == 0) dbgf_("JP D %.0f land %.0f th %.1f off %.1f allowed %d z %.0f", D, land, th * 180 / M_PI, off, jump_allowed(sh, n), P.z); }
-                        }
-                    }
-                }
-                speed_keys(speed(), want, &keys);
-                if (!g_jump_plan && off < 10 && jump_allowed(sh, n)) ks_add(&keys, K_JUMP);
-                {        // anything on a collision course but the station (an asteroid: we flew into one for 15 s)
-                    extern const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss);
-                    vec_t q;
-                    const ship_t *obst = collision_ahead(sh, n, 452, &q);
-                    if (obst && obst->type != SHIP_SST) {      // (not the station: that's where we're going)
-                        double m = hypot(q.x, q.y);
-                        double mx = m > 1 ? q.x / m : 0, my = m > 1 ? q.y / m : 1;
-                        ks_clear(&keys);
-                        steer((vec_t){mx * 4000, my * 4000, 1500}, jstx(), jsty(), 3, 3, &keys);
-                        speed_keys(speed(), 30, &keys);
-                    }
-                }
-                if (now() - c_ts.last_log > 100) {
-                    c_ts.last_log = now();
-                    dbgf_("to station: planet %.0f, alt %d, off %.0f, spd %d", vlen(P), altitude(), off, speed());
-                    if (g_jump_log && !jump_allowed(sh, n)) log_no_jump(sh, n);      // (why no in-system jump: what's in the bubble)
-                }
-            }
-            // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
-            // empty starfield on the way to the station)
-            // (TSVIEW=1: the cruise in the rear view: Solid's game loop draws the filled planet ahead in ~3 frames a pass, and
-            // the ship moves once a pass; with little to draw it runs faster, the same way in fewer frames)
-            { extern int g_curious; if (g_ts_view >= 1) { if (space_view() != 1) ks_add(&keys, K_F1); }
-              else if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
-            cruise_tick();
-            { extern int g_dock_log; if (g_dock_log) { ship_t *const s2 = g_see_buf; int n2 = see_ships(s2); const ship_t *p2 = find_planet(s2, n2); dbgf_("TS fr %u mc %d jx %d jy %d spd %d pd %.0f ja %d jk %d", now(), mcnt(), jstx() - 128, jsty() - 128, speed(), p2 ? vlen(pos_of(p2)) : 0.0, jump_allowed(s2, n2), ks_has(&keys, K_JUMP)); } }
-            apply_flight(&keys);
-        }
+        to_station_step();
     }
     CO_END(c_ts);
 }
@@ -769,175 +641,8 @@ PT_THREAD(to_station(float seconds)) {
 #else
 #define DKP
 #endif
-// ---- The planned approach (PLANDOCK=1): one shortest path to a gate on the slot's axis, flown with feed-forward from
-// its curvature, re-planned only when well off it; the final takes over on the axis. In the plane of the axis and the
-// ship: x along the axis from the station's centre (out of the slot +), y off it (>= 0). The axis, the hull and the
-// planet (49152 out along the axis: the slot faces it) are symmetric about the axis, so the plane is rebuilt from where
-// we are each frame and needs no frame fixed in space (one turned by our own ALPHA/BETA was 0.075 rad wrong whenever
-// the stick moved: the game takes up the joystick partway through a loop)
-// (Dubins: the shortest path at a bounded curvature is turn-straight-turn. Cubic Beziers under a curvature limit swept
-// wide to keep their sharpest point legal: 7 s slower than the vector field)
-#define PD_N 1200
-DKP double g_pd_r = 1800, g_pd_clr = 1100, g_pd_dev = 500, g_pd_planet = 30000;     // (PDR: the turn radius (the ship's at 40 is 1280); PDCLR, PDDEV, PDPLANET)
-int g_plan_dock = 0;             // (PLANDOCK=1: the planned approach)
-DKP double g_pd_xt = 600, g_pd_xtk = 0.15, g_pd_kp = 0.125;     // (PDXT, PDXTK: the cross-track error for a 45 deg pull back, and its share of the way still to go; PDKP: the heading error closed a loop)
-DKP double g_pd_fk = 0.15;       // (PDFK: the share of a new reading the filtered position takes: 1 no filter)
-DKP double g_pd_rolldb = 1.5;    // (PDRDB: no roll for a turn under this, 1/256 rad a loop: rolling fully for a 2/256 sideways turn chattered)
-int g_pd_late = 0;               // (PDLATE=1: hand over only at the plan's end: smoother, but 52 bumps in 234: the final needs room to roll with the slot)
-// (a point: where, and how far along. Its curvature is its segment's: kap[k] from the first point of segments 1 and 2,
-// kb[0] and kb[1], the last point's 0. 12 bytes a point, not 16: the plugin's RAM is 72 KB)
-typedef struct { float x, y, s; } pd_pt_t;
-static struct { int ok, near, n, type, nplans, fon, fmc, kb[2]; float kap[3]; pd_pt_t pt[PD_N]; double g, fa, fl; float last[9]; } s_pd;
-static float pd_kap(int i) { return i >= s_pd.n - 1 ? 0 : s_pd.kap[i < s_pd.kb[0] ? 0 : i < s_pd.kb[1] ? 1 : 2]; }
-
-static double mod2pi(double x) { x = fmod(x, 2 * M_PI); return x < 0 ? x + 2 * M_PI : x; }
-
-// the Dubins words LSL, RSR, LSR, RSL in normalised form (al, be: the headings against the line between the ends; d:
-// its length in R). The segments in radians of R; the total, or -1
-static double dubins_word(int w, double al, double be, double d, double *t, double *p, double *q) {
-    double sa = sin(al), sb = sin(be), ca = cos(al), cb = cos(be), cab = cos(al - be), ps, tmp;
-    switch (w) {
-    case 0:  // LSL
-        ps = 2 + d * d - 2 * cab + 2 * d * (sa - sb); if (ps < 0) return -1;
-        tmp = atan2(cb - ca, d + sa - sb); *t = mod2pi(-al + tmp); *p = sqrt(ps); *q = mod2pi(be - tmp); break;
-    case 1:  // RSR
-        ps = 2 + d * d - 2 * cab + 2 * d * (sb - sa); if (ps < 0) return -1;
-        tmp = atan2(ca - cb, d - sa + sb); *t = mod2pi(al - tmp); *p = sqrt(ps); *q = mod2pi(-be + tmp); break;
-    case 2:  // LSR
-        ps = -2 + d * d + 2 * cab + 2 * d * (sa + sb); if (ps < 0) return -1;
-        *p = sqrt(ps); tmp = atan2(-ca - cb, d + sa + sb) - atan2(-2, *p); *t = mod2pi(-al + tmp); *q = mod2pi(-mod2pi(be) + tmp); break;
-    default: // RSL
-        ps = d * d - 2 + 2 * cab - 2 * d * (sa + sb); if (ps < 0) return -1;
-        *p = sqrt(ps); tmp = atan2(ca + cb, d - sa - sb) - atan2(2, *p); *t = mod2pi(al - tmp); *q = mod2pi(be - tmp); break;
-    }
-    return *t + *p + *q;
-}
-
-// walk a word from (x, y, th) in 25s, kept clear of the station and the planet; out: keep it as the path
-static int dubins_walk(int w, double x, double y, double th, double R, double t, double p, double q, int out) {
-    static const int TURN[4][3] = {{1, 0, 1}, {-1, 0, -1}, {1, 0, -1}, {-1, 0, 1}};
-    double seg[3] = {t * R, p * R, q * R}, step = 25, sacc = 0, next = 0, ds = 0;
-    int n = 0;
-    if (out) ds = fmax(step, (seg[0] + seg[1] + seg[2]) / (PD_N - 2));
-    for (int k = 0; k < 3; k++) {
-        double left = seg[k], kap = TURN[w][k] / R;
-        if (out) { s_pd.kap[k] = (float) kap; if (k) s_pd.kb[k - 1] = n; }
-        while (left > 1e-6) {
-            double h = fmin(step, left);
-            if (kap != 0) {      // (an exact arc)
-                double dth = h * kap;
-                x += (sin(th + dth) - sin(th)) / kap; y -= (cos(th + dth) - cos(th)) / kap; th += dth;
-            } else x += h * cos(th), y += h * sin(th);
-            left -= h, sacc += h;
-            if (hypot(x, y) < g_pd_clr || hypot(x - 49152, y) < g_pd_planet) return 0;
-            if (out && sacc >= next && n < PD_N - 1) {
-                s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, (float) sacc};
-                n++, next += ds;
-            }
-        }
-    }
-    if (out) { s_pd.pt[n] = (pd_pt_t){(float) x, (float) y, (float) sacc}; s_pd.n = n + 1; }
-    return 1;
-}
-
-// p, h: us and our heading in the plane. The shortest clear path to a gate 1500-5000 out, arriving down the axis
-static int plan_dock(vec_t p, vec_t h) {
-    static const double G[] = {1500, 2500, 3500, 5000};
-    double R = g_pd_r, best = 1e18, bt = 0, bp = 0, bq = 0, bg = 0;
-    int bw = -1;
-    double th0 = atan2(h.y, h.x), th1 = M_PI;
-    for (unsigned gi = 0; gi < sizeof G / sizeof G[0]; gi++) {
-        double g = G[gi], dx = g - p.x, dy = 0 - p.y, D = hypot(dx, dy), th = atan2(dy, dx);
-        for (int w = 0; w < 4; w++) {
-            double t, pp, q, L = dubins_word(w, mod2pi(th0 - th), mod2pi(th1 - th), D / R, &t, &pp, &q);
-            if (L < 0 || L * R + g >= best) continue;
-            if (!dubins_walk(w, p.x, p.y, th0, R, t, pp, q, 0)) continue;
-            best = L * R + g, bw = w, bt = t, bp = pp, bq = q, bg = g;
-        }
-    }
-    if (bw < 0) return 0;
-    dubins_walk(bw, p.x, p.y, th0, R, bt, bp, bq, 1);
-    s_pd.g = bg, s_pd.type = bw, s_pd.ok = 1, s_pd.near = 0, s_pd.nplans++;
-    { extern int g_dock_log; if (g_dock_log) dbgf_("PLAN #%d %s gate %.0f len %.0f from %.0f,%.0f th %.1f", s_pd.nplans, (const char *[]){"LSL", "RSR", "LSR", "RSL"}[bw], bg, best - bg, p.x, p.y, th0 * 180 / M_PI); }
-    return 1;
-}
-
-// follow: the curvature's feed-forward plus a pull back onto the path. Out: the turn this loop across our view (x
-// right, y up; rad a loop); 0 once past the gate. Where the path is across the axis (y < 0) we're mirrored onto it
-static int plan_follow(vec_t a, vec_t lh, vec_t p, double spd, double *ux, double *uy, double *dev) {
-    int lo = s_pd.near > 2 ? s_pd.near - 2 : 0, hi = s_pd.near + 40 < s_pd.n - 1 ? s_pd.near + 40 : s_pd.n - 1, bi = lo, sg = 1;
-    double bd = 1e18;
-    for (int k = lo; k <= hi; k++)
-        for (int m = 1; m >= -1; m -= 2) {
-            double d = hypot(s_pd.pt[k].x - p.x, s_pd.pt[k].y - m * p.y);
-            if (d < bd) bd = d, bi = k, sg = m;
-        }
-    s_pd.near = bi;
-    if (bi >= s_pd.n - 1) { *dev = bd; return 0; }
-    if (sg < 0) p.y = -p.y, lh = vneg(lh);
-    vec_t A = {s_pd.pt[bi].x, s_pd.pt[bi].y, 0}, B = {s_pd.pt[bi + 1].x, s_pd.pt[bi + 1].y, 0}, AB = vadd(B, A, -1);
-    double L2 = vdot(AB, AB), u = L2 > 0 ? fmax(0.0, fmin(1.0, vdot(vadd(p, A, -1), AB) / L2)) : 0;
-    vec_t q = vadd(A, AB, u), T = vnorm(AB), Lf = {-T.y, T.x, 0};
-    *dev = vlen(vadd(p, q, -1));
-    double kappa = pd_kap(bi);
-    double e = vdot(vadd(p, q, -1), Lf);                     // (+: left of it)
-    double togo = s_pd.pt[s_pd.n - 1].s - s_pd.pt[bi].s + s_pd.g;
-    double xt = fmax(g_pd_xt, g_pd_xtk * togo);              // (a few hundred off 40000 out barely registers)
-    double ang = -atan(e / xt);
-    vec_t D2 = {T.x * cos(ang) - T.y * sin(ang), T.x * sin(ang) + T.y * cos(ang), 0};
-    vec_t D = vadd((vec_t){a.x * D2.x, a.y * D2.x, a.z * D2.x}, lh, D2.y);
-    vec_t N = vadd((vec_t){a.x * Lf.x, a.y * Lf.x, a.z * Lf.x}, lh, Lf.y);
-    double off = atan2(hypot(D.x, D.y), D.z), r = hypot(D.x, D.y);
-    double ff = spd * kappa, nr = hypot(N.x, N.y);
-    *ux = (r > 1e-9 ? D.x / r * off * g_pd_kp : 0) + (nr > 1e-9 ? N.x / nr * ff : 0);
-    *uy = (r > 1e-9 ? D.y / r * off * g_pd_kp : 0) + (nr > 1e-9 ? N.y / nr * ff : 0);
-    return 1;
-}
-
-// a settled read: the station's numbers as the previous frame's (a frame can end with Elite partway through moving it:
-// half old, half new)
-static int station_settled(const ship_t *st) {
-    float now9[9] = {(float) st->x, (float) st->y, (float) st->z, st->nosev[0], st->nosev[1], st->nosev[2], st->roofv[0], st->roofv[1], st->roofv[2]};
-    int same = !memcmp(now9, s_pd.last, sizeof now9);
-    memcpy(s_pd.last, now9, sizeof now9);
-    return same;
-}
-static void plan_reset(void) { s_pd.ok = 0; s_pd.fon = 0; }
-#if !APP_LOADED
-// the planned approach's numbers from the environment (run_sim and the lab)
-void plandock_env(void) {
-#define E(v, name) if (getenv(name)) v = atof(getenv(name))
-    E(g_plan_dock, "PLANDOCK"); E(g_pd_r, "PDR"); E(g_pd_clr, "PDCLR"); E(g_pd_dev, "PDDEV"); E(g_pd_planet, "PDPLANET");
-    E(g_pd_xt, "PDXT"); E(g_pd_xtk, "PDXTK"); E(g_pd_kp, "PDKP"); E(g_pd_fk, "PDFK"); E(g_pd_rolldb, "PDRDB"); E(g_pd_late, "PDLATE");
-#undef E
-}
-#endif
-
-// the stick for a turn (ux, uy; rad a loop). Small turns: pitch only, no roll
-static double follow_stick(double ux, double uy, int jx, int jy, keyset_t *keys) {
-    static int last_up = 1;
-    double mag = hypot(ux, uy) * 256, clock = atan2(ux, uy), beta;
-    int up = fabs(clock) <= M_PI / 2, tx = 128;
-    if (up != last_up && fabs(fabs(clock) - M_PI / 2) < 0.35) up = last_up;
-    last_up = up;
-    if (mag < g_pd_rolldb) beta = uy * 256;
-    else {
-        double roll_err = up ? clock : clock - copysign(M_PI, clock);
-        tx = jstx_for(-roll_err * 256 / 3);
-        double pw = fmax(0.0, cos(roll_err));
-        beta = mag * pw * pw * pw * (up ? 1 : -1);
-    }
-    int ty = jsty_for(beta);
-    { extern int g_want_jx, g_want_jy; g_want_jx = tx, g_want_jy = ty; }
-    if (tx > jx + 3) ks_add(keys, K_ROLL_LEFT);
-    else if (tx < jx - 3) ks_add(keys, K_ROLL_RIGHT);
-    if (ty > jy + 6) ks_add(keys, K_DIVE);
-    else if (ty < jy - 6) ks_add(keys, K_CLIMB);
-    return mag / 256 * 3 * 180 / M_PI;
-}
-
 static struct {
-    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold, lroll, vf, evade, l1, arcon, pd; double spin, spin_psi; int spin_jx; int32_t left;
+    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold, lroll, vf, evade, arcaim, arcon; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
@@ -954,65 +659,22 @@ DKP double g_dk_ylim = 0.10510423526567646;     // (DKYLIM (deg): the most the h
 DKP double g_dk_g = 0.15;        // (DKG: the share of the sideways offset closed a loop)
 int g_dock_dash = 1;         // (curious: the powered run in, braking late; DOCKDASH=0 off)
 DKP double g_dd_k = 1.5, g_dd_m = 150;
-DKP double g_dk_lined = 0.08;    // (DKLINED: DOCKSMOOTH=3 starts the final this far off the axis (of the distance along it): the centring
+DKP double g_dk_lined = 0.08;    // (DKLINED: the final starts this far off the axis (of the distance along it): the centring
                              // there needs the loops a fast approach doesn't leave it)
-DKP double g_dk_lvl_d = 0;       // (DKLVL: DOCKSMOOTH=3 rolls with the station from this far out, on the way to the axis)
-DKP double g_dk_chi = 60, g_dk_vfk = 4;     // (DKCHI, DKVFK: DOCKSMOOTH=4's approach angle far off the axis, and k x the turn radius)
+DKP double g_dk_chi = 60, g_dk_vfk = 4;     // (DKCHI, DKVFK: the vector field's approach angle far off the axis, and k x the turn radius)
 DKP double g_dk_room0 = 1800;    // (DKROOM: ... and where the turn's to be done: the final then has its time to centre)
-DKP int g_dk_avoid = 1;      // (DKAVOID=0: no planet avoidance in the line-up)
 DKP double g_dk_clear = 33000, g_dk_near = 60000; // (DKCLEAR, DKNEAR: ... kept this far from the planet's centre (the stop is at ~31000, altitude 70), acted on inside near)
-DKP double g_dk_rm_d = 30000; // (DKRMD: DOCKSMOOTH=5 rolls with the station inside this)
-DKP double g_dk_vfin = 0;    // (DKVFIN: ... handed to the final within this of the axis)
+DKP double g_dk_rm_d = 30000; // (DKRMD: the final rolls with the station inside this)
 DKP double g_dk_ev_min = 1500, g_dk_ev_spd = 8;   // (DKEVMIN, DKEVSPD: no stepping aside inside this; its speed)
 DKP double g_dk_evade_x = 300; // (DKEVADE: the step aside from traffic leaving the slot, 0 off: heavy hits 17 -> 3 of 308)
-DKP double g_dk_vfmin = 0;   // (DKVFMIN: ... engaged only this far out or more)
-DKP double g_dk_l1 = 3000;   // (DKL1: DOCKSMOOTH=6's L1 distance)
-DKP double g_dk_arc_r = 2500, g_dk_arc_j = 4500, g_dk_arc_end = 80, g_dk_arc_kr = 8;   // (DKARCR, DKARCJ: DOCKSMOOTH=7's circle radius and where it joins the axis)
-DKP double g_dk_cone5 = 4200; // (DKCONE5: DOCKSMOOTH=5's cone, 0.6 lat + this)
-DKP double g_dk_turn_m = 1.5;    // (DKTURNM: DOCKSMOOTH=3's margin on the room to turn in)
-int g_dock_smooth = 7;       // (DOCKSMOOTH=0: the line-up as it was, rolling after its aim and slowing onto the axis; 2 flat out)
+DKP double g_dk_arc_r = 2500, g_dk_arc_j = 4500, g_dk_arc_end = 80, g_dk_arc_kr = 8;   // (DKARCR, DKARCJ: the approach circle's radius and where it joins the axis)
+DKP double g_dk_cone5 = 4200; // (DKCONE5: the vector field's cone, 0.6 lat + this)
+DKP double g_dk_turn_m = 1.5;    // (DKTURNM: the margin on the room to turn in)
 int g_fight_frames;           // (frames spent in fights on the way in: the arrival-to-dock time leaves them out)
 int g_dock_begins;           // (dock() calls so far: run_sim's DOCKSNAP saves the machine at each)
-PT_THREAD(dock(float seconds)) {
-    CO_BEGIN(c_dk);
-    g_dock_begins++;
-    c_dk.end = deadline(seconds);
-    c_dk.final = 0;
-    c_dk.have_spin = 0;
-    c_dk.spin_mc = -1;
-    c_dk.commit = 0;
-    c_dk.xhold = 0;
-    c_dk.lroll = 0;
-    c_dk.vf = 0;
-    c_dk.evade = 0;
-    c_dk.l1 = 0;
-    c_dk.arcon = 0;
-    c_dk.pd = 0;
-    plan_reset();
-    c_dk.last_log = now();
-    for (;;) {
-        CO_YIELD(c_dk);
-        if (is_docked() || briefing()) {
-            g_in_flight = 0;
-            { keyset_t k = {{0}, 0}; g_flight = k; hold(&k); }
-            CO_EXIT(c_dk);
-        }
-        if (expired(c_dk.end)) CO_FAIL(c_dk, "dock");
-        if (!c_dk.final) {
-            c_dk.f0 = now();
-            CO_CALL(c_dk, fight_if_needed(&c_dk.fought));
-            if (c_dk.fought && g_curious) c_dk.end += now() - c_dk.f0;      // (curious: as to_station)
-            if (c_dk.fought) { plan_reset(); continue; }      // (a plan afresh; the filter starts again from the next reading)
-        }
-        {
-            ship_t *const sh = g_see_buf;
-            int n = see_ships(sh);
-            if (!find_station(sh, n)) {
-                c_dk.final = 0;
-                plan_reset();
-                goto need_station;
-            }
-        }
+// (a frame of the approach, out of dock()'s own stack frame, as to_station_step. 1: damping on first)
+static __attribute__((noinline)) int dock_step(void)
+{
         {
             ship_t *const sh = g_see_buf;
             int n = see_ships(sh);
@@ -1025,60 +687,17 @@ PT_THREAD(dock(float seconds)) {
             keyset_t keys = {{0}, 0};
             // lined up: on the slot's axis, out in front (tighter to start the final than to stay in it)
             if (c_dk.final) lined = along > 0 && lat < fmax(300, along * 0.4);
-            else lined = along > 1200 && lat < fmax(120, along * (g_dock_smooth >= 3 ? g_dk_lined : 0.08));
-            // (DKVFIN: flying the field, the final waits until it's this close to the axis. Off (0): handing over at 8% of along leaves
-            // a ~30-48 deg swing at full speed, but waiting for the axis cost centring, 98 -> 93%, 2 -> 7 outside the slot)
-            if (!c_dk.final && g_dock_smooth >= 5 && c_dk.vf && g_dk_vfin > 0) lined = along > 1200 && lat < g_dk_vfin;
+            else lined = along > 1200 && lat < fmax(120, along * g_dk_lined);
             // (on the arc: the final takes over only once the arc has brought us onto the axis: handed over at 8% of along,
             // halfway round, the final's re-aim swung the nose 39 deg)
             if (!c_dk.final && c_dk.arcon && lat > g_dk_arc_end) lined = 0;
-            if (g_plan_dock && g_pd_late && s_pd.ok && !c_dk.final && s_pd.near < s_pd.n - 2) lined = 0;
-            // (PLANDOCK: the planned approach. On an unsettled read the stick stays as it is: rejecting reads that jumped too
-            // far froze the corrections for seconds, then a full dive. The position filtered instead: Elite's small-angle
-            // rotation (MVEIT) skews the vectors while we turn until it squares them up, so the axis snaps by a fraction of
-            // a degree, 200-450 units at 20000)
-            int planned = 0;
-            if (!lined && g_plan_dock) {
-                int settled = station_settled(st);
-                if (!settled && s_pd.ok) planned = 1, want = 40, off = 0;
-                else {
-                    vec_t lh = lat > 1 ? vnorm(vadd(rel, nv, -along)) : vnorm(fvec(st->roofv));
-                    vec_t h = {nv.z, lh.z, 0};               // (our heading, our z, in the plane)
-                    int mc = mcnt();
-                    if (!s_pd.fon) s_pd.fon = 1, s_pd.fa = along, s_pd.fl = lat;
-                    else {      // (predicted by our own motion, then g_pd_fk of each reading)
-                        int nl = (s_pd.fmc - mc) & 255;
-                        if (nl > 8) nl = 8;
-                        s_pd.fa += speed() * nl * h.x, s_pd.fl += speed() * nl * h.y;
-                        s_pd.fa += g_pd_fk * (along - s_pd.fa), s_pd.fl += g_pd_fk * (lat - s_pd.fl);
-                    }
-                    s_pd.fmc = mc;
-                    vec_t p = {s_pd.fa, fabs(s_pd.fl), 0};
-                    double dev = 0, ux = 0, uy = 0;
-                    if (s_pd.ok && !plan_follow(nv, lh, p, speed(), &ux, &uy, &dev)) s_pd.ok = 0;
-                    if (!s_pd.ok || dev > fmax(g_pd_dev, 0.03 * dist)) {
-                        if (vlen(h) < 0.05) h = (vec_t){-1, 0, 0};
-                        if (plan_dock(p, vnorm(h))) plan_follow(nv, lh, p, speed(), &ux, &uy, &dev);
-                    }
-                    if (s_pd.ok) {
-                        planned = 1, want = 40;
-                        off = follow_stick(ux, uy, jx, jy, &keys);
-                        if (g_dock_log) dbgf_("PF along %.0f lat %.0f f %.0f %.0f dev %.0f near %d/%d ux %.2f uy %.2f", along, lat, s_pd.fa, s_pd.fl, dev, s_pd.near, s_pd.n, ux * 256, uy * 256);
-                    }
-                }
-                if (planned) c_dk.final = 0, c_dk.pd = 1;
-            }
-            if (planned) ;
-            else if (!lined) {
+            if (!lined) {
                 if (along < 600) {
                     vec_t side = vnorm(fvec(st->roofv));
                     if (vdot(rel, side) < 0) side = vneg(side);
                     goal = vadd(vadd(S, nv, 2500), side, along < 0 ? 2500 : 0);
                 } else {
                     double k = dist < 12000 ? fmin(6000, fmax(2500, along)) : 6000;
-                    // (DOCKSMOOTH=4: out in front by enough to be inside the field's cone with room for it: a ship far off
-                    // to the side came in on the 6000 point and met the cone's edge with along used up, ~1000 off at 2000 out)
-                    if (g_dock_smooth == 4) k = fmin(14000, fmax(2500, 0.6 * lat + 4000));
                     goal = vadd(S, nv, k);
                 }
                 double gd = vlen(goal);
@@ -1091,55 +710,37 @@ PT_THREAD(dock(float seconds)) {
                     want = (int) fmax(8, fmin(want, 14));
                     // (smooth: on at the final's own pace. Its speed went with the distance across to the axis, so it
                     // crawled at 8 for ~40 s sliding onto it, then the final's 22 and 40: a stop and a surge)
-                    if (g_dock_smooth) want = along > 2500 ? 22 : 14;
+                    want = along > 2500 ? 22 : 14;
                 }
-                // (DOCKSMOOTH=2: flat out all the way, one curve onto the axis: at 40 the tightest turn, BETA 8 a loop, is
-                // ~1400 across, and the line-up starts 3000-6000 out. A sharp turn in close at 22)
-                if (g_dock_smooth == 2) want = gd > 1200 || along > 1500 ? 40 : 22;
-                // (DOCKSMOOTH=3: as fast as the turn still to make allows. A loop covers ~1.1 x the speed and the tightest
+                // (the line-up: as fast as the turn still to make allows. A loop covers ~1.1 x the speed and the tightest
                 // turn is BETA 8 (8/256 rad) a loop: a turn of radius ~35 x the speed, so turning th rad takes ~35 v th.
                 // The turn: onto the slot's axis, and over to the aim and back (a sideways step is two turns). The room:
                 // what's left before the commit, 1800 out, with g_dk_turn_m to spare)
                 // (in front of the station only: behind it the way round to the front is a fixed detour, and as a
                 // half turn with little room it crawled round the station at 8 for a minute)
-                // (DOCKSMOOTH=4: a vector field onto the slot's axis, as fixed-wing drones line up on a runway (Nelson et al.
+                // (a vector field onto the slot's axis, as fixed-wing drones line up on a runway (Nelson et al.
                 // 2007): not a point on the axis to chase but a heading for where we are, down the axis, turned towards it
                 // by chi = chi_inf (2/pi) atan(k e) for e off it. Far off it comes in at chi_inf; near, the heading eases
                 // onto the axis, with no overshoot, arriving pointed down it. k from the turn radius at speed (~35 v), so
-                // what the field asks is a turn the ship can fly. The speed: DOCKSMOOTH=3's, for the turn still to make)
+                // what the field asks is a turn the ship can fly. The speed: as above, for the turn still to make)
                 // (inside the approach cone only, where there's room to close e at the approach angle (along > ~0.6 e at
                 // 60 deg); outside it, to the axis point in front as before. With hysteresis: switching at a fixed along,
                 // a ship far off to the side sat on the line and flipped between the two aims, 40 deg apart. Let go only
                 // well outside it: let go 1500 out, on the axis, the old aim was 2500 out, behind us, and it turned round)
-                // (DOCKSMOOTH=5, adaptive: the field only when the ship arrives in the cone with the room it needs, along > 0.6 lat +
+                // (adaptive: the field only when the ship arrives in the cone with the room it needs, along > 0.6 lat +
                 // g_dk_cone5 (its glide onto the axis plus the final's 3000); otherwise the turn-limited approach, with no
                 // detour out in front to reach the cone (that cost ~27 s an approach and timeouts)
-                if (g_dock_smooth >= 4) {
+                {
                     int was = c_dk.vf;
-                    c_dk.vf = c_dk.vf ? along > 0.4 * lat : along > 0.6 * lat + (g_dock_smooth >= 5 ? g_dk_cone5 : 3000) && dist > g_dk_vfmin;     // (DKVFMIN: not when it arrives in the cone close in: there the field was a curve, then the final's re-aim, then the slot levelling: a move too many)
+                    c_dk.vf = c_dk.vf ? along > 0.4 * lat : along > 0.6 * lat + g_dk_cone5;
                     if (c_dk.vf != was) dbgf_("VF %s along %.0f lat %.0f dist %.0f", c_dk.vf ? "on" : "off", along, lat, dist);
                 }
-                // (DOCKSMOOTH=6: L1 guidance, as ArduPilot's fixed-wing planes follow a line (Park, Deyst and How 2004): always
-                // aim at the point on the slot's axis g_dk_l1 away from us. One law from the cruise to the axis: it bends onto the
-                // axis in a single curve and joins it tangentially, where the cruise-to-a-point, the turn in and the final's
-                // re-aim were three moves. Far off the axis (lat > L1) the point is 0.6 lat down from us, in at ~60 deg)
-                // (only for joining the axis, within L1 of it: far off to the side the L1 point was the station itself and the
-                // ship flew at it side-on. Further out, DOCKSMOOTH=5's approach brings it there)
-                if (g_dock_smooth == 6 && along > 1500 && (c_dk.l1 || lat < g_dk_l1)) {
-                    c_dk.l1 = 1;
-                    {
-                        double L = g_dk_l1, at = along - sqrt(fmax(0.0, L * L - lat * lat));
-                        goal = vadd(S, nv, fmax(1200.0, at));
-                        double th = atan2(hypot(goal.x, goal.y), goal.z), room = dist - g_dk_room0;
-                        want = th < 0.01 ? 40 : (int) fmax(8, fmin(40, room / (35 * th * g_dk_turn_m)));
-                    }
-                }
-                // (DOCKSMOOTH=7, one planned curve (a Dubins-style approach circle): in the plane of the axis and the ship, a
+                // (and one planned curve (a Dubins-style approach circle): in the plane of the axis and the ship, a
                 // circle of radius g_dk_arc_r touching the axis at g_dk_arc_j out on our side. Fly to its tangent point, then
                 // round it onto the axis, joining it tangentially, pointed down it: no turn in, no re-aim)
-                if (g_dock_smooth == 7) c_dk.l1 = 0, c_dk.arcon = 0;
-                vec_t arc_c = {0, 0, 0}, arc_t = {0, 0, 1}; int on_arc = 0;     // (DOCKSMOOTH=7: the circle's centre and its direction of travel where we are)
-                if (g_dock_smooth == 7 && along > g_dk_arc_j + 300 && lat > 60) {
+                c_dk.arcaim = 0, c_dk.arcon = 0;
+                vec_t arc_c = {0, 0, 0}, arc_t = {0, 0, 1}; int on_arc = 0;     // (the circle's centre and its direction of travel where we are)
+                if (along > g_dk_arc_j + 300 && lat > 60) {
                     double R = g_dk_arc_r, aj = g_dk_arc_j;
                     vec_t w = vnorm(vadd(rel, nv, -along));                  // (from the axis towards us)
                     double ca = aj, ce = R, da = along - ca, de = lat - ce, dc = hypot(da, de), ga, ge;
@@ -1166,9 +767,9 @@ PT_THREAD(dock(float seconds)) {
                     }
                     goal = vadd(vadd(S, nv, ga), w, ge);
                     want = 40;
-                    c_dk.l1 = 1;
+                    c_dk.arcaim = 1;
                 }
-                if (g_dock_smooth >= 4 && !c_dk.l1 && c_dk.vf) {
+                if (!c_dk.arcaim && c_dk.vf) {
                     vec_t lv = vadd(rel, nv, -along), u = vneg(nv);
                     double e = vlen(lv), chi = g_dk_chi * M_PI / 180 * (2 / M_PI) * atan(e * g_dk_vfk / (35 * 40));
                     vec_t o = {0, 0, 0}, d = e > 1 ? vadd(vadd(o, u, cos(chi)), lv, -sin(chi) / e) : u;
@@ -1177,7 +778,7 @@ PT_THREAD(dock(float seconds)) {
                     double room = dist - g_dk_room0;
                     want = th < 0.01 ? 40 : (int) fmax(8, fmin(40, room / (35 * th * g_dk_turn_m)));
                 }
-                if ((g_dock_smooth == 3 || (g_dock_smooth >= 5 && !c_dk.vf && !c_dk.l1)) && along > 1500) {
+                if (!c_dk.vf && !c_dk.arcaim && along > 1500) {
                     double th = atan2(hypot(nv.x, nv.y), -nv.z) + 2 * atan2(hypot(goal.x, goal.y), goal.z);
                     double room = dist - g_dk_room0;
                     want = th < 0.01 ? 40 : (int) fmax(8, fmin(40, room / (35 * th * g_dk_turn_m)));
@@ -1187,7 +788,7 @@ PT_THREAD(dock(float seconds)) {
                 // (apply_flight: altitude under 70, distance under ~42500) spun the ship round facing it. So, as a drone avoids an
                 // obstacle by its collision cone: a goal behind the planet's clearance (g_dk_clear from its centre, altitude ~84)
                 // is turned to the cone's edge, in the plane of the heading, and the ship skims past it)
-                if (g_dk_avoid) {
+                {
                     const ship_t *pl = find_planet(sh, n);
                     if (pl) {
                         vec_t P = pos_of(pl);
@@ -1214,37 +815,14 @@ PT_THREAD(dock(float seconds)) {
                 if (off < 3) { ks_del(&keys, K_ROLL_LEFT); ks_del(&keys, K_ROLL_RIGHT); }
                 // (smooth: and the joystick too, which that missed: the stick swung side to side every second, the
                 // station rocking. A roll only as one move: from 3 deg off until it's within 1)
-                if (g_dock_smooth) {
+                {
                     c_dk.lroll = c_dk.lroll ? off > 1 : off > 3;
                     extern int g_want_jx;
                     if (!c_dk.lroll) {
                         ks_del(&keys, K_ROLL_LEFT); ks_del(&keys, K_ROLL_RIGHT);
                         if (g_want_jx >= 0) g_want_jx = 128;
-                    } else if (g_dock_smooth >= 3 && g_want_jx >= 0 && abs(g_want_jx - 128) > 66)
+                    } else if (g_want_jx >= 0 && abs(g_want_jx - 128) > 66)
                         g_want_jx = g_want_jx > 128 ? 194 : 62;     // (a roll at ALPHA 16, the station's own spin, not the stick's end)
-                    // (and in the last g_dk_lvl_d, the nose on its aim: roll with the station already, its slot level, as the
-                    // final does. Without it the final began with the slot at any angle and spent its first ~2000 levelling
-                    // it (the trim closes 8/256 a loop), not centring: 87% centred, not 95. Rolling, the aim swings round the
-                    // nose, so the pitch is the final's own law (MVEIT: K2 = y - a x), on the aim point)
-                    if (g_dock_smooth == 3 && !c_dk.lroll && dist < g_dk_lvl_d && g_want_jx >= 0 && g_want_jy_on() && goal.z > 100) {
-                        double psi = atan2(st->roofv[1], st->roofv[0]);
-                        double err = fmod(psi + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2;
-                        double trim = fmax(-8.0, fmin(8.0, err * 256 / 25 / 0.20));
-                        double alpha = (st->roll < 0 ? -16.0 : 16.0) + trim;
-                        int a8 = (int) lround(fabs(alpha));
-                        int jt = a8 >= 8 ? a8 * 4 + 2 : a8 * 8 + 4;
-                        if (jt > 127) jt = 127;
-                        g_want_jx = 128 + (alpha < 0 ? -jt : jt);
-                        double ar = alpha_from_jstx(jx) / 256.0;
-                        if (fabs(ar) > 0.03) {
-                            double gx = goal.x, gy = goal.y, gz = goal.z, lim = gz * 0.0524077793;
-                            c_dk.xhold = c_dk.xhold ? fabs(gx) >= 1 : fabs(gx) > g_dk_xon;
-                            double ys = c_dk.xhold ? -copysign(fmax(fabs(g_dk_g * gx / ar), 20.0), gx / ar) : 0;
-                            ys = fmax(-lim, fmin(lim, ys));
-                            extern int g_want_jy;
-                            g_want_jy = jsty_nose_up(((gy - ar * gx) - ys) / gz * 256);
-                        }
-                    }
                 }
                 // (on the circle: bank once and hold it, the circle's centre straight above the nose, and pitch round it, as a
                 // plane flies a steady turn. Rolling after the aim point as it slid round the circle flicked the stick side to
@@ -1270,7 +848,6 @@ PT_THREAD(dock(float seconds)) {
                         if (g_dock_log) dbgf_("ARC err %.1f dc %.0f rate %.2f beta %.2f jy %d", err * 180 / M_PI, dc, rate, beta, g_want_jy - 128);
                     }
                 }
-                if (off > 60 && want > 8 && g_dock_smooth < 3) want = g_dock_smooth == 2 && dist > 4000 ? 40 : g_dock_smooth == 2 ? 22 : 8;
             } else {
                 // (with the joystick none of this: the stick sits where it's put, damping or not)
                 if (!c_dk.final && R(A_DAMP) && !(IO->analogue && R(A_JSTK))) {
@@ -1280,8 +857,7 @@ PT_THREAD(dock(float seconds)) {
                     // snap to the centre: the slot see-sawed 20 deg either side all the way in. (Not in a
                     // fight: fight_if_needed has run above, nothing's about.)
                     hold_none();
-                    CO_CALL(c_dk, set_damping(1));
-                    continue;
+                    return 1;
                 }
                 // aim along the slot's axis: at a point on it ahead of us that slides in to the slot's centre
                 // (on the station's face, 160 out from its centre), so an offset closes onto the axis
@@ -1330,7 +906,7 @@ PT_THREAD(dock(float seconds)) {
                     dbgf_("spin %.4f rad/it (alpha %.2f) psi %.3f jx %d dist %.0f mc %d sroll %d", c_dk.spin, c_dk.spin * 256, psi, jx - 128, dist, mc, st->roll);
                 // (with the nose within 10 deg: a bigger turn first needs the roll too; and always in the last
                 // 600, where 12 off the axis is 5 deg and the steering's own roll turned the slot 70 deg)
-                if (dist < (g_dock_smooth >= 5 ? g_dk_rm_d : 5000) && (off < 10 || dist < 600)) {     // (DOCKSMOOTH=5: from the final's start: the slot spun 0-90 deg beyond 5000, the commit (slot within 7) only flickered, and it crawled at 22 for 30 s)
+                if (dist < g_dk_rm_d && (off < 10 || dist < 600)) {     // (from the final's start: the slot spun 0-90 deg beyond 5000, the commit (slot within 7) only flickered, and it crawled at 22 for 30 s)
                     // roll with it: the station spins at a fixed rate (its roll counter is always
                     // full), and in the sim its slot holds still when our roll angle per iteration
                     // (alpha) is 16 the same way, measured as dpsi*256 = -3.2 - 0.20 alpha. So hold
@@ -1393,7 +969,7 @@ PT_THREAD(dock(float seconds)) {
                 // the last 400; and holding back while the slot isn't level near it
                 double rl = fabs(fmod(atan2(st->roofv[1], st->roofv[0]) + M_PI / 2 + 4 * M_PI, M_PI) - M_PI / 2) * 180 / M_PI;
                 want = dist > 2500 ? 22 : dist > 1000 ? 14 : dist > 400 ? 9 : 4;
-                if (((g_dock_smooth >= 5 && c_dk.vf) || c_dk.pd) && dist > 4000) want = 40;      // (the final's start, the slot still levelling: no dip to 22 with the room to brake later)
+                if (c_dk.vf && dist > 4000) want = 40;      // (the final's start, the slot still levelling: no dip to 22 with the room to brake later)
                 // (curious, docking with style: hard acceleration, slowing only in time): lined up (the nose
                 // within 5 deg, the slot level within 10, near the axis), the fastest speed that still brakes to 4 by 400
                 // out: a speed key changes it 1 a game loop and a loop covers ~1.1 x the speed, so braking from v takes
@@ -1439,14 +1015,13 @@ PT_THREAD(dock(float seconds)) {
                 }
                 if (c_dk.evade && dist > g_dk_ev_min) { c_dk.commit = 0; if (want > g_dk_ev_spd) want = (int) g_dk_ev_spd; }     // (stepping aside: slow, no commit)
                 if (dist < 600 && rl > 20) want = 1;
-                if (off > 8 && want > 4 && !c_dk.commit && !(((g_dock_smooth >= 5 && c_dk.vf) || c_dk.pd) && dist > 4000)) want = 4;     // (far out the turn is room enough at 40: the field's hand-over is ~26 deg)
+                if (off > 8 && want > 4 && !c_dk.commit && !(c_dk.vf && dist > 4000)) want = 4;     // (far out the turn is room enough at 40: the field's hand-over is ~26 deg)
                 c_dk.final = 1;
             }
             speed_keys(speed(), want, &keys);
             // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
             // empty starfield on the way to the station)
-            { extern int g_curious, g_ts_view; if (g_ts_view == 2) { if (space_view() != 1) ks_add(&keys, K_F1); }
-              else if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
+            { extern int g_curious; if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }
             apply_flight(&keys);
             if (g_dock_log) {     // the approach frame by frame: range, along the slot axis and off it, the angle to
                                   // the station's centre, the slot's roll off level (deg), stick, speed, shields
@@ -1463,6 +1038,49 @@ PT_THREAD(dock(float seconds)) {
                 dbgf_("%s dist %.0f along %.0f lat %.0f off %.0f spd %d", c_dk.final ? "final" : "line up", dist, along,
                       lat, off, speed());
             }
+        }
+    return 0;
+}
+PT_THREAD(dock(float seconds)) {
+    CO_BEGIN(c_dk);
+    g_dock_begins++;
+    c_dk.end = deadline(seconds);
+    c_dk.final = 0;
+    c_dk.have_spin = 0;
+    c_dk.spin_mc = -1;
+    c_dk.commit = 0;
+    c_dk.xhold = 0;
+    c_dk.lroll = 0;
+    c_dk.vf = 0;
+    c_dk.evade = 0;
+    c_dk.arcaim = 0;
+    c_dk.arcon = 0;
+    c_dk.last_log = now();
+    for (;;) {
+        CO_YIELD(c_dk);
+        if (is_docked() || briefing()) {
+            g_in_flight = 0;
+            { keyset_t k = {{0}, 0}; g_flight = k; hold(&k); }
+            CO_EXIT(c_dk);
+        }
+        if (expired(c_dk.end)) CO_FAIL(c_dk, "dock");
+        if (!c_dk.final) {
+            c_dk.f0 = now();
+            CO_CALL(c_dk, fight_if_needed(&c_dk.fought));
+            if (c_dk.fought && g_curious) c_dk.end += now() - c_dk.f0;      // (curious: as to_station)
+            if (c_dk.fought) continue;
+        }
+        {
+            ship_t *const sh = g_see_buf;
+            int n = see_ships(sh);
+            if (!find_station(sh, n)) {
+                c_dk.final = 0;
+                goto need_station;
+            }
+        }
+        if (dock_step()) {      // (damping on first)
+            CO_CALL(c_dk, set_damping(1));
+            continue;
         }
         continue;
     need_station:

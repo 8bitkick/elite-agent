@@ -158,7 +158,7 @@ void hold_none(void) {
 
 static void vlog(int level, const char *fmt, va_list ap) {
     if (!IO->log) return;
-    char buf[200];
+    static char buf[200];      // (static: off the stack, under the deepest calls)
     vsnprintf(buf, sizeof buf, fmt, ap);
     IO->log(IO->ctx, level, buf);
 }
@@ -183,7 +183,7 @@ const char *legal_name(void) { return legal() >= 50 ? "Fugitive" : legal() ? "Of
 
 void note(const char *fmt, ...) {
     if (!IO->note) return;
-    char buf[300];
+    static char buf[300];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof buf, fmt, ap);

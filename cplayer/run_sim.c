@@ -418,28 +418,19 @@ int main(int argc, char **argv) {
     { extern int g_jump_log; g_jump_log = getenv("JLOG") != NULL; }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
-    { extern int g_dock_smooth; if (getenv("DOCKSMOOTH")) g_dock_smooth = atoi(getenv("DOCKSMOOTH")); }
     { extern double g_dk_turn_m; if (getenv("DKTURNM")) g_dk_turn_m = atof(getenv("DKTURNM")); }
     { extern double g_dk_room0; if (getenv("DKROOM")) g_dk_room0 = atof(getenv("DKROOM")); }
     { extern double g_dk_lined; if (getenv("DKLINED")) g_dk_lined = atof(getenv("DKLINED")); }
-    { extern double g_dk_lvl_d; if (getenv("DKLVL")) g_dk_lvl_d = atof(getenv("DKLVL")); }
     { extern double g_dk_chi, g_dk_vfk; if (getenv("DKCHI")) g_dk_chi = atof(getenv("DKCHI")); if (getenv("DKVFK")) g_dk_vfk = atof(getenv("DKVFK")); }
     { extern double g_dk_cone5; if (getenv("DKCONE5")) g_dk_cone5 = atof(getenv("DKCONE5")); }
-    { extern double g_ts_aim; if (getenv("TSAIM")) g_ts_aim = atof(getenv("TSAIM")); }
-    { extern int g_ts_view; if (getenv("TSVIEW")) g_ts_view = atoi(getenv("TSVIEW")); }
-    { extern int g_jump_plan; extern double g_jump_to; if (getenv("JPLAN")) g_jump_plan = atoi(getenv("JPLAN")); if (getenv("JTO")) g_jump_to = atof(getenv("JTO")); }
     { extern double g_dk_arc_r, g_dk_arc_j; if (getenv("DKARCR")) g_dk_arc_r = atof(getenv("DKARCR")); if (getenv("DKARCJ")) g_dk_arc_j = atof(getenv("DKARCJ")); }
     { extern double g_dk_arc_kr; if (getenv("DKARCKR")) g_dk_arc_kr = atof(getenv("DKARCKR")); }
-    { extern double g_dk_l1; if (getenv("DKL1")) g_dk_l1 = atof(getenv("DKL1")); }
-    { extern double g_dk_vfmin; if (getenv("DKVFMIN")) g_dk_vfmin = atof(getenv("DKVFMIN")); }
     { extern double g_dk_evade_x; if (getenv("DKEVADE")) g_dk_evade_x = atof(getenv("DKEVADE")); }
     { extern double g_dk_ev_min, g_dk_ev_spd; if (getenv("DKEVMIN")) g_dk_ev_min = atof(getenv("DKEVMIN")); if (getenv("DKEVSPD")) g_dk_ev_spd = atof(getenv("DKEVSPD")); }
-    { extern double g_dk_vfin; if (getenv("DKVFIN")) g_dk_vfin = atof(getenv("DKVFIN")); }
     { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
-    { extern int g_dk_avoid; extern double g_dk_clear; if (getenv("DKAVOID")) g_dk_avoid = atoi(getenv("DKAVOID")); if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
+    { extern double g_dk_clear; if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
     { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
     { extern double g_dk_ylim; if (getenv("DKYLIM")) g_dk_ylim = tan(atof(getenv("DKYLIM")) * M_PI / 180); }
-    { extern void plandock_env(void); plandock_env(); }
     { extern int g_dock_trig; if (getenv("DOCKTRIG")) g_dock_trig = atoi(getenv("DOCKTRIG")); }
     { extern int g_dock_fast; if (getenv("DOCKFAST")) g_dock_fast = atoi(getenv("DOCKFAST")); }
     { extern double g_dk_g; if (getenv("DKG")) g_dk_g = atof(getenv("DKG")); }

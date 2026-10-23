@@ -86,7 +86,7 @@ static void save_totals(void) {}
 static void say(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char *fmt, ...)
 {
-    char line[200];
+    static char line[200];      // (static: off the stack, under the deepest calls)
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(line, sizeof line, fmt, ap);
@@ -182,6 +182,27 @@ static void set_on(bool on)
     say("PLAYER %s", on ? "on" : "off");
 }
 
+// The stack's high-water mark: core 0's stack (SCRATCH_Y, 0x20081000-0x20082000) painted below where init runs, and
+// the lowest word overwritten found once a minute, against the stack pointer at the frame's entry (the app's own use,
+// what its header's stack_size promises)
+#define STK_LO 0x20081000u
+#define STK_HI 0x20082000u
+#define STK_PAINT 0x5AC3A55Cu
+static uint32_t s_frame_sp, s_stk_used;
+static uint32_t sp_now(void) { uint32_t sp; __asm volatile ("mov %0, sp" : "=r" (sp)); return sp; }
+static void stack_paint(void)
+{
+    uint32_t sp = sp_now();
+    if (sp <= STK_LO || sp > STK_HI) return;
+    for (volatile uint32_t *p = (volatile uint32_t *) STK_LO; (uint32_t) p < sp - 256; p++) *p = STK_PAINT;
+}
+static uint32_t stack_low(void)
+{
+    const volatile uint32_t *p = (const volatile uint32_t *) STK_LO;
+    while ((uint32_t) p < STK_HI && *p == STK_PAINT) p++;
+    return (uint32_t) p;
+}
+
 static bool elite_init(const struct app_api *api)
 {
     s_api = api;
@@ -202,6 +223,7 @@ static bool elite_init(const struct app_api *api)
     s_tot.magic = TOT_MAGIC;
     s_tot.boots = 1;
     s_resets_seen = io->resets;
+    stack_paint();
     return true;
 }
 
@@ -234,6 +256,7 @@ static void elite_frame(const struct machine_hook_io *io)
     // (a reset: the frame count starts again, and the keys it held went with the old machine)
     if (io->frame < s_last_frame) keyq_reset();
     s_last_frame = io->frame;
+    s_frame_sp = sp_now();
     uint32_t t0 = s_api->time_us();
     player_frame();
     uint32_t us = s_api->time_us() - t0;
@@ -273,7 +296,10 @@ static void elite_frame(const struct machine_hook_io *io)
     if (us > s_us_max) s_us_max = us;
     s_us_sum += us, s_n++;
     if (s_n == 3000) {      // every minute: how long it takes
-        say("PLAYER time avg %lu us max %lu us, cruise turbo %lu frames", (unsigned long) (s_us_sum / s_n), (unsigned long) s_us_max, (unsigned long) s_turbo_frames);
+        uint32_t lo = stack_low();
+        if (s_frame_sp > lo && s_frame_sp - lo > s_stk_used) s_stk_used = s_frame_sp - lo;
+        say("PLAYER time avg %lu us max %lu us, cruise turbo %lu frames, stack %lu bytes at most (of %lu; %lu free below)", (unsigned long) (s_us_sum / s_n), (unsigned long) s_us_max,
+            (unsigned long) s_turbo_frames, (unsigned long) s_stk_used, (unsigned long) APP_STACK_SIZE, (unsigned long) (lo - STK_LO));
         s_turbo_frames = 0;
         s_us_max = s_us_sum = s_n = 0;
     }
@@ -434,7 +460,7 @@ static const struct machine_boot_image *elite_boot_image(void) { return &elite_s
 #define ELITE_DISC ""               // (the disc it carries, its name: presto/app/build.sh)
 #endif
 APP_HEADER(.machine = MACHINE_MODEL_MASTER_128, .name = "elite-agent", .version = ELITE_VERSION, .disc = ELITE_DISC,
-           .stack_size = 2048, .boot_image = elite_boot_image, .init = elite_init, .frame = elite_frame,
+           .stack_size = 3072, .boot_image = elite_boot_image, .init = elite_init, .frame = elite_frame,
            .command = elite_command, .program_json = elite_program_json);
 #else
 // The first way: machine_hook.h's functions, called by the firmware it's built into

@@ -598,8 +598,9 @@ trading:
         const sys_t *h = here_sys(), *a = c_trip.a, *b = c_trip.b;
         int room = cargo_bay() - 2;
         double far = c_trip.far, near = -1e30;
-        const sys_t *nb[64];
-        int d[64], n = h ? in_range(galaxy(), h->x, h->y, 70, nb, d, 64) : 0;
+        static const sys_t *nb[64];      // (static: 512 bytes off trip's stack frame, under every fight on the trip)
+        static int d[64];
+        int n = h ? in_range(galaxy(), h->x, h->y, 70, nb, d, 64) : 0;
         for (int i = 0; i < n; i++)
             if (nb[i] != h) { double r = loop_rate(h, nb[i], cash(), room); if (r > near) near = r; }
         if (a && h && a != h && b != h && far > near * 4 / 3 + 100) {
