@@ -522,6 +522,14 @@ int g_recharge = 90;
 int show_hurt(void) { return energy() < 200 || fsh() < 128 || ash() < 128; }
 static int hurt(void) { return show_hurt(); }
 static int recharged(void) { return energy() >= 240 && fsh() >= 200 && ash() >= 200; }
+// (the jump log's line apart, its 300 bytes off to_station's stack: the plugin's stack is the firmware's, 2 KB)
+static __attribute__((noinline)) void log_no_jump(const ship_t *sh, int n) {
+    char b[300]; int k = 0;
+    for (int i = 0; i < n && k < 260; i++) if (ship_in_space(&sh[i]) && sh[i].type < 128)
+        k += snprintf(b + k, sizeof b - k, " t%d d%.0f%s%s", sh[i].type, vlen(pos_of(&sh[i])), (sh[i].newb & NEWB_HOSTILE) ? "h" : "", ship_dead(&sh[i]) ? "x" : "");
+    b[k] = 0;
+    dbgf_("  no jump: sspr %d junk %d:%s", R(A_SSPR), R(A_JUNK), b);
+}
 static struct { CO; uint32_t until; int fought; } c_rc;
 PT_THREAD(recharge(void)) {
     CO_BEGIN(c_rc);
@@ -737,13 +745,7 @@ PT_THREAD(to_station(float seconds)) {
                 if (now() - c_ts.last_log > 100) {
                     c_ts.last_log = now();
                     dbgf_("to station: planet %.0f, alt %d, off %.0f, spd %d", vlen(P), altitude(), off, speed());
-                    if (g_jump_log && !jump_allowed(sh, n)) {      // (why no in-system jump: what's in the bubble)
-                        char b[300]; int k = 0;
-                        for (int i = 0; i < n && k < 260; i++) if (ship_in_space(&sh[i]) && sh[i].type < 128)
-                            k += snprintf(b + k, sizeof b - k, " t%d d%.0f%s%s", sh[i].type, vlen(pos_of(&sh[i])), (sh[i].newb & NEWB_HOSTILE) ? "h" : "", ship_dead(&sh[i]) ? "x" : "");
-                        b[k] = 0;
-                        dbgf_("  no jump: sspr %d junk %d:%s", R(A_SSPR), R(A_JUNK), b);
-                    }
+                    if (g_jump_log && !jump_allowed(sh, n)) log_no_jump(sh, n);      // (why no in-system jump: what's in the bubble)
                 }
             }
             // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
