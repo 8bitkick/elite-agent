@@ -949,6 +949,8 @@ DKP double g_dk_cosa = 0.98480775, g_dk_cen = 4.4;                 // (DKAPPR (d
 DKP double g_dk_sw = 200;        // (DKSW: inside this along the axis the aim goes from the slot's centre to the station's: off the axis,
                              // a different direction, and the centring left no time to follow it: 5-8 across at entry)
 DKP double g_dk_xon = 2;         // (DKXON: the sideways offset that starts the hold)
+DKP double g_dk_ylim = 0.10510423526567646;     // (DKYLIM (deg): the most the hold sets the centre off the nose, tan 6 deg: at 3, a final
+                                                // begun 10 deg off at 1600 out was still 70 to the side at 700, ground along the face: 25 bumps in 6 dockings -> 3 in 3)
 DKP double g_dk_g = 0.15;        // (DKG: the share of the sideways offset closed a loop)
 int g_dock_dash = 1;         // (curious: the powered run in, braking late; DOCKDASH=0 off)
 DKP double g_dd_k = 1.5, g_dd_m = 150;
@@ -1345,7 +1347,7 @@ PT_THREAD(dock(float seconds)) {
                     if (g_dock_trig && g_want_jy_on() && aimp.z > 100) {
                         double a = alpha_from_jstx(jx) / 256.0;
                         if (fabs(a) > 0.03) {
-                            double x = aimp.x, y = aimp.y, z = aimp.z, lim = z * 0.0524077793;    // (tan 3 deg)
+                            double x = aimp.x, y = aimp.y, z = aimp.z, lim = z * g_dk_ylim;
                             // (in whole units, though: MVEIT works out a y as (y ALPHA) / 256 and drops the fraction, so
                             // with ALPHA 16 nothing moves under |y| 16. Asked for 5 to 9, x stayed 2-4 off and drifted.
                             // So the law's y, or 20 if that's less (x moving a unit a loop), while it's over 2 off, until

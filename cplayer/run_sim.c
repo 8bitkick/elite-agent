@@ -438,6 +438,7 @@ int main(int argc, char **argv) {
     { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
     { extern int g_dk_avoid; extern double g_dk_clear; if (getenv("DKAVOID")) g_dk_avoid = atoi(getenv("DKAVOID")); if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
     { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
+    { extern double g_dk_ylim; if (getenv("DKYLIM")) g_dk_ylim = tan(atof(getenv("DKYLIM")) * M_PI / 180); }
     { extern void plandock_env(void); plandock_env(); }
     { extern int g_dock_trig; if (getenv("DOCKTRIG")) g_dock_trig = atoi(getenv("DOCKTRIG")); }
     { extern int g_dock_fast; if (getenv("DOCKFAST")) g_dock_fast = atoi(getenv("DOCKFAST")); }
