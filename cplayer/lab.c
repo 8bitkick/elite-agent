@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
     { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
     { extern double g_dk_blend; if (getenv("DKBLEND")) g_dk_blend = atof(getenv("DKBLEND")); }
     { extern double g_dk_plag; if (getenv("DKPLAG")) g_dk_plag = atof(getenv("DKPLAG")); }
+    { extern double g_dk_lg; if (getenv("DKLG")) g_dk_lg = atof(getenv("DKLG")); }
     { extern double g_dk_ltrim; if (getenv("DKLTRIM")) g_dk_ltrim = atof(getenv("DKLTRIM")); }
     { extern double g_dk_clear; if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
     { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }

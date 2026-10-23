@@ -8,7 +8,8 @@ came within 40 deg of the nose (at most 10 s before) to within 8 deg of it for g
 stalled in view (closing under 2 deg a second over the next half second), and the number of separate moves bringing
 it in (runs of it closing faster than that, apart by 0.3 s or more). One move is one smooth curve. And at the
 hand-over to the final: how far off the nose the station was, and its slot off level. Overshoot: the most the station
-strays off the nose in the 3 s after it first comes within 1 deg; and the pitch stick's reversals in the 2 s before
+strays off the nose in the 3 s after it first comes within 4 deg (the final's sideways hold of up to 6 deg included), and
+the crossing: how far past the nose it goes in those 3 s, on the far side from where it came in; and the pitch stick's reversals in the 2 s before
 the hand-over."""
 import math, re, statistics, sys
 
@@ -47,8 +48,17 @@ def turnin(d):
             gap += 1
     # (overshoot: the most the station strays off the nose in the 3 s after it first comes within 1 deg (from the
     # turn-in's start); and the pitch stick's reversals in the last 2 s before the hand-over)
-    i0 = next((i for i in range(start, len(d)) if ang[i] < 1), None)
-    over = max(ang[i0:i0 + 150]) if i0 is not None else 0
+    i0 = next((i for i in range(start, len(d)) if ang[i] < 4), None)
+    over = cross = 0
+    if i0 is not None:
+        over = max(ang[i0:i0 + 150])
+        # (crossing: how far past the nose, on the far side from where the station came in (its direction in the view
+        # half a second before it arrived), in those 3 s)
+        j = max(start, i0 - 25)
+        ux, uy = d[j]['sx'], d[j]['sy']
+        n = math.hypot(ux, uy)
+        if n > 0.5:
+            cross = max([0.0] + [-(x['sx'] * ux + x['sy'] * uy) / n for x in d[i0:i0 + 150] if abs(x['sx']) < 30 and abs(x['sy']) < 30])
     last, prev2 = 0, 0
     for x in d[max(0, h - 100):h]:
         sg = (x['jy'] >= 8) - (x['jy'] <= -8)
@@ -56,7 +66,7 @@ def turnin(d):
             prev2 += 1
         if sg:
             last = sg
-    return dict(over=over, prev2=prev2, tt=(end - start) / 50, stall=len(st) / 50, moves=max(1, moves), hang=ang[min(h, len(d) - 1)], hroll=abs(d[min(h, len(d) - 1)]['roll']),
+    return dict(over=over, cross=cross, prev2=prev2, tt=(end - start) / 50, stall=len(st) / 50, moves=max(1, moves), hang=ang[min(h, len(d) - 1)], hroll=abs(d[min(h, len(d) - 1)]['roll']),
                 stallL=sum(1 for i in st if i < h) / 50)
 
 
@@ -123,7 +133,7 @@ def summary(rows, label=''):
     for k, name in (('t', 'docking time (s)'), ('tf', 'final (s)'), ('late', 'off the axis at entry'), ('rolle', 'slot roll at entry (deg)'),
                     ('rrev', 'roll reversals a second'), ('prev', 'pitch reversals a second'), ('tt', 'turn-in: 40 to 8 deg (s)'),
                     ('stall', 'turn-in: station stalled off-centre (s)'), ('stallL', '... of it before the hand-over (s)'), ('moves', 'turn-in: separate moves'),
-                    ('over', 'overshoot past the nose (deg)'), ('prev2', 'pitch reversals, last 2 s before the final'),
+                    ('over', 'off the nose after first on it (deg)'), ('cross', 'crossing past the nose (deg)'), ('prev2', 'pitch reversals, last 2 s before the final'),
                     ('hang', 'hand-over: station off the nose (deg)'), ('hroll', 'hand-over: slot off level (deg)')):
         xs = [r[k] for r in ok if k in r]
         if xs:
