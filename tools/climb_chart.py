@@ -14,7 +14,7 @@ HMAX, TMAX = int(os.environ.get('HMAX', 140)), 7000      # (HMAX=hours: the x ax
 STYLE = {   # colour, label (validated: violet / aqua / orange, every line direct-labelled)
     'efficient': ('#6250d6', 'Efficient'),
     'fair': ('#1baf7a', 'Fair (information)'),
-    'curious': ('#eb6834', 'Curious (show fights)'),
+    'curious': ('#eb6834', 'Curious (more stylish piloting)'),
     'master': ('#6250d6', 'BBC Master (SNG47, points by ship)'),
     'modelb': ('#eb6834', 'Model B (disc Elite, 1 a kill)'),
 }

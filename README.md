@@ -21,7 +21,7 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (22.6-24.1 on five careers, no deaths) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers, on an earlier build; every RAM read audited) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, its fights are for watching: **146.4 game hours** (139.2-155.3 on six careers) |
+| **Curious** | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, but for style: **146.4 game hours** (139.2-155.3 on six careers) |
 
 All modes save at each dock (about 4 seconds; on the Presto curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
@@ -47,7 +47,7 @@ hours on the native emulator at the real machine's speed.
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
 
-Curious mode's fights are for the camera, and it's tuned on how big the enemy is on screen and for how long: a ship
+Curious mode's fights get more stylish piloting, tuned on how big the enemy is on screen and for how long: a ship
 drawn 64 to 160 pixels counts a whole second, less as it gets smaller or too big to fit (`tools/show.py`'s BIG SHIPS).
 Its steering in a fight is a camera operator's (`cplayer/cfly.c`): with the enemy in the picture the pitch eases on
 and off and never flips for a small error, a roll is one deliberate move when the ship is out to the side, and a

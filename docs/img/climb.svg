@@ -44,6 +44,6 @@
 <text x="145.5" y="44.1" fill="#0b0b0b" text-anchor="end">Efficient 23.8 h</text>
 <line x1="319.1" x2="341.1" y1="312" y2="312" stroke="#6250d6" stroke-width="3"/><text x="347.1" y="316" fill="#0b0b0b">Efficient: 22.6-24.1 h (avg 23.8)</text>
 <line x1="319.1" x2="341.1" y1="292" y2="292" stroke="#1baf7a" stroke-width="3"/><text x="347.1" y="296" fill="#0b0b0b">Fair (information): 29.0-30.7 h (avg 29.8)</text>
-<line x1="319.1" x2="341.1" y1="272" y2="272" stroke="#eb6834" stroke-width="3"/><text x="347.1" y="276" fill="#0b0b0b">Curious (show fights): 139.2-155.3 h (avg 146.4)</text>
+<line x1="319.1" x2="341.1" y1="272" y2="272" stroke="#eb6834" stroke-width="3"/><text x="347.1" y="276" fill="#0b0b0b">Curious (more stylish piloting): 139.2-155.3 h (avg 146.4)</text>
 <line x1="319.1" x2="341.1" y1="252" y2="252" stroke="#8a8a96" stroke-width="3" stroke-dasharray="5 3"/><text x="347.1" y="256" fill="#0b0b0b">Where it started: keyboard aim, 57.3 h</text>
 </svg>
