@@ -21,28 +21,28 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (22.6-24.1 on five careers, no deaths) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers, on an earlier build; every RAM read audited) |
-| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time: its fights are for watching (Elite took 134.8 game hours on an earlier build, the column below) |
+| **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, its fights are for watching: **146.4 game hours** (139.2-155.3 on six careers) |
 
 All modes save at each dock (about 4 seconds; on the Presto curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 22.6 to 24.1 hours, fair 29.0 to 30.7, curious 134.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 22.6 to 24.1 hours, fair 29.0 to 30.7, curious 139.2 to 155.3, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
-| | Efficient (5) | Fair (5) | Curious (1, round 5) |
+| | Efficient (5) | Fair (5) | Curious (6) |
 |---|---|---|---|
-| Game hours to Elite | 23.8 | 29.8 | 134.8 |
-| Star systems visited | 62 | 67 | 272 |
-| Galaxies | 3 | 3 | 8 |
-| Light years flown (dock to dock) | 630 | 677 | 3,109 |
-| Docks | 348 | 366 | 1,049 |
-| Fights | 2,074 | 2,521 | 5,523 |
-| Kills | 5,458 | 5,587 | 12,705 |
-| Witchspace sessions (Thargoids) | 190 | 198 | 66 |
-| Deaths (reloaded) | 0 | 3 | 115 |
-| Escape pods used | 0 | 0 | 0 |
-| Most credits held | 30,911 Cr | 23,538 Cr | 18,743 Cr |
+| Game hours to Elite | 23.8 | 29.8 | 146.4 |
+| Star systems visited | 62 | 67 | 228 |
+| Galaxies | 3 | 3 | 7 |
+| Light years flown (dock to dock) | 630 | 677 | 2,909 |
+| Docks | 348 | 366 | 1,028 |
+| Fights | 2,074 | 2,521 | 5,807 |
+| Kills | 5,458 | 5,587 | 15,929 |
+| Witchspace sessions (Thargoids) | 190 | 198 | 62 |
+| Deaths (reloaded) | 0 | 3 | 224 |
+| Escape pods used | 0 | 0 | 2 |
+| Most credits held | 30,911 Cr | 23,538 Cr | 19,118 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
