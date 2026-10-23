@@ -289,7 +289,28 @@ static void shoot(void) {
     fclose(f);
 }
 
+// DOCKSNAP=dir: the machine (and the stick values the core keeps outside it) each time dock() begins: the
+// docking lab's starts (lab LABDOCK=1)
+static void dock_snap(void) {
+    static const char *dir; static int last = -1, on = -1;
+    extern int g_dock_begins;
+    if (on < 0) on = (dir = getenv("DOCKSNAP")) != NULL;
+    if (!on || g_dock_begins == last) return;
+    last = g_dock_begins;
+    char path[600];
+    snprintf(path, sizeof path, "%s/s%s_%09u.dock", dir, getenv("SKEW") ? getenv("SKEW") : "0", io.frame);
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    static uint8_t *st;
+    if (!st) st = malloc(beeb_state_size());
+    beeb_save(B, st);
+    uint32_t hdr[4] = {0x4B434F44, (uint32_t) s_adc[0], (uint32_t) s_adc[1], (uint32_t) s_adc[2]};     // "DOCK"
+    fwrite(hdr, 4, 4, f);
+    fwrite(st, 1, beeb_state_size(), f);
+    fclose(f);
+}
 static void step(void) {
+    dock_snap();
     { static int on = -1; if (on < 0) on = getenv("INLOG") != NULL;
       if (on) { uint32_t h = 2166136261u; for (int i = 0; i < 0x8000; i++) h = (h ^ io.ram[i]) * 16777619u; printf("RAM %u %08x\n", io.frame, h); } }
     io.taps_done += (uint32_t) keyq_step(io.frame, key);
@@ -397,6 +418,27 @@ int main(int argc, char **argv) {
     { extern int g_jump_log; g_jump_log = getenv("JLOG") != NULL; }
     { extern int g_joystick; if (getenv("JOYSTICK")) g_joystick = atoi(getenv("JOYSTICK")); }
     { extern int g_dock_centre; if (getenv("DOCKC")) g_dock_centre = atoi(getenv("DOCKC")); }
+    { extern int g_dock_smooth; if (getenv("DOCKSMOOTH")) g_dock_smooth = atoi(getenv("DOCKSMOOTH")); }
+    { extern double g_dk_turn_m; if (getenv("DKTURNM")) g_dk_turn_m = atof(getenv("DKTURNM")); }
+    { extern double g_dk_room0; if (getenv("DKROOM")) g_dk_room0 = atof(getenv("DKROOM")); }
+    { extern double g_dk_lined; if (getenv("DKLINED")) g_dk_lined = atof(getenv("DKLINED")); }
+    { extern double g_dk_lvl_d; if (getenv("DKLVL")) g_dk_lvl_d = atof(getenv("DKLVL")); }
+    { extern double g_dk_chi, g_dk_vfk; if (getenv("DKCHI")) g_dk_chi = atof(getenv("DKCHI")); if (getenv("DKVFK")) g_dk_vfk = atof(getenv("DKVFK")); }
+    { extern double g_dk_cone5; if (getenv("DKCONE5")) g_dk_cone5 = atof(getenv("DKCONE5")); }
+    { extern double g_ts_aim; if (getenv("TSAIM")) g_ts_aim = atof(getenv("TSAIM")); }
+    { extern int g_ts_view; if (getenv("TSVIEW")) g_ts_view = atoi(getenv("TSVIEW")); }
+    { extern int g_jump_plan; extern double g_jump_to; if (getenv("JPLAN")) g_jump_plan = atoi(getenv("JPLAN")); if (getenv("JTO")) g_jump_to = atof(getenv("JTO")); }
+    { extern double g_dk_arc_r, g_dk_arc_j; if (getenv("DKARCR")) g_dk_arc_r = atof(getenv("DKARCR")); if (getenv("DKARCJ")) g_dk_arc_j = atof(getenv("DKARCJ")); }
+    { extern double g_dk_arc_kr; if (getenv("DKARCKR")) g_dk_arc_kr = atof(getenv("DKARCKR")); }
+    { extern double g_dk_l1; if (getenv("DKL1")) g_dk_l1 = atof(getenv("DKL1")); }
+    { extern double g_dk_vfmin; if (getenv("DKVFMIN")) g_dk_vfmin = atof(getenv("DKVFMIN")); }
+    { extern double g_dk_evade_x; if (getenv("DKEVADE")) g_dk_evade_x = atof(getenv("DKEVADE")); }
+    { extern double g_dk_ev_min, g_dk_ev_spd; if (getenv("DKEVMIN")) g_dk_ev_min = atof(getenv("DKEVMIN")); if (getenv("DKEVSPD")) g_dk_ev_spd = atof(getenv("DKEVSPD")); }
+    { extern double g_dk_vfin; if (getenv("DKVFIN")) g_dk_vfin = atof(getenv("DKVFIN")); }
+    { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
+    { extern int g_dk_avoid; extern double g_dk_clear; if (getenv("DKAVOID")) g_dk_avoid = atoi(getenv("DKAVOID")); if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
+    { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
+    { extern void plandock_env(void); plandock_env(); }
     { extern int g_dock_trig; if (getenv("DOCKTRIG")) g_dock_trig = atoi(getenv("DOCKTRIG")); }
     { extern int g_dock_fast; if (getenv("DOCKFAST")) g_dock_fast = atoi(getenv("DOCKFAST")); }
     { extern double g_dk_g; if (getenv("DKG")) g_dk_g = atof(getenv("DKG")); }
@@ -634,9 +676,24 @@ int main(int argc, char **argv) {
             }
             prev = now_;
         }
+        {   // (the kill that made Elite: its frame, for SHOTS)
+            static int was = -1;
+            if (was >= 0 && was < 25 && io.ram[A_TALLY + 1] >= 25) printf("%7.1f TALLY ELITE at frame %u\n", io.frame / 3000.0, io.frame);
+            was = io.ram[A_TALLY + 1];
+        }
         if (io.frame % 3000 == 0 && io.ram[A_TALLY + 1] >= 25 && io.ram[A_QQ12]) {    // Elite, and docked
             printf("%7.1f ELITE: tally %d after %.1f game hours\n", io.frame / 50.0 / 60.0,
                    io.ram[A_TALLY] | io.ram[A_TALLY + 1] << 8, io.frame / 50.0 / 3600.0);
+            if (getenv("ENDSTATUS")) {      // (and the Status page, ENDSTATUS seconds of it, filmed)
+                uint32_t n = (uint32_t) (atof(getenv("ENDSTATUS")) * 50);
+                // (every key let go first: the player may be holding one, CTRL for a mis-jump, and CTRL f8 isn't Status)
+                for (int c = 0; c < 0x80; c++) beeb_key(B, c, 0);
+                beeb_frames(B, 10);
+                // (and RETURN: a prompt (the chart's Planet Name?) takes the f8 as typing)
+                beeb_key(B, K_RETURN, 1); beeb_frames(B, 6); beeb_key(B, K_RETURN, 0); beeb_frames(B, 50);
+                beeb_key(B, K_F8, 1); beeb_frames(B, 10); beeb_key(B, K_F8, 0); beeb_frames(B, 25);
+                for (uint32_t i = 0; i < n; i++) { if (i % 2 == 0) shoot(); else beeb_frames(B, 1); io.frame++; }
+            }
             break;
         }
     }

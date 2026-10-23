@@ -205,8 +205,38 @@ int main(int argc, char **argv) {
     char roms[256], disc[256];
     snprintf(roms, sizeof roms, "%s/roms/mos3.20", beeb_emu_dir());
     snprintf(disc, sizeof disc, "%s/discs/elite-master-flicker-free-sng47.ssd", beeb_emu_dir());
+    if (getenv("LABDISC")) snprintf(disc, sizeof disc, "%s", getenv("LABDISC"));
     B = beeb_new(roms, disc);
-    elite_assume_master();      // (the lab: the Master's snapshots)
+    if (!getenv("LABDISC")) elite_assume_master();      // (the lab: the Master's snapshots)
+    { extern int g_lab_dock, g_dock_log; if (getenv("LABDOCK")) g_lab_dock = 1, g_dock_log = 1; }
+    { extern int g_dock_smooth; if (getenv("DOCKSMOOTH")) g_dock_smooth = atoi(getenv("DOCKSMOOTH")); }
+    { extern double g_dk_turn_m, g_dk_room0, g_dk_lined, g_dk_lvl_d, g_dk_chi, g_dk_vfk, g_dk_xon, g_dk_g;
+      if (getenv("DKTURNM")) g_dk_turn_m = atof(getenv("DKTURNM")); if (getenv("DKROOM")) g_dk_room0 = atof(getenv("DKROOM"));
+      if (getenv("DKLINED")) g_dk_lined = atof(getenv("DKLINED")); if (getenv("DKLVL")) g_dk_lvl_d = atof(getenv("DKLVL"));
+      if (getenv("DKCHI")) g_dk_chi = atof(getenv("DKCHI")); if (getenv("DKVFK")) g_dk_vfk = atof(getenv("DKVFK"));
+    { extern double g_dk_cone5; if (getenv("DKCONE5")) g_dk_cone5 = atof(getenv("DKCONE5")); }
+    { extern double g_ts_aim; if (getenv("TSAIM")) g_ts_aim = atof(getenv("TSAIM")); }
+    { extern int g_ts_view; if (getenv("TSVIEW")) g_ts_view = atoi(getenv("TSVIEW")); }
+    { extern int g_jump_plan; extern double g_jump_to; if (getenv("JPLAN")) g_jump_plan = atoi(getenv("JPLAN")); if (getenv("JTO")) g_jump_to = atof(getenv("JTO")); }
+    { extern double g_dk_arc_r, g_dk_arc_j; if (getenv("DKARCR")) g_dk_arc_r = atof(getenv("DKARCR")); if (getenv("DKARCJ")) g_dk_arc_j = atof(getenv("DKARCJ")); }
+    { extern double g_dk_arc_kr; if (getenv("DKARCKR")) g_dk_arc_kr = atof(getenv("DKARCKR")); }
+    { extern double g_dk_l1; if (getenv("DKL1")) g_dk_l1 = atof(getenv("DKL1")); }
+    { extern double g_dk_vfmin; if (getenv("DKVFMIN")) g_dk_vfmin = atof(getenv("DKVFMIN")); }
+    { extern double g_dk_evade_x; if (getenv("DKEVADE")) g_dk_evade_x = atof(getenv("DKEVADE")); }
+    { extern double g_dk_ev_min, g_dk_ev_spd; if (getenv("DKEVMIN")) g_dk_ev_min = atof(getenv("DKEVMIN")); if (getenv("DKEVSPD")) g_dk_ev_spd = atof(getenv("DKEVSPD")); }
+    { extern double g_dk_vfin; if (getenv("DKVFIN")) g_dk_vfin = atof(getenv("DKVFIN")); }
+    { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
+    { extern int g_dk_avoid; extern double g_dk_clear; if (getenv("DKAVOID")) g_dk_avoid = atoi(getenv("DKAVOID")); if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
+    { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
+    { extern void plandock_env(void); plandock_env(); }
+      if (getenv("DKXON")) g_dk_xon = atof(getenv("DKXON")); if (getenv("DKG")) g_dk_g = atof(getenv("DKG"));
+      extern double g_dk_sw; if (getenv("DKSW")) g_dk_sw = atof(getenv("DKSW"));
+      extern double g_dk_xoff, g_dk_fade0, g_dk_fade1, g_dk_cosa, g_dk_cen;
+      if (getenv("DKXOFF")) g_dk_xoff = atof(getenv("DKXOFF")); if (getenv("DKFADE0")) g_dk_fade0 = atof(getenv("DKFADE0"));
+      if (getenv("DKFADE1")) g_dk_fade1 = atof(getenv("DKFADE1")); if (getenv("DKAPPR")) g_dk_cosa = cos(atof(getenv("DKAPPR")) * M_PI / 180);
+      if (getenv("DKCEN")) g_dk_cen = atof(getenv("DKCEN"));
+      extern double g_dk_shf, g_dk_sha, g_dk_clr;
+      if (getenv("DKSHF")) g_dk_shf = atof(getenv("DKSHF")); if (getenv("DKSHA")) g_dk_sha = atof(getenv("DKSHA")); if (getenv("DKCLR")) g_dk_clr = atof(getenv("DKCLR")); }
     if (!B) return 1;
     if (getenv("LABP")) {
         char *s = strdup(getenv("LABP")), *tok, *save;
@@ -281,10 +311,14 @@ int main(int argc, char **argv) {
         FILE *f = fopen(path, "rb");
         if (!f) continue;
         uint32_t hdr[4];
+        int dock_adc = 0;
         if (fread(hdr, 4, 4, f) == 4 && hdr[0] == 0x54484746) { if (fread(st, 1, sz, f) != sz) { fclose(f); continue; } }
+        else if (hdr[0] == 0x4B434F44) { if (fread(st, 1, sz, f) != sz) { fclose(f); continue; } dock_adc = 1; }
         else { fseek(f, 0, SEEK_SET); if (fread(st, 1, sz, f) != sz) { fclose(f); continue; } }
         fclose(f);
         beeb_load(B, st);
+        if (dock_adc) for (int c = 0; c < 3; c++) if ((int32_t) hdr[1 + c] >= 0) beeb_analogue(B, c, (int) hdr[1 + c]);
+        if (getenv("LABDISC")) { elite_forget(); elite_detect(3, beeb_ram(B)); }
         // (the setting a career picks while docked, before the fight: the harness sets it in the snapshot,
         // since switching it here would pause the fight already on. Elite's CAPS toggle flips the byte)
         { extern int g_lab_undamped; if (g_lab_undamped) beeb_ram(B)[A_DAMP] = 0xFF; }
@@ -391,7 +425,8 @@ int main(int argc, char **argv) {
                 }
             }
             io.taps_done += (uint32_t) keyq_step(io.frame, key);
-            if (s_shot) shot_frame(); else beeb_frames(B, 1);
+            { static int every = -1; if (every < 0) every = getenv("SHOTEVERY") ? atoi(getenv("SHOTEVERY")) : 1;
+              if (s_shot && fr % every == 0) shot_frame(); else beeb_frames(B, 1); }
             io.frame++;
             if (getenv("TRACE") && fr > atoi(getenv("TRACE")))
                 fprintf(stderr, "%d E %d F %d A %d qq12 %d qq11 %d mcnt %d delta %d lasct %d damp %d\n", fr, energy(), fsh(), ash(), R(A_QQ12), R(A_QQ11), R(A_MCNT), R(A_DELTA), R(A_LASCT), R(A_DAMP));
@@ -637,6 +672,12 @@ int main(int argc, char **argv) {
         memset(s_ttk, 0, sizeof s_ttk);
         memset(s_expo, 0, sizeof s_expo);
         { extern const char *g_lab_why; if (getenv("WHY") && g_lab_why) fprintf(stderr, "%s: %s\n", path, g_lab_why); g_lab_why = 0; }
+        { extern int g_lab_dock;
+          if (g_lab_dock) {      // (the docking lab: the delimiters the docking tools read, and one line a dock)
+              fprintf(stderr, "%s\n", is_docked() ? "STATUS Docked" : died ? "died: back" : "timeout");
+              { extern int g_fight_frames; printf("DOCKLAB %s %s frames %u E %d F %d A %d fight %d\n", path, is_docked() ? "docked" : died ? "died" : "timeout", io.frame, energy(), fsh(), ash(), g_fight_frames); }
+              continue;
+          } }
         printf("%s %.3f %.2f %.1f %d %d %d  %d %d %d %d %d %d %d %d %d %d  %d %d\n", path, died ? 0.0 : tally() - t0, (io.frame - (g_lab_t0 == 0xFFFFFFFF ? 0 : g_lab_t0) - g_pause_frames) / 3000.0, g_lab_cleared / 50.0, dmg,
                died, g_lab_pod, dg.kills, dg.start_n, dg.left, dg.present, dg.sights, dg.fire_on, dg.fire_off, dg.hot, dg.aimed, dg.dealt,
                s_prev_n, s_rrev_n);

@@ -759,9 +759,16 @@ static int lab_threats(int rng) {
     int n = see_ships(sh);
     return threats(sh, n, rng, t, 1);
 }
+int g_lab_dock;             // (LABDOCK: the docking lab, dock() alone from a DOCKSNAP start)
 PT_THREAD(lab(void)) {
     CO_BEGIN(c_lab);
     c_lab.f0 = now();
+    if (g_lab_dock) {
+        g_in_flight = 1;
+        CO_CALL(c_lab, dock((float) g_lab_window));
+        g_lab_done = 1;
+        CO_EXIT(c_lab);
+    }
     g_lab_t0 = now();           // (the fight's clock starts here)
     g_in_flight = 1;
     while (now() - c_lab.f0 < (uint32_t) g_lab_window * 50) {
@@ -787,6 +794,7 @@ PT_THREAD(lab(void)) {
 extern int g_depart_y;
 void player_lab_init(player_io_t *io) {
     IO = io;
+    { extern int g_fight_frames; g_fight_frames = 0; }
     fair_reset();
     g_fail = NULL;
     g_gen++;
@@ -801,6 +809,7 @@ void player_lab_init(player_io_t *io) {
 }
 const char *g_lab_why;
 int player_lab_frame(void) {        // 1 when finished (or dead: g_fail "died")
+    elite_zp_frame(IO->ram);        // (Solid Elite's borrowed zero page held, as player_frame does: the lab read its renderer's bytes as shields)
     fair_begin_frame();
     drv_frame_start();
     if (g_fail) { g_lab_why = g_fail; fair_end_frame(); return 1; }

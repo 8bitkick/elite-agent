@@ -40,6 +40,7 @@ CFP int g_cf_appr_every = 8;        // ... decided every this many game loops, h
 int g_cf_plan_every = 8;        // (combat.c: off the picture, the planner re-plans every this many loops in the show)
 CFP double g_cf_slip_r = 1.5;       // ... a roll only if it's this many hit radii out sideways
 CFP double g_cf_up_hyst = 30;       // degrees: the pull plane (above or below) kept until the target's this far past 90
+CFP int g_cf_couple = 0;            // FRAME/TRACK: the roll's own swing of the target (MVEIT: y -= ALPHA x) taken out of the pitch
 
 static struct { int mc, up, rolling, pitching, dwell, a, b, tx, ty, mode, appr_n; double ev; } C = {-1, 1};
 
@@ -112,23 +113,34 @@ double cfly_steer(vec_t v, int jx, int jy, double tol, keyset_t *keys) {
             a = C.rolling ? C.rolling * (track ? g_cf_roll_rate / 2 : g_cf_roll_rate) : 0;
             // the pitch: eased on, damped on its own change, never reversed for a small error
             double dey = C.ev == C.ev ? ey - C.ev : 0;                  // (its change since last loop, rad)
-            double want = (ey + g_cf_damp * dey) * 256 / g_cf_pan_k;      // (its change added: it closes or runs, and the rate meets it)
+            double eyp = ey;
+            if (g_cf_couple) {
+                // (rolling at ALPHA, Elite moves it y -= ALPHA x / 256 a loop: last loop's roll is in dey, not the
+                // ship's own motion, and this loop's will move it before the pitch does. Pitch for where the roll
+                // leaves it, damped on its own drift only, as the docking's pitch holds the slot)
+                dey += C.a / 256.0 * ex;
+                eyp = ey - a / 256.0 * ex;
+            }
+            double want = (eyp + g_cf_damp * dey) * 256 / g_cf_pan_k;     // (its change added: it closes or runs, and the rate meets it)
             // (no nudging: the pitch went on and off at its smallest rate, and the nose nudged, stopped and nudged up and
             // down. A move starts only clearly off (cf_start hit radii), then runs until it's
             // on (cf_hold): one deliberate move, not a stutter)
-            if (!C.pitching && fabs(ey) > g_cf_start_r * tol) C.pitching = 1;
+            if (!C.pitching && fabs(eyp) > g_cf_start_r * tol) C.pitching = 1;
             // (and stops only on it and not drifting: a ship crossing steadily is followed at its own rate, not caught
             // up with in stops and starts)
-            if (C.pitching && fabs(ey) < g_cf_hold_r * tol && fabs(dey) * 256 < 0.5) C.pitching = 0;
+            if (C.pitching && fabs(eyp) < g_cf_hold_r * tol && fabs(dey) * 256 < 0.5) C.pitching = 0;
             if (!C.pitching) want = 0;
             int bw = sat(want, 8);
-            if (bw == 0 && C.pitching) bw = sgn(ey);                    // (running: at least its smallest rate, to finish)
+            if (bw == 0 && C.pitching) bw = sgn(eyp);                   // (running: at least its smallest rate, to finish)
             if (bw && C.b && sgn(bw) != sgn(C.b) && fabs(ey) < 2 * tol) bw = 0;   // (through zero, not a flip)
             if (bw > C.b + g_cf_slew) bw = C.b + g_cf_slew;
             else if (bw < C.b - g_cf_slew) bw = C.b - g_cf_slew;
             if (fabs(ey) > 20 * M_PI / 180) bw = sgn(ey) * 8;           // (far above or below: break out, full)
             // (a change held cf_dwell loops at least, but for a break out or a stop on it)
             if (bw != C.b && C.dwell < g_cf_dwell && fabs(ey) <= 20 * M_PI / 180 && C.pitching) bw = C.b;
+            // (the stick has no BETA 2: J 36 gives 1, the next step 3 (jsty_nose_up). Said as it'll be, so the slew
+            // and the dwell count what the ship does)
+            if (g_cf_couple && abs(bw) == 2) bw = abs(C.b) >= 2 ? sgn(bw) * 3 : sgn(bw);
             if (bw != C.b) C.dwell = 0; else C.dwell++;
             b = bw;
             ev = ey;
@@ -182,7 +194,7 @@ void cfly_env(void) {
     E(g_cf_roll_on, "CF_ROLLON"); E(g_cf_roll_off, "CF_ROLLOFF"); E(g_cf_roll_rate, "CF_ROLLRATE");
     E(g_cf_start_r, "CF_START"); E(g_cf_dwell, "CF_DWELL"); E(g_cf_appr_px, "CF_APPRPX"); E(g_cf_appr_every, "CF_APPREVERY");
     if (getenv("CF_PLANEVERY")) g_cf_plan_every = atoi(getenv("CF_PLANEVERY"));
-    E(g_cf_track_r, "CF_TRACK"); E(g_cf_hold_r, "CF_HOLD"); E(g_cf_slip_r, "CF_SLIP"); E(g_cf_up_hyst, "CF_UPHYST");
+    E(g_cf_track_r, "CF_TRACK"); E(g_cf_hold_r, "CF_HOLD"); E(g_cf_slip_r, "CF_SLIP"); E(g_cf_up_hyst, "CF_UPHYST"); E(g_cf_couple, "CF_COUPLE");
     E(g_cf_turn, "CF_TURN"); E(g_cf_lead_max, "CF_LEADMAX"); E(g_cf_lead_d, "CF_LEADD");
 #undef E
 }
