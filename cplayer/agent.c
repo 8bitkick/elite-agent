@@ -204,13 +204,11 @@ static struct { CO; } c_save;
 // (never a broke commander over a solvent save: an escape pod left one with 25 Cr, fuel ate the rest,
 // and every dock saved it, down to 5 Cr. A reload then put it back where it couldn't buy fuel: 115 times)
 static long s_saved_cash = -1;
-// (curious: every third dock, and always before witchspace, s_save_force: the disk menu at every dock was 20-30 s of
-// a viewer's time each, 8% of it with the market screens; the round-7 review)
-static int s_save_force, s_save_n;
+// (curious too, at every dock: every third (the round-7 review: the disk menu was 20-30 s of a viewer's time) made
+// each death or stuck reload replay up to three trips, 20-24 game hours in 100. The Presto runs the menu in turbo
+// instead, player_dull_cruise)
 PT_THREAD(save_ours(void)) {
     CO_BEGIN(c_save);
-    { extern int g_curious; if (g_curious && !s_save_force && s_saved_cash >= 0 && ++s_save_n % 3) CO_EXIT(c_save); }
-    s_save_force = 0;
     if (saving() && cash() < 2000 && s_saved_cash >= 0 && cash() < s_saved_cash) CO_EXIT(c_save);
     if (saving()) {
         CO_CALL(c_save, save_commander(name_is_ours() ? NULL : g_name));
@@ -382,7 +380,6 @@ PT_THREAD(witch(void)) {
     CO_CALL(c_ws, sell_all());
     CO_CALL(c_ws, refuel());
     CO_CALL(c_ws, shop());
-    s_save_force = 1;
     CO_CALL(c_ws, save_ours());
     CO_CALL(c_ws, allow_misjumps());         // (pause, X, unpause: it works docked too)
     status_("Into witchspace for Thargoids (a forced mis-jump towards %s)", c_ws.dest->name);

@@ -218,8 +218,10 @@ PT_THREAD(from_title(void)) {
 
 static struct { CO; char name[8]; } c_save;
 static int is_saved_or_menu(void) { return view() == V_STATUS; }
+uint32_t g_save_until;      // (a save under way, to about then: the Presto runs its disk menu in turbo)
 PT_THREAD(save_commander(const char *name)) {
     CO_BEGIN(c_save);
+    g_save_until = deadline(40);
     c_save.name[0] = 0;
     if (name) { strncpy(c_save.name, name, 7); c_save.name[7] = 0; }
     CO_CALL(c_save, hold_until(K_AT, is_menu, 3, "disc menu"));
@@ -247,6 +249,7 @@ PT_THREAD(save_commander(const char *name)) {
     if (memcmp(IO->ram + A_NA_PC + 8, IO->ram + A_TP, g_ev.save_cmp)) logf_("save: the copy doesn't match");
     note("{\"event\": \"save\", \"tally\": %.2f, \"cash\": %.1f}", tally(), cash() / 10.0);
     fair_saved();
+    g_save_until = now();
     CO_END(c_save);
 }
 

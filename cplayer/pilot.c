@@ -398,6 +398,7 @@ int player_dull_cruise(void) {
     // (only in a space view, no hyperspace countdown, and a second since the last of either: the Presto's screen rolled
     // at the hyperspace selection, turbo on through the chart, Data on System and the countdown)
     static uint32_t s_ui_last;
+    { extern uint32_t g_save_until; if (g_curious && !expired(g_save_until)) return 1; }     // (and a save's disk menu)
     if (view() != 0 || hyperspace_count()) s_ui_last = now();
     if (g_turbo_ui_fix && (view() != 0 || hyperspace_count() || now() - s_ui_last < 50)) return 0;
     if (!g_curious || now() - s_cruise_last > 2 || now() - s_cruise_since < 20 * 50) return 0;
@@ -642,7 +643,7 @@ PT_THREAD(to_station(float seconds)) {
 #define DKP
 #endif
 static struct {
-    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold, lroll, vf, evade, arcaim, arcon; double spin, spin_psi; int spin_jx; int32_t left;
+    CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold, lroll, vf, evade, arcaim, arcon, ff0; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
@@ -1086,7 +1087,12 @@ PT_THREAD(dock(float seconds)) {
     need_station:
         c_dk.left = (int32_t)(c_dk.end - now());
         if (c_dk.left < 250) c_dk.left = 250;
+        c_dk.ff0 = g_fight_frames;
         CO_CALL(c_dk, to_station(c_dk.left / 50.0f));
+        // (curious: the fights on the way in don't count against the docking's clock either, as its own and to_station's
+        // don't: a run in from a jump with eight show fights on the way timed the docking out and reloaded the last
+        // save, 46-81 times in 100 game hours, 28-40 of the hours replayed)
+        if (g_curious) c_dk.end += (uint32_t) (g_fight_frames - c_dk.ff0);
     }
     CO_END(c_dk);
 }
