@@ -3,7 +3,7 @@
 A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build), written in pure C. It reads
 the machine's RAM and plays only through the keyboard and the analogue joystick (Elite's own joystick
 option). It's self-contained: no OS, no heap, no network, no model, just rules, about 100 KB of code
-and 60 KB of RAM compiled for the RP2350's Cortex-M33. It runs on that microcontroller, a Pimoroni
+and under 30 KB of RAM compiled for the RP2350's Cortex-M33. It runs on that microcontroller, a Pimoroni
 Presto, beside the BBC Master emulator, averaging about 2.4 ms of each 20 ms frame; the same code runs on a native
 build of the emulator (Pi or Mac) for development.
 
@@ -19,30 +19,30 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 
 | Mode | What it does | Jameson to Elite |
 |---|---|---|
-| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **26.8 game hours** (26.2-27.4 on five careers, 5 deaths in all) |
-| **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers; every RAM read audited) |
+| **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (22.6-24.1 on five careers, no deaths) |
+| **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers, on an earlier build; every RAM read audited) |
 | **Curious** | explores every galaxy, meets every ship type, both missions; fights for the camera: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time: its fights are for watching (Elite took 134.8 game hours on an earlier build, the column below) |
 
-All modes save at each dock (about 4 seconds), so a death loses only the trip since. Times are game
+All modes save at each dock (about 4 seconds; on the Presto curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 26.2 to 27.4 hours, fair 29.0 to 30.7, curious 134.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 22.6 to 24.1 hours, fair 29.0 to 30.7, curious 134.8, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 
 | | Efficient (5) | Fair (5) | Curious (1, round 5) |
 |---|---|---|---|
-| Game hours to Elite | 26.8 | 29.8 | 134.8 |
-| Star systems visited | 64 | 67 | 272 |
+| Game hours to Elite | 23.8 | 29.8 | 134.8 |
+| Star systems visited | 62 | 67 | 272 |
 | Galaxies | 3 | 3 | 8 |
-| Light years flown (dock to dock) | 646 | 677 | 3,109 |
-| Docks | 350 | 366 | 1,049 |
-| Fights | 2,079 | 2,521 | 5,523 |
-| Kills | 5,521 | 5,587 | 12,705 |
+| Light years flown (dock to dock) | 630 | 677 | 3,109 |
+| Docks | 348 | 366 | 1,049 |
+| Fights | 2,074 | 2,521 | 5,523 |
+| Kills | 5,458 | 5,587 | 12,705 |
 | Witchspace sessions (Thargoids) | 190 | 198 | 66 |
-| Deaths (reloaded) | 1 | 3 | 115 |
+| Deaths (reloaded) | 0 | 3 | 115 |
 | Escape pods used | 0 | 0 | 0 |
-| Most credits held | 32,191 Cr | 23,538 Cr | 18,743 Cr |
+| Most credits held | 30,911 Cr | 23,538 Cr | 18,743 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
@@ -69,6 +69,8 @@ hours and pay for themselves: without them it reaches Elite 4.7 hours later.
   of 101, the target in the sights 82% of the time.
 - **Thargoids.** Witchspace fights score about 30 points a fight minute, normal space about 12.
 - **Cheap deaths.** With a save at every dock it can take risks a no-save player can't.
+- **Docking.** A smooth line-up at full speed: about 17 s a dock faster than v0.3, over ~350 docks a
+  career, and no more flying into the planet on the way.
 - **No waiting about.** It fights pirates on the way in as far out as it engages in a hunt (ones
   hanging back used to block the in-system jump), and leaves witchspace after its last fight without
   recharging: 31.4 to 27.4 hours.
@@ -93,10 +95,14 @@ in its repository): six 5-hour efficient careers reached Dangerous, past the Con
 **Docking** is at full speed, on the slot's centre. Elite's docking test checks only angles (the approach
 within 26 deg of the slot's axis, the station's centre within 22 deg, the slot within 36.6 deg of level),
 never speed, so with the angles well inside those and both shields at 160 or more it flies in at 40. It
-rolls with the station to hold the slot level, and holds the slot's centre just enough above or below the
-nose that the roll carries it across onto the nose (Elite's own rotation step, in its whole units;
-`cplayer/pilot.c`). Over 24 two-hour careers: 9 dockings in 10 within 4 across and 8 along the slot's
-+-10 by +-30, 4 in 732 outside it, 9 in 10 at full speed, none hurt beyond the shields.
+lines up on the slot's axis by a vector field, as fixed-wing drones line up on a runway: far off the axis
+it heads in at up to 60 deg, turning onto the axis as it closes, and from behind the station it first flies
+a circle onto it, banked once and pitching round as a plane flies a steady turn, clear of the planet. On
+the axis it rolls with the station to hold the slot level, and holds the slot's centre up to 6 deg above
+or below the nose so the roll carries it across onto the nose (`cplayer/pilot.c`). Over 12 two-hour
+careers: 81 s from the station's safe zone to docked (the median; 98 s on v0.3), entries within 21 of
+the axis, half the stick reversals of v0.3. Its old line-up flew into the planet four times in five
+careers to Elite; this one hasn't in ten.
 
 ## The player (`cplayer/`)
 
