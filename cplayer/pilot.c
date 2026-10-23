@@ -671,6 +671,7 @@ DKP double g_dk_evade_x = 300; // (DKEVADE: the step aside from traffic leaving 
 DKP double g_dk_arc_r = 2500, g_dk_arc_j = 4500, g_dk_arc_end = 80, g_dk_arc_kr = 8;   // (DKARCR, DKARCJ: the approach circle's radius and where it joins the axis)
 DKP double g_dk_cone5 = 4200; // (DKCONE5: the vector field's cone, 0.6 lat + this)
 DKP double g_dk_blend = 3;      // (DKBLEND: the line-up hands its aim and its stick over to the final's from this x the final's threshold; 0 off)
+DKP double g_dk_plag = 2;       // (DKPLAG: the line-up's pitch onto the slot brakes for this many loops of lag)
 DKP double g_dk_ltrim = 15;     // (DKLTRIM: the line-up's slot-levelling roll, at most this ALPHA off the station's spin)
 DKP double g_dk_turn_m = 1.5;    // (DKTURNM: the margin on the room to turn in)
 int g_fight_frames;           // (frames spent in fights on the way in: the arrival-to-dock time leaves them out)
@@ -844,7 +845,7 @@ static __attribute__((noinline)) int dock_step(void)
                 }
                 // (and rolling and pulling together, in the same stretch: the roll slides from the turn's to the final's
                 // slot-levelling roll (the station's spin, ALPHA 16, and a trim up to g_dk_ltrim more), the pitch to the
-                // final's law on the aim: y onto -g x / a, so the roll swings a sideways aim round onto the pitch and the
+                // final's law: y onto -g x / a, so the roll swings a sideways aim round onto the pitch and the
                 // pitch closes it as it comes. Before, the turn rolled at the spin (the slot held where it was) and stalled
                 // with the station some 20 deg off the nose; the final then rolled the slot 70 deg level and pitched it
                 // in: two moves. Docking lab, 278 starts: the slot off level at the hand-over median 40 -> 22 deg)
@@ -857,9 +858,17 @@ static __attribute__((noinline)) int dock_step(void)
                         g_want_jx = jstx_for(al);
                         double a = alpha_from_jstx(jx) / 256.0, bs = beta_from_jsty(g_want_jy) / 256.0, b = bs;
                         if (fabs(a) > 0.03) {
-                            double x = goal.x, y = goal.y, z = goal.z, lim = z * g_dk_ylim;
-                            double ys = fmax(-lim, fmin(lim, -g_dk_g * x / a));
-                            b = (1 - bw) * bs + bw * ((y - a * x) - ys) / z;
+                            // (the final's own law, on the slot's centre and with its hold as it keeps it, so the hand-over
+                            // changes nothing: on the line-up's slid aim instead, the station crossed the nose, and the final's
+                            // aim, 4 deg from it, blipped the pitch to full. And braked: the rate that gets there in 1 +
+                            // g_dk_plag loops, not in one (the stick to rotation lag): flat out until the error changed
+                            // sign, it overshot 5 deg and pitched back)
+                            vec_t sp = vadd(S, nv, 160);
+                            double x = sp.x, y = sp.y, z = sp.z, lim = z * g_dk_ylim;
+                            c_dk.xhold = c_dk.xhold ? fabs(x) >= g_dk_xoff : fabs(x) > g_dk_xon;
+                            double ys = c_dk.xhold ? -copysign(fmax(fabs(g_dk_g * x / a), 20.0), x / a) : 0;
+                            ys = fmax(-lim, fmin(lim, ys));
+                            b = (1 - bw) * bs + bw * ((y - a * x) - ys) / z / (1 + g_dk_plag);
                         }
                         g_want_jy = jsty_nose_up(256 * b);
                         if (g_dock_log) dbgf_("DLEAD w %.2f serr %.1f al %.1f b %.2f", bw, serr * 180 / M_PI, al, b * 256);

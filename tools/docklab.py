@@ -7,7 +7,9 @@ second (the roll and pitch sticks changing side, |J| 8 or more each way); and th
 came within 40 deg of the nose (at most 10 s before) to within 8 deg of it for good: its time, the time the station sat
 stalled in view (closing under 2 deg a second over the next half second), and the number of separate moves bringing
 it in (runs of it closing faster than that, apart by 0.3 s or more). One move is one smooth curve. And at the
-hand-over to the final: how far off the nose the station was, and its slot off level."""
+hand-over to the final: how far off the nose the station was, and its slot off level. Overshoot: the most the station
+strays off the nose in the 3 s after it first comes within 1 deg; and the pitch stick's reversals in the 2 s before
+the hand-over."""
 import math, re, statistics, sys
 
 sys.path.insert(0, __import__('os').path.dirname(__file__))
@@ -43,7 +45,18 @@ def turnin(d):
         else:
             inmove = False
             gap += 1
-    return dict(tt=(end - start) / 50, stall=len(st) / 50, moves=max(1, moves), hang=ang[min(h, len(d) - 1)], hroll=abs(d[min(h, len(d) - 1)]['roll']),
+    # (overshoot: the most the station strays off the nose in the 3 s after it first comes within 1 deg (from the
+    # turn-in's start); and the pitch stick's reversals in the last 2 s before the hand-over)
+    i0 = next((i for i in range(start, len(d)) if ang[i] < 1), None)
+    over = max(ang[i0:i0 + 150]) if i0 is not None else 0
+    last, prev2 = 0, 0
+    for x in d[max(0, h - 100):h]:
+        sg = (x['jy'] >= 8) - (x['jy'] <= -8)
+        if sg and last and sg != last:
+            prev2 += 1
+        if sg:
+            last = sg
+    return dict(over=over, prev2=prev2, tt=(end - start) / 50, stall=len(st) / 50, moves=max(1, moves), hang=ang[min(h, len(d) - 1)], hroll=abs(d[min(h, len(d) - 1)]['roll']),
                 stallL=sum(1 for i in st if i < h) / 50)
 
 
@@ -110,6 +123,7 @@ def summary(rows, label=''):
     for k, name in (('t', 'docking time (s)'), ('tf', 'final (s)'), ('late', 'off the axis at entry'), ('rolle', 'slot roll at entry (deg)'),
                     ('rrev', 'roll reversals a second'), ('prev', 'pitch reversals a second'), ('tt', 'turn-in: 40 to 8 deg (s)'),
                     ('stall', 'turn-in: station stalled off-centre (s)'), ('stallL', '... of it before the hand-over (s)'), ('moves', 'turn-in: separate moves'),
+                    ('over', 'overshoot past the nose (deg)'), ('prev2', 'pitch reversals, last 2 s before the final'),
                     ('hang', 'hand-over: station off the nose (deg)'), ('hroll', 'hand-over: slot off level (deg)')):
         xs = [r[k] for r in ok if k in r]
         if xs:

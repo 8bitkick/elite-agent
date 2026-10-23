@@ -220,6 +220,7 @@ int main(int argc, char **argv) {
     { extern double g_dk_ev_min, g_dk_ev_spd; if (getenv("DKEVMIN")) g_dk_ev_min = atof(getenv("DKEVMIN")); if (getenv("DKEVSPD")) g_dk_ev_spd = atof(getenv("DKEVSPD")); }
     { extern double g_dk_rm_d; if (getenv("DKRMD")) g_dk_rm_d = atof(getenv("DKRMD")); }
     { extern double g_dk_blend; if (getenv("DKBLEND")) g_dk_blend = atof(getenv("DKBLEND")); }
+    { extern double g_dk_plag; if (getenv("DKPLAG")) g_dk_plag = atof(getenv("DKPLAG")); }
     { extern double g_dk_ltrim; if (getenv("DKLTRIM")) g_dk_ltrim = atof(getenv("DKLTRIM")); }
     { extern double g_dk_clear; if (getenv("DKCLEAR")) g_dk_clear = atof(getenv("DKCLEAR")); }
     { extern double g_dk_near; if (getenv("DKNEAR")) g_dk_near = atof(getenv("DKNEAR")); }
