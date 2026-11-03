@@ -1,0 +1,3 @@
+{"round": 0, "frames": 136360, "acq": 92745, "loss": 0.0529, "err_acq": [5.7, 0.79], "err_rest": [0.012, 0.007], "val": 20.072, "val_died": 0, "hold": 81.7, "secs": 11{"round": 1, "frames": 274297, "acq": 190798, "loss": 0.0764, "err_acq": [5.86, 0.76], "err_rest": [0.0, 0.0], "val": 20.254, "val_died": 0, "hold": 83.0, "secs": 68}
+{"round": 2, "frames": 410657, "acq": 283543, "loss": 0.0765, "err_acq": [5.8, 0.75], "err_rest": [0.0, 0.0], "val": 20.254, "val_died": 0, "hold": 83.0, "secs": 193}
+{"round": 3, "frames": 547017, "acq": 376288, "loss": 0.0765, "err_acq": [5.78, 0.74], "err_rest": [0.0, 0.0], "val": 20.254, "val_died": 0, "hold": 83.0, "secs": 142}

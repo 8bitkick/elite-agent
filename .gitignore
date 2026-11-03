@@ -32,3 +32,23 @@ presto/build.log
 cplayer/.beebjit-obj/
 presto/app/build/
 rp2350-bbc-micro/
+
+# fight recordings, careers and lab output
+/fights*/
+/*.fight
+/*.lst
+/*.log
+/journal*.jsonl
+/hard.json
+/hard_*.txt
+/hard_*.err
+/lab_*.txt
+/lab_*.err
+/career*.log
+/careers/
+/t10*.lst
+/three.lst
+/one.lst
+/two.lst
+/*.err
+wsp/evolve/*.pt

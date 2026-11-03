@@ -15,14 +15,15 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 | ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
 | A flyby, watched from the side | Lasers on a Thargoid in witchspace | Elite |
 
-**[→ The weight-space pilot: this agent's dogfight as a hand-written neural network](https://github.com/8bitkick/elite-agent/blob/weight-space/wsp/README.md)**
+**[→ Weight-space fair: a hand-written neural network flies Elite on what a player can see, and outscores the C pilot](wsp/README.md)**
 
-[![A Deadly-rank fight flown by the network, its units lit beside the game](https://github.com/8bitkick/elite-agent/raw/weight-space/docs/img/weight-space.gif)](https://github.com/8bitkick/elite-agent/blob/weight-space/wsp/README.md)
+[![A Deadly-rank fight flown by the first version of the network, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md)
 
-On the `weight-space` branch, the dogfight core is rewritten as a neural network whose weights were written by hand, with no
-training, then spliced into this agent behind `WSP=1`. The whole model is under 8 KB of weights, run by a forward pass in plain C with no ML library, the same as the rest of the agent. It flies the real game and clears every one of the fight lab's hardest
-recorded fights without a death. The network, the lab results and the roadmap are in
-**[wsp/README.md](https://github.com/8bitkick/elite-agent/blob/weight-space/wsp/README.md)**. (After MIT CSAIL's
+`WSP=1 FAIR=1` hands the dogfight to a neural network: 2,256 weights (8.8 KB), written by hand unit by unit and then
+tuned by evolution, run by a forward pass in plain C with no ML library, like the rest of the agent. In fair mode it
+scores 2.8% more points a fight minute than the C pilot on 450 held-out fights, and reaches Elite in 27.2 game hours
+against the C's 27.8 on the same seeds. How it was written, evolved and measured, and what didn't work, are in
+**[wsp/README.md](wsp/README.md)**. (After MIT CSAIL's
 [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/), 2 Nov 2026.)
 
 ## Modes
@@ -31,12 +32,13 @@ recorded fights without a death. The network, the lab results and the roadmap ar
 |---|---|---|
 | **Efficient** | straight for Elite; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **23.8 game hours** (23.4-24.2 on five careers, 1 death in all) |
 | **Fair** | only what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)) | **29.8 game hours**, efficient + fair (29.0-30.7 on five careers, on an earlier build; every RAM read audited) |
+| **Weight-space fair** | fair, with the dogfight flown by a neural network: 2,256 weights written by hand and tuned by evolution, run in plain C; in witchspace the C's planner turns onto each new target (`WSP=1 FAIR=1`; [`wsp/README.md`](wsp/README.md)) | **27.2 game hours** (26.0-28.4 on three careers; this build's fair C takes 27.8 on the same seeds) |
 | **Curious** | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | not tuned for time, but for style: **146.4 game hours** (139.2-155.3 on six careers, on v0.4) |
 
 All modes save at each dock (about 4 seconds; on the Presto curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours: efficient 23.4 to 24.2 hours, fair 29.0 to 30.7, curious 139.2 to 155.3, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
+![Kill tally against game hours: efficient 23.4 to 24.2 hours, weight-space fair 26.0 to 28.4, fair 29.0 to 30.7, curious 139.2 to 155.3, and where it started, keyboard aim, 57.3](docs/img/climb.svg)
 
 **Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py`):
 

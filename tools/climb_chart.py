@@ -3,7 +3,7 @@
 
   climb_chart.py out.svg GROUP=journal.jsonl[,journal.jsonl...] ... [keyboard=docs/img/climb-keyboard.csv]
 
-GROUP is efficient, fair or curious, or master or modelb (the two machines side by side, docs/DUAL.md); each career's journal (run_sim's) is read up to its rank of Elite.
+GROUP is efficient, fair, curious or wsp (the weight-space network), or master or modelb (the two machines side by side, docs/DUAL.md); each career's journal (run_sim's) is read up to its rank of Elite.
 The keyboard line is the first joystick-less career (hours,tally rows), kept as data since its build is gone.
 """
 import json, os, sys
@@ -14,9 +14,11 @@ HMAX, TMAX = int(os.environ.get('HMAX', 140)), 7000      # (HMAX=hours: the x ax
 STYLE = {   # colour, label (validated: violet / aqua / orange, every line direct-labelled)
     'efficient': ('#6250d6', 'Efficient'),
     'fair': ('#1baf7a', 'Fair (information)'),
+    'cfair': ('#1baf7a', 'C pilot, fair'),
     'curious': ('#eb6834', 'Curious (more stylish piloting)'),
     'master': ('#6250d6', 'BBC Master (SNG47, points by ship)'),
     'modelb': ('#eb6834', 'Model B (disc Elite, 1 a kill)'),
+    'wsp': ('#c42e8a', 'Weight-space fair (WSP=1 FAIR=1)'),
 }
 
 
@@ -78,7 +80,7 @@ def main():
         s.append(poly(keyboard, '#8a8a96', 1.8, '5 3'))
         legend.append(('#8a8a96', '5 3', 'Where it started: keyboard aim, %.1f h' % keyboard[-1][0]))
         s.append('<text x="%.1f" y="%.1f" fill="#52514e" text-anchor="start">Keyboard %.1f h</text>' % (X(keyboard[-1][0]) + 4, Y(6400) - 8, keyboard[-1][0]))
-    for g in ('curious', 'fair', 'efficient', 'modelb', 'master'):
+    for g in ('curious', 'fair', 'efficient', 'wsp', 'modelb', 'master'):
         if g not in groups:
             continue
         colour, label = STYLE[g]
@@ -89,6 +91,10 @@ def main():
             txt = '%s: %.1f h' % (label, hs[0]) if len(hs) == 1 else '%s: %.1f-%.1f h (avg %.1f)' % (label, min(hs), max(hs), sum(hs) / len(hs))
             legend.append((colour, None, txt))
             # direct label at the end of the group's earliest line
+            if g == 'wsp':      # (above the others, at its earliest line, in its colour: it lands between efficient and fair)
+                s.append('<text x="%.1f" y="%.1f" fill="%s" text-anchor="end" font-weight="bold">%s %.1f h</text>'
+                         % (X(min(hs)), Y(6400) - 22, colour, label.split(' (')[0], sum(hs) / len(hs)))
+                continue
             s.append('<text x="%.1f" y="%.1f" fill="#0b0b0b" text-anchor="%s">%s</text>'
                      % (X(min(hs) if g in ('efficient', 'master') else max(hs)), Y(6400) - 8, 'end' if g in ('efficient', 'master') else 'start' if g in ('fair', 'modelb') else 'middle', '%s %.1f h' % (label.split(' (')[0] if g in ('master', 'modelb') else label.split(' ')[0], sum(hs) / len(hs))))
     y = 40
