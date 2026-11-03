@@ -15,6 +15,12 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 | ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
 | A flyby, watched from the side | Lasers on a Thargoid in witchspace | Elite |
 
+> **Weight-space branch.** After MIT CSAIL's [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/)
+> (2 Nov 2026), the dogfight core was rewritten as a neural network with its 2,053 weights written by hand, no training. It flies
+> the real game: on the fight lab's hardest recorded fights (Thargoid swarms, five-ship pirate packs) it clears every one with no
+> deaths at 68-95% of the C pilot's points a minute. The network, the splice (`WSP=1`), the lab results and the roadmap are on the
+> [`weight-space`](https://github.com/8bitkick/elite-agent/tree/weight-space) branch (`wsp/README.md`, `wsp/ROADMAP.md`).
+
 ## Modes
 
 | Mode | What it does | Jameson to Elite |
