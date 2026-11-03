@@ -178,7 +178,7 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
         if (g_fail) {           // refused again: the game resolves it to another system; don't plan it again
             // (unless we're short of fuel for it: then it's the tank, not the system)
             if (fuel() >= distance_qq8(here_x(), here_y(), c_hy.dest->x, c_hy.dest->y))
-                g_unreachable[galaxy() & 7][c_hy.dest->num >> 3] |= (uint8_t) (1u << (c_hy.dest->num & 7));
+                g_unreachable[galaxy() & 7][c_hy.dest->num >> 3] |= (uint8_t) (1u << (c_hy.dest->num & 7)), g_unreachable_n++;
             logf_("%s can't be selected for a jump (fuel %.1f LY): leaving it out of plans", c_hy.dest->name, fuel() / 10.0);
             status_("Jump to %s refused: planning again", c_hy.dest->name);
             g_fail = 0;             // (not a failure of ours: the caller flies on, docks, and plans without it)
@@ -195,7 +195,10 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
     c_hy.until = deadline(120);
     for (;;) {                  // the countdown runs on while we wait, and while we fight
         CO_YIELD(c_hy);
-        if (here_x() != c_hy.x0 || here_y() != c_hy.y0 || witchspace() != c_hy.w0) break;
+        // (a forced mis-jump from witchspace, a chain: arrived when we've moved. The witchspace flag can drop for a frame
+        // on the way, and that read as a way out: dock() began in witchspace, its escape-pod clock ran through the rest
+        // of the chain, and the pod went at the station's door: 8 times in a career that chained 14 at a time, 4 of them stuck)
+        if (here_x() != c_hy.x0 || here_y() != c_hy.y0 || (witchspace() != c_hy.w0 && !(c_hy.w0 && g_misjump))) break;
         if (expired(c_hy.until)) CO_FAIL(c_hy, "arrival");
         g_phase = 3;
         // (test) the stronger shield towards them: a dead front shield and a full aft one (a mis-jump straight
@@ -263,6 +266,10 @@ PT_THREAD(hyperspace_fighting(const sys_t *dest)) {
 }
 
 static struct { CO; const sys_t *dest; uint32_t until; uint8_t key; int x0, y0, dx, dy, px, py; } c_cur;
+// (g_cursor_soft: a cursor that can't reach the system isn't a stuck; g_cursor_missed says so and the caller picks
+// another. The stick's cursor couldn't settle on Issoinen, (102, 3) in galaxy 2, a farm's way out: it drifted off and
+// wrapped to x 254, and each time the career reloaded the last save)
+int g_cursor_soft, g_cursor_missed;
 PT_THREAD(select_by_cursor(const sys_t *dest)) {
     CO_BEGIN(c_cur);
     c_cur.dest = dest;
@@ -276,7 +283,12 @@ PT_THREAD(select_by_cursor(const sys_t *dest)) {
     for (;;) {
         const sys_t *near = nearest_system(galaxy(), target_x(), target_y());
         if (near && near->num == c_cur.dest->num) break;
-        if (expired(c_cur.until)) CO_FAIL(c_cur, "cursor");
+        if (expired(c_cur.until)) {
+            if (!g_cursor_soft) CO_FAIL(c_cur, "cursor");
+            g_cursor_missed = 1;            // (the caller picks another)
+            if (IO->analogue && R(A_JSTK)) { keyset_t none = {{0}, 0}; g_want_jx = g_want_jy = 128; hold(&none); }
+            CO_EXIT(c_cur);
+        }
         {
             int dx = c_cur.dest->x - target_x(), dy = c_cur.dest->y - target_y();
             c_cur.key = abs(dx) >= abs(dy) ? (dx > 0 ? K_RIGHT : K_LEFT) : (dy > 0 ? K_DOWN : K_UP);
@@ -332,10 +344,11 @@ static int thg_bail(void) { combat_thg_init(); return g_cp_thg.bail_energy; }
 int g_chain = 1;
 extern int g_curious;
 int g_ws_noregen = -1;      // (-1: by mode, efficient only)
-static const sys_t *chain_hop(void) {
+// (the geometry alone, from (x, y) with `fuel`: agent.c's farm model asks it of every system in the galaxy)
+const sys_t *chain_hop_at(int x, int y, int fuel, int *cost) {
     const sys_t *c[8];
     int d[8];
-    int n = in_range(galaxy(), here_x(), here_y(), fuel(), c, d, 8);
+    int n = in_range(galaxy(), x, y, fuel, c, d, 8);
     for (int i = 0; i < n; i++) {
         const sys_t *o[1];
         int od[1];
@@ -343,13 +356,39 @@ static const sys_t *chain_hop(void) {
         // jump while bailing out is a death). And from where it drops us, a way out that a random
         // mis-jump (3 in 256) can't strand: that one lands back here, (x, y XOR 31 XOR 31), with
         // what's left after both. Stranded is a reload: three of six in a career came from chains
-        int f1 = fuel() - d[i];
+        int f1 = fuel - d[i];
         const sys_t *e[8];
-        int de[8], ne = in_range(galaxy(), here_x(), here_y() ^ 31, f1 - 5, e, de, 8);
+        int de[8], ne = in_range(galaxy(), x, y ^ 31, f1 - 5, e, de, 8);
         for (int j = 0; j < ne; j++)
-            if (in_range(galaxy(), here_x(), here_y(), f1 - de[j] - 5, o, od, 1)) return c[i];
+            if (in_range(galaxy(), x, y, f1 - de[j] - 5, o, od, 1)) { if (cost) *cost = d[i]; return c[i]; }
     }
     return NULL;
+}
+static const sys_t *chain_hop(void) { return chain_hop_at(here_x(), here_y(), fuel(), NULL); }
+// the way out of witchspace from (x, y) with `fuel`: NULL if none in reach. (The way out can mis-jump as well,
+// one in eighty, dropping us at (x, y XOR 31) with what's left: prefer a way out from which that landing still
+// reaches a system; the escape pod doesn't work in witchspace, so stranded is a reload. And not a trap: a system
+// with no safe jump on, see jump_max.) Efficient: of the ways out that pass, the best farm (agent.c's farm_value,
+// the mis-jumps a session from there chains; nearest first among equals): the next session starts where we dock
+int farm_value(const sys_t *s);         // (agent.c: -1 when not farming by it)
+const sys_t *way_out_at(int x, int y, int fuel) {
+    const sys_t *c8[8];
+    int d8[8];
+    int n8 = in_range(galaxy(), x, y, fuel, c8, d8, 8);
+    if (!n8) return NULL;
+    const sys_t *out = c8[0];
+    int best = -2;
+    for (int pass = 0; pass < 2 && best == -2; pass++)
+        for (int i = 0; i < n8; i++) {
+            const sys_t *o[1];
+            int od[1];
+            if (pass == 0 && jump_trap(galaxy(), c8[i]->num)) continue;
+            if (!in_range(galaxy(), x, y ^ 31, fuel - d8[i], o, od, 1)) continue;
+            int v = farm_value(c8[i]);
+            if (v > best) best = v, out = c8[i];
+            if (v < 0) break;           // (not farming by it: the first that passes, as ever)
+        }
+    return out;
 }
 // anything that can hurt us near: hostile-flagged, or a Thargoid/Thargon whatever its flags (a freshly
 // launched Thargon isn't flagged yet: we chained into one and died on the chart)
@@ -379,49 +418,37 @@ PT_THREAD(leave_witchspace(void)) {
         // while: MJP moves us, QQ1 XOR 31, after setting MJ, and the drawing in between spans frames)
         c_lw.until = deadline(6);
         while (here_y() != (g_depart_y ^ 31) && !expired(c_lw.until)) CO_YIELD(c_lw);
-        {
-            const sys_t *out[1];
-            int dist[1];
-            // (the way out can mis-jump as well, one in eighty, dropping us at (x, y XOR 31) with what's left:
-            // prefer a way out from which that landing still reaches a system; the escape pod doesn't work
-            // in witchspace, so stranded is a reload)
-            const sys_t *c8[8];
-            int d8[8];
-            int n8 = in_range(galaxy(), here_x(), here_y(), fuel(), c8, d8, 8);
-            if (!n8) {
-                // stranded (no fuel for any way out): the galactic hyperdrive needs none, and Ghy doesn't
-                // ask whether we're in witchspace. CTRL with H; CTRL let go once counting, as CTRL at the
-                // count's end (author credits on) is a forced mis-jump
-                if (!has_hyperdrive()) CO_FAIL(c_lw, "stranded in witchspace");
-                status_("Stranded in witchspace: out by galactic hyperdrive");
-                hold_none();
-                g_hold_ctrl = 1;
-                hold(&g_flight);
-                CO_CALL(c_lw, press(K_H, 10, 3));
-                c_lw.until = deadline(1);
-                CO_WAIT(c_lw, is_counting() || expired(c_lw.until));
-                g_hold_ctrl = 0;
-                hold_none();
-                if (!is_counting()) CO_FAIL(c_lw, "stranded in witchspace (galactic hyperdrive refused)");
-                c_lw.until = deadline(30);
-                CO_WAIT(c_lw, !witchspace() || expired(c_lw.until));
-                logf_("galactic hyperdrive out of witchspace: galaxy %d, (%d,%d)", galaxy() + 1, here_x(), here_y());
-                CO_EXIT(c_lw);
-            }
-            out[0] = c8[0];
-            // (and not a trap: a system with no safe jump on, see jump_max)
-            for (int pass = 0, done = 0; pass < 2 && !done; pass++)
-                for (int i = 0; i < n8; i++) {
-                    const sys_t *o[1];
-                    int od[1];
-                    if (pass == 0 && jump_trap(galaxy(), c8[i]->num)) continue;
-                    if (in_range(galaxy(), here_x(), here_y() ^ 31, fuel() - d8[i], o, od, 1)) { out[0] = c8[i]; done = 1; break; }
-                }
-            (void) dist;
-            c_lw.dest = out[0];
+        c_lw.dest = way_out_at(here_x(), here_y(), fuel());
+        if (!c_lw.dest) {
+            // stranded (no fuel for any way out): the galactic hyperdrive needs none, and Ghy doesn't
+            // ask whether we're in witchspace. CTRL with H; CTRL let go once counting, as CTRL at the
+            // count's end (author credits on) is a forced mis-jump
+            if (!has_hyperdrive()) CO_FAIL(c_lw, "stranded in witchspace");
+            status_("Stranded in witchspace: out by galactic hyperdrive");
+            hold_none();
+            g_hold_ctrl = 1;
+            hold(&g_flight);
+            CO_CALL(c_lw, press(K_H, 10, 3));
+            c_lw.until = deadline(1);
+            CO_WAIT(c_lw, is_counting() || expired(c_lw.until));
+            g_hold_ctrl = 0;
+            hold_none();
+            if (!is_counting()) CO_FAIL(c_lw, "stranded in witchspace (galactic hyperdrive refused)");
+            c_lw.until = deadline(30);
+            CO_WAIT(c_lw, !witchspace() || expired(c_lw.until));
+            logf_("galactic hyperdrive out of witchspace: galaxy %d, (%d,%d)", galaxy() + 1, here_x(), here_y());
+            CO_EXIT(c_lw);
         }
         logf_("way out of witchspace: %s", c_lw.dest->name);
+        g_cursor_soft = 1, g_cursor_missed = 0;
         CO_CALL(c_lw, select_by_cursor(c_lw.dest));
+        g_cursor_soft = 0;
+        if (g_cursor_missed) {          // (out of plans, as a refused jump: then the next way out)
+            logf_("%s can't be selected on the chart: leaving it out of plans", c_lw.dest->name);
+            g_unreachable[galaxy() & 7][c_lw.dest->num >> 3] |= (uint8_t) (1u << (c_lw.dest->num & 7));
+            g_unreachable_n++;
+            continue;
+        }
         CO_CALL(c_lw, hold_until(K_F0, is_front, 3, "front view"));
         {
             ship_t *const sh = g_see_buf;

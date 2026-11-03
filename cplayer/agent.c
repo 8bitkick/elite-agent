@@ -362,15 +362,92 @@ PT_THREAD(hunt(float minutes)) {
 // then out to the nearest system. The hop leaves fuel for the way out: a mis-jump costs the hop's
 // fuel and drops us at (x, y XOR 31) (MJP in the source)
 static struct { CO; const sys_t *dest; double tally0; uint32_t t0; } c_ws;
-static const sys_t *witch_hop(void) {
+const sys_t *chain_hop_at(int x, int y, int fuel, int *cost);       // (flight.c)
+const sys_t *way_out_at(int x, int y, int fuel);
+static const sys_t *witch_hop_at(int x, int y, int *dist) {
     const sys_t *out[1], *near[2];
     int d[1], nd[2];
     // (0.2 LY to spare on both: the game's distance can round against ours, and a jump it refuses is a stuck)
-    if (!in_range(galaxy(), here_x(), here_y() ^ 31, 68, out, d, 1)) return NULL;
+    if (!in_range(galaxy(), x, y ^ 31, 68, out, d, 1)) return NULL;
     int budget = 68 - d[0];                  // (after a refuel)
-    int n = in_range(galaxy(), here_x(), here_y(), budget, near, nd, 2);
+    int n = in_range(galaxy(), x, y, budget, near, nd, 2);
+    if (n && dist) *dist = nd[0];
     return n ? near[0] : NULL;
 }
+static const sys_t *witch_hop(void) { return witch_hop_at(here_x(), here_y(), NULL); }
+
+// ---- where to farm (efficient). A session chains mis-jumps while the fuel covers another hop and a safe way out
+// (flight.c's chain_hop), so what one makes is the galaxy's geometry round the system it starts from: one mis-jump
+// (~8.4 points in ~2.8 min, dock to dock) or up to a dozen and more (~0.5 min each). Without the re-measuring hunts
+// moving it on (EXPERIMENTS: careers 26.9 -> 37+ h), a career farmed one mis-jump at a time between two systems.
+// The model: from each system with a full tank, the session's mis-jumps (as witch_hop, chain_hop and way_out_at
+// choose) and where it docks after; a system's worth, the points a minute of the next four sessions from it
+#define FARM_K 4
+static struct { int g, step, unreach; uint8_t n[256], exit[256], endf[256], endy[256]; uint16_t v[256]; } s_farm = {-1};
+static int farm_ready_model(void) { return s_farm.g == galaxy() && s_farm.unreach == g_unreachable_n && s_farm.step > 256 + 1; }
+int farm_value(const sys_t *s) { return !g_curious && s_farm.g == galaxy() && s_farm.step >= 256 ? s_farm.n[s->num] : -1; }
+// a step of the model: 16 systems' sessions, then every way out, then the worths
+static void farm_step(void) {
+    const sys_t *sys = galaxy_systems(galaxy());
+    if (s_farm.g != galaxy() || s_farm.unreach != g_unreachable_n) s_farm.g = galaxy(), s_farm.unreach = g_unreachable_n, s_farm.step = 0;
+    if (s_farm.step < 256) {
+        for (int i = s_farm.step; i < s_farm.step + 16; i++) {
+            int d = 0, n = 0, f = 0, y = sys[i].y, cost;
+            if (witch_hop_at(sys[i].x, sys[i].y, &d)) {
+                f = 70 - d, y ^= 31, n = 1;
+                while (n < 30 && chain_hop_at(sys[i].x, y, f, &cost)) f -= cost, y ^= 31, n++;
+            }
+            s_farm.n[i] = (uint8_t) n, s_farm.endf[i] = (uint8_t) f, s_farm.endy[i] = (uint8_t) y;
+        }
+        s_farm.step += 16;
+    } else if (s_farm.step == 256) {
+        for (int i = 0; i < 256; i++) {
+            const sys_t *e = s_farm.n[i] ? way_out_at(sys[i].x, s_farm.endy[i], s_farm.endf[i]) : NULL;
+            s_farm.exit[i] = (uint8_t) (e ? e->num : i);
+        }
+        s_farm.step++;
+    } else if (s_farm.step == 257) {
+        for (int i = 0; i < 256; i++) {
+            int n = 0, m = 0;
+            for (int k = 0, j = i; k < FARM_K; k++, j = s_farm.exit[j]) n += s_farm.n[j], m += 233 + 49 * s_farm.n[j];
+            s_farm.v[i] = (uint16_t) (n * 10000 / m);
+        }
+        s_farm.step++;
+    }
+}
+// the best place to farm from here: the one that reaches the next milestone soonest, the hops to it (~3.5 min each,
+// trading on the way) and then the points still wanted at its sessions' rate (~8.45 points a mis-jump). The milestone
+// is when the career leaves this galaxy or ends: mission 1 is offered at a tally of 256 (galaxy 1), mission 2 is due at
+// 1280 (galaxy 2), then Elite at 6400. (Run 1, an hour's horizon everywhere: a 17-hop trip in galaxy 1 to a farm it
+// left 25 minutes later.) NULL: here (or nowhere sooner by a tenth)
+static double farm_minutes(int num, int hops, double need) {
+    return s_farm.v[num] ? 3.5 * hops + need / (8.45 * s_farm.v[num] / 100.0) : 1e9;
+}
+static const sys_t *farm_ground(void) {
+    static int16_t hops[256];
+    static uint8_t q[256];
+    const sys_t *sys = galaxy_systems(galaxy()), *h = here_sys();
+    if (!h || !farm_ready_model()) return NULL;
+    double goal = g_no_missions ? 6400 : galaxy() == 0 ? 256 : galaxy() == 1 && m2() == 0 ? 1280 : 6400;
+    double need = goal - tally_seen();
+    if (need <= 0) return NULL;
+    for (int i = 0; i < 256; i++) hops[i] = -1;
+    int head = 0, tail = 0, best = h->num;
+    double here = farm_minutes(h->num, 0, need), bt = here;
+    q[tail++] = h->num, hops[h->num] = 0;
+    while (head < tail) {
+        int a = q[head++];
+        double t = farm_minutes(a, hops[a], need);
+        if (t < bt) best = a, bt = t;
+        if (hops[a] >= 22) continue;          // (route()'s paths: 24 systems)
+        const sys_t *nb[64];
+        int d[64], n = in_range(galaxy(), sys[a].x, sys[a].y, 70, nb, d, 64);
+        for (int i = 0; i < n; i++)
+            if (hops[nb[i]->num] < 0) { hops[nb[i]->num] = (int16_t) (hops[a] + 1); q[tail++] = nb[i]->num; }
+    }
+    return best != h->num && bt < here * 0.9 ? &sys[best] : NULL;
+}
+
 PT_THREAD(witch(void)) {
     CO_BEGIN(c_ws);
     c_ws.dest = witch_hop();
@@ -409,7 +486,8 @@ static void rate_add(int k, double pts, uint32_t frames) {
 // (and money for fuel: Thargoids pay points, not cash, and every session buys fuel; broke, a jump can't
 // start and nothing else can be done. Below WITCH_CASH, trade or hunt bounties first)
 #define WITCH_CASH 1000      // tenths: 100 Cr
-static int witch_ready(void) { return farm_ready() && laser(0) == 0x97 && laser(1) != 0 && cash() >= WITCH_CASH && witch_hop() != NULL; }
+static int witch_able(void) { return farm_ready() && laser(0) == 0x97 && laser(1) != 0 && cash() >= WITCH_CASH; }
+static int witch_ready(void) { return witch_able() && witch_hop() != NULL; }
 // (why not witchspace now: the first condition that fails, for the trip log)
 static int choose_witch(void);
 static const char *witch_why(void) {
@@ -419,23 +497,18 @@ static const char *witch_why(void) {
     if (laser(0) != 0x97) return "no witch: military";
     if (laser(1) == 0) return "no witch: rear laser";
     if (cash() < WITCH_CASH) return "no witch: cash";
-    if (witch_hop() == NULL) return "no witch: hop";
+    if (g_curious && witch_hop() == NULL) return "no witch: hop";       // (efficient: on to a farm instead, see trip)
     return choose_witch() ? "witch" : "hunt chosen";
 }
-double g_explore_ratio = 0;     // (test, EXPLORE: 0 always explore)
 static int choose_witch(void) {
-    if (!witch_ready()) return 0;
     if (g_fair && !g_fair_misjump) return 0;       // (fair, without the Easter egg: no forced mis-jumps)
-    if (g_curious) return g_rate[1].n * 2 <= g_rate[0].n;          // one session in three
+    if (g_curious) return witch_ready() && g_rate[1].n * 2 <= g_rate[0].n;          // one session in three
+    if (!witch_able()) return 0;
     if (g_rate[1].n < 3) return 1;
     if (g_rate[0].n < 3) return 0;
-    // one session in ten to the other: rates change as the ship and the galaxy do. (Efficient: not while one is
-    // g_explore_ratio times the other: witchspace runs ~6 pts/min to hunting's ~1.3 all career, and the
-    // re-measuring hunts were ~20 sessions, ~2.8 game hours)
-    int best = rate_of(1) > rate_of(0);
-    double hi = fmax(rate_of(0), rate_of(1)), lo = fmin(rate_of(0), rate_of(1));
-    if ((g_rate[0].n + g_rate[1].n) % 10 == 9 && !(g_explore_ratio > 0 && hi > g_explore_ratio * lo)) return !best;
-    return best;
+    // (efficient: the better rate, no re-measuring sessions. One in ten to the other was ~20 hunts a career, ~4 game
+    // hours with the hops to and from the anarchies; their moves were what found the farms that chain, see farm_ground)
+    return rate_of(1) > rate_of(0);
 }
 static struct { double t; uint32_t f; int kind, pending; } g_sess;      // kind: -1 none
 int player_session_kind(void) { return g_sess.kind; }     // (run_sim's time split: 0 hunting, 1 witchspace, -1 neither)
@@ -518,6 +591,24 @@ PT_THREAD(trip(void)) {
     if (g_curious) g_no_session++;
     // (the backstop: a dozen trips with no session at all, witchspace if it's ready)
     if (choose_witch() || (g_curious && g_no_session >= 12 && witch_ready())) {
+        if (!g_curious) {
+            // efficient: farm where the sessions chain most (the model a step a frame, once a galaxy)
+            while (!farm_ready_model()) { farm_step(); CO_YIELD(c_trip); }
+            c_trip.a = farm_ground();
+            if (c_trip.a) {
+                c_trip.n = route(galaxy(), here_x(), here_y(), c_trip.a->x, c_trip.a->y, 3.0f, c_trip.path, 24);
+                if (c_trip.n > 1) {
+                    logf_("farming from %s (%d mis-jumps a session; here %d): via %s", c_trip.a->name, s_farm.n[c_trip.a->num],
+                          here_sys() ? s_farm.n[here_sys()->num] : -1, c_trip.path[1]->name);
+                    note("{\"event\": \"farm_move\", \"to\": \"%s\", \"mj\": %d, \"jumps\": %d}", c_trip.a->name,
+                         s_farm.n[c_trip.a->num], c_trip.n - 1);
+                    CO_CALL(c_trip, fly_to(c_trip.path[1], NULL));
+                    CO_EXIT(c_trip);
+                }
+            }
+        }
+    }
+    if ((choose_witch() && witch_hop()) || (g_curious && g_no_session >= 12 && witch_ready())) {
         g_no_session = 0;
         g_sess.t = tally_seen(), g_sess.f = now(), g_sess.kind = 1;
         CO_CALL(c_trip, witch());
@@ -733,7 +824,7 @@ void player_frame(void) {
         g_fail = NULL;
         g_gen++;                // every coroutine starts afresh
         g_in_flight = 0;
-        g_misjump = g_hold_ctrl = g_bail_energy = 0;
+        g_misjump = g_hold_ctrl = g_bail_energy = g_cursor_soft = 0;
         (void) 0;    // (an open session is scored at the next dock, after the reload: a death scores what the save had)
         hold_none();
         c_car.pt.lc = 0;
@@ -802,7 +893,7 @@ void player_lab_init(player_io_t *io) {
     drv_reset_keys();
     g_lab_cleared = 0;
     g_lab_t0 = 0xFFFFFFFF;
-    g_misjump = g_hold_ctrl = g_bail_energy = 0;
+    g_misjump = g_hold_ctrl = g_bail_energy = g_cursor_soft = 0;
     if (witchspace()) g_depart_y = here_y() ^ 31;     // (the snapshot is after the flip: no waiting for it)
 }
 const char *g_lab_why;

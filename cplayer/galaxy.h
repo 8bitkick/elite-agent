@@ -15,6 +15,7 @@ int distance_qq8(int x0, int y0, int x1, int y1);    // light years x 10, as QQ8
 const sys_t *nearest_system(int galaxy, int qq9, int qq10);     // TT111's choice
 // systems with 0 < distance <= max_qq8, nearest first; returns how many (up to max)
 extern uint8_t g_unreachable[8][32];
+extern int g_unreachable_n;
 int jump_max(int galaxy, int num);
 int jump_trap(int galaxy, int num);
 extern uint8_t g_loop_reach[256];
