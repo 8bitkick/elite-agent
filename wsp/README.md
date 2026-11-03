@@ -5,7 +5,7 @@
 *Sidewinder, Mamba, Adder and a pirate Cobra Mk III, recorded at Deadly rank, replayed with the network flying; four kills in 4.8 seconds. Left: BBC Master Elite in the emulator. Right: the network's 91 units, lit by activation.*
 
 A reimagining of [8bitkick/elite-agent](https://github.com/8bitkick/elite-agent)'s combat core
-using the idea in [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/):
+using the idea in MIT CSAIL's [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/):
 instead of writing the pilot as C rules, **write it as the weights of a neural network, directly**.
 No data, no loss, no gradients, no rollouts before it is scored. Every one of the 2,053 weights was
 placed by reasoning about what each unit should compute, the way the blog's Experiment 5 writes a
