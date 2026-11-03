@@ -15,12 +15,12 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 | ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
 | A flyby, watched from the side | Lasers on a Thargoid in witchspace | Elite |
 
-## [→ The weight-space pilot: this agent's dogfight as a hand-written neural network](wsp/README.md)
+**[→ The weight-space pilot: this agent's dogfight as a hand-written neural network](wsp/README.md)**
 
 [![A Deadly-rank fight flown by the network, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md)
 
 On this branch, the dogfight core is rewritten as a neural network whose weights were written by hand, with no training,
-then spliced into this agent behind `WSP=1`. It flies the real game and clears every one of the fight lab's hardest
+then spliced into this agent behind `WSP=1`. The whole model is under 8 KB of weights, run by a forward pass in plain C with no ML library, the same as the rest of the agent. It flies the real game and clears every one of the fight lab's hardest
 recorded fights without a death. The network, the lab results and the roadmap are in **[wsp/README.md](wsp/README.md)**.
 (After MIT CSAIL's [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/), 2 Nov 2026.)
 
