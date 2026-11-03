@@ -9,8 +9,13 @@
 #include "show.h"
 #include "ptime.h"
 #include "wsp_pilot.h"
-// WSP=1: the weight-space pilot (wsp_pilot.c) flies the stick, fires and sets the throttle in a fight
-static int wsp_on(void) { static int v = -1; if (v < 0) { const char *e = getenv("WSP"); v = e && *e != '0'; } return v; }
+// the weight-space pilot (wsp_pilot.c, wsp/README.md) flies the stick, fires and sets the throttle in a fight: in fair mode
+// by default, its own pilot; WSP=1 in efficient mode too, WSP=0 the C law in fair mode (comparisons)
+static int wsp_on(void) {
+    static int v = -1;
+    if (v < 0) { const char *e = getenv("WSP"); v = e ? *e != '0' : -2; }
+    return v == -2 ? g_fair != 0 : v;
+}
 static wsp_out_t s_wsp;
 #if APP_LOADED
 static FILE *wsp_log(void) { return NULL; }      // (the Presto app: no files)

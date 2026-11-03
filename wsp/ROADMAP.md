@@ -6,13 +6,14 @@ a paired comparison against the C pilot), kept only if points a minute go up wit
 
 ## Done
 
-| | efficient | fair |
+| | Optimal | Fair |
 |---|---|---|
-| v1: 2,053 hand-written weights, lateral-offset steering | ~72% of the C (hard set) | |
+| v1: 2,053 AI-authored weights, lateral-offset steering | ~72% of the C rules (hard set) | |
 | v2 as written: the C's steering law in angle space, every constant named | 92.4% | |
 | v2 evolved: CMA-ES on the 21 named parameters | 97.2% | 97.1% |
-| v2 evolved + the C's planner for witchspace acquisition (`WSP=1`) | 98.6% | **102.8%** |
-| fair careers to Elite, three seeds | | **27.2 h against 27.8** |
+| v2 evolved + the C's planner for witchspace acquisition (fair mode's pilot) | 98.6% | **102.8%** |
+| fair careers to Elite, before chain-farm, three seeds | | **27.2 h against 27.8** |
+| fair careers to Elite, with chain-farm, two seeds | | 16.5 h against 16.4 (level) |
 
 Tried and dropped (wsp/README.md has the numbers): PPO on a residual, DAgger regression of the planner,
 stick dithering, confidence gates on lead and fire, a nose hold, fair-tracker settings.
@@ -24,15 +25,16 @@ stick dithering, confidence gates on lead and fire, a nose hold, fair-tracker se
    which a regression averaged away. DAgger as before (`evolve/distil.py`, `WSPTEACH=1`), gated beyond three hit
    radii so the tracking stays exact. Done when `WSPPLAN=0` with the distilled units matches `WSPPLAN=2`.
 2. **Use the confidence inputs.** Four inputs (heading seen, staleness, range and motion uncertainty) are wired
-   in and read "sure" in efficient mode; the written law ignores them. Hand-written gates on them cost points, so
+   in and read "sure" in Optimal mode; the written law ignores them. Written gates on them cost points, so
    let evolution set them jointly with the rest (the parameters exist: `lead_guess`, `fire_r_guess`).
 3. **Target choice.** Still the C's (`target_value`). In fair mode a far Thargon is a dot with a guessed heading;
    a network that weighs targets by how sure it is of them, not just their points and turn time, is the kind of
    decision the paper is about.
-4. **Efficient careers.** The lab says 98.6% of the C in efficient mode; careers to Elite on the same seeds
+4. **Optimal careers.** The lab says 98.6% of the C rules in Optimal mode; careers to Elite on the same seeds
    would confirm it.
-5. **The Presto.** The network is compiled into the board's builds but can't be switched on there (no
-   environment); a mode on the web panel and over USB, like Fair.
+5. **The Presto.** Fair mode flies the network by default, and the board has no environment to say otherwise, so
+   fair mode on the Presto now flies it too. Its build includes `wsp_pilot.c` with file I/O compiled out, but it
+   hasn't been built or run on the board yet: do that, and time the forward pass (about 2,000 multiply-adds a frame).
 6. **The reading side.** Give the `.npz` without its names and notes to a frontier model and ask what it does,
    unit by unit, as the paper's first experiments do. `author.py`'s notes are the ground truth.
 

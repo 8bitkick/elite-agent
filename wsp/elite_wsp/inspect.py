@@ -14,7 +14,7 @@ def main(path="elite_pilot.npz"):
             b = net.b[i][j]
             print(f"  {name:12s} = {' '.join(terms)}{f' {b:+.4g}' if b else ''}   # {net.notes[i][j]}")
         prev = net.names[i]
-    print(f"\n{net.size()} weights, all written by hand")
+    print(f"\n{net.size()} weights, every one written as a named unit (wsp/elite_wsp/author.py)")
 
 
 if __name__ == "__main__":

@@ -12,10 +12,11 @@ W, H = 820, 420
 X0, X1, Y0, Y1 = 64, 640, 352, 24          # plot area
 HMAX, TMAX = int(os.environ.get('HMAX', 140)), 7000      # (HMAX=hours: the x axis)
 STYLE = {   # colour, label (validated: violet / aqua / orange, every line direct-labelled)
-    'efficient': ('#6250d6', 'Efficient'),
-    'fair': ('#1baf7a', 'Fair (information)'),
-    'cfair': ('#1baf7a', 'C pilot, fair'),
-    'curious': ('#eb6834', 'Curious (more stylish piloting)'),
+    'efficient': ('#6250d6', 'Optimal (RAM peeks beyond a player)'),
+    'fair': ('#1baf7a', 'Fair (on-screen visible inputs, 8 KB AI pilot model)'),
+    'cfair': ('#8a8a96', 'Fair, C rules (WSP=0)'),
+    'fairnet': ('#1baf7a', 'Fair, network (the default)'),
+    'curious': ('#eb6834', 'Curious (exploration and dogfights)'),
     'master': ('#6250d6', 'BBC Master (SNG47, points by ship)'),
     'modelb': ('#eb6834', 'Model B (disc Elite, 1 a kill)'),
     'wsp': ('#c42e8a', 'Weight-space fair (WSP=1 FAIR=1)'),

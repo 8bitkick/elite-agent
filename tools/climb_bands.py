@@ -53,11 +53,11 @@ def main():
         fin = [c[-1][0] for c in careers]
         legend.append((colour, len(careers) > 1, '%s: best %.1f h' % (label.split(' (')[0], fin[0]) + (', slowest %.1f, mean of %d %.1f' % (fin[-1], len(fin), sum(fin) / len(fin)) if len(fin) > 1 else '')))
     y = Y(2200)             # (bottom right: empty, the careers are past here before they climb this high)
-    lx = X(HMAX * 0.52)
+    lx = X(HMAX * 0.6)
     for colour, band, txt in legend:
         s.append('<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" stroke="%s" stroke-width="2.8"/><text x="%.1f" y="%d" fill="#0b0b0b">%s</text>' % (lx, lx + 22, y, y, colour, lx + 28, y + 4, txt))
         y += 20
-    s.append('<text x="%d" y="%d" fill="#52514e" text-anchor="end">bold: each pilot&#8217;s fastest career; faint: its slowest (the same three seeds for both fair pilots)</text>' % (X1, Y0 + 58))
+    s.append('<text x="%d" y="%d" fill="#52514e" text-anchor="end">bold: each pilot&#8217;s fastest career; faint: its slowest (the same seeds for both fair pilots)</text>' % (X1, Y0 + 58))
     s.append('</svg>')
     open(out, 'w').write('\n'.join(s) + '\n')
 
