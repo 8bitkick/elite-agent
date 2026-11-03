@@ -1,152 +1,135 @@
-"""Weight-space programming: the dogfight law written straight into an MLP.
+"""The v2 pilot, written unit by unit. Every constant is a named parameter (PARAMS); evolution moves them.
 
-No data, no loss, no gradients. Each hidden unit is named and its incoming
-weights are written by hand from reference.py's spec. The primitives are the
-ones a ReLU network offers natively:
+The law is the C pilot's steer() and throttle, re-expressed for a ReLU network over the senses
+(features.py), with the hands (the stick maps) left to wsp_pilot.c:
 
-  relu(u), relu(-u)                      the two halves of a signed value; |u| is their sum
-  sat(u) = relu(S*u) - relu(S*u - 1)     a step 0..1 (S sharp): a boolean from a comparison
-  relu(v + M*g - M)                      v gated by boolean g (|v| < M): "v if g else 0"
-  relu(a + b - 1)                        AND of two booleans
+  roll   alpha = -roll_gain * s * min(|lead x| / roll_ramp, roll_cap * |cx|) * sign      s = +1 above, -1 below
+  pitch  beta  =  pitch_gain * relu(s * lead y - pitch_cone * |lead x|) * s  +  back_gain when far off the nose
+  fire   off angle < fire_r * angular radius, ahead, in range, laser cool
+  speed  the C's bands: stop to turn, then by range
 
-Run as a script to write elite_pilot.npz.
+Run as a script to write elite_pilot.npz, elite_pilot.wsp (run-time) and cplayer/pilot_weights.h.
 """
-import numpy as np
-
+import math, sys
 from .features import NAMES as FEATURES
+from .layers import Layer, sat_ref, neg, add
 
-S = 1000.0     # step sharpness: a comparison is decided within 1/S of a scaled unit (4 game units; sharper loses float32 precision)
-M = 32.0       # gate headroom: positions are clipped to ±8 scaled, aim points to a little more
-
-ROLL_GAIN, PITCH_GAIN, LEAD_C = 593.0, 1362.0, 4.5 / 64.0
-FIRE_R, FIRE_ZMAX, HOT, FAR, MID, STICK = 1.431, 30000 / 4096.0, 0.85, 2.0, 0.5, 127.0
-ROLL_KICK, PITCH_KICK, KICK_AT = 32.0, 36.0, 0.002
-BAND_GAIN = (3.0, 1.0, 0.3)   # 1/z at each band's typical range (0.3, 1, 3.5 scaled): the gains act on the angle   # the stick's dead zone (jstx_for, jsty_for), and the error that earns the kick
-
-
-class Layer:
-    """A ReLU layer whose units are written one at a time by name."""
-
-    def __init__(self, inputs, relu=True):
-        self.inputs, self.relu = list(inputs), relu
-        self.names, self.rows, self.biases, self.notes = [], [], [], []
-
-    def unit(self, name, weights, bias=0.0, note=""):
-        row = np.zeros(len(self.inputs))
-        for src, w in weights.items():
-            row[self.inputs.index(src)] += w
-        self.names.append(name); self.rows.append(row); self.biases.append(bias); self.notes.append(note)
-        return name
-
-    def passthrough(self, name):
-        """The same value one layer on (relu of a non-negative value is itself)."""
-        return self.unit(name, {name: 1.0}, note="carried forward")
-
-    def sat_pair(self, name, weights, bias, note=""):
-        """sat(u) = relu(S u) - relu(S u - 1): two units; combine with sat_ref()."""
-        w = {k: S * v for k, v in weights.items()}
-        self.unit(name + "+", w, S * bias, note)
-        self.unit(name + "-", w, S * bias - 1.0, note + " (the saturating half)")
-        return name
-
-    def W(self):
-        return np.array(self.rows, dtype=np.float32), np.array(self.biases, dtype=np.float32)
+# the defaults are the C pilot's own tuned numbers (combat.c, g_cp) translated to these units
+PARAMS = dict(
+    lead=4.5,                 # game loops ahead to aim
+    roll_gain=256 / 1.726,    # roll rate a radian of roll error (steer: 256 / roll_iters)
+    roll_ramp=0.06,           # rad: within this of the nose the roll eases off with the lateral offset
+    roll_cap=1.0,             # the roll error's cap as clock-x
+    pitch_gain=256 / 3.007,   # pitch rate a radian (steer: 256 / pitch_iters)
+    pitch_cone=1.0,           # pitch eases off as |lead x| grows (steer: cos^3 of the roll error)
+    back_gain=8.0,            # pitch hard when the target is far off the nose and near the vertical plane
+    back_cone=1.0,
+    acq_th=0.5,               # "far off": off angle / pi (0.5: behind, as the C law has it)
+    # fair mode: what to do when the senses are unsure (features hseen, age, rsd, vsd; all "sure" in efficient mode)
+    nose_hold=0.0,            # inside this many hit radii of the nose, no roll: pitch alone brings it in (steer's g_nose_hold)
+    lead_guess=1.0,           # the lead's share when the heading is guessed from motion (1: as seen; 0: aim at the dot)
+    fire_r_guess=1.0,         # the hit radius's scale when the type is a stand-in (the heading guessed)
+    hyst=0.34,                # above/below kept on the side the stick is pitching (steer: 0.35 rad)
+    fire_r=1.431,             # hit radii (combat.c fire_r)
+    fire_range=30000 / 4096,
+    hot=224 / 255,            # laser temperature to hold fire above
+    turn_off=15 / 180,        # off angle (th units) past which it turns rather than flies
+    spd_turn=0.0,
+    near=1000 / 4096, mid=1800 / 4096, far=4000 / 4096,
+    spd_close=0.0, spd_near=1.0, spd_mid=31.0, spd_far=27.0,
+)
+M = 4.0                       # gate headroom (the gated values are under roll_cap + 1)
 
 
-def sat_ref(name, scale=1.0):
-    return {name + "+": scale, name + "-": -scale}
-
-
-def build():
-    # ------------------------------------------------------------------ layer 1: decode the geometry
+def build(P=None):
+    P = {**PARAMS, **(P or {})}
+    # ------------------------------------------------------------------ layer 1: read the sightline
     L1 = Layer(FEATURES)
-    aim = {"x": {"tx": 1, "vx": LEAD_C}, "y": {"ty": 1, "vy": LEAD_C}, "z": {"tz": 1, "vz": LEAD_C, "own": -LEAD_C}}
-    for k, w in aim.items():                      # the lead aim point, split into its two signed halves
-        L1.unit(f"a{k}+", w, note=f"aim {k}, positive part")
-        L1.unit(f"a{k}-", {s: -v for s, v in w.items()}, note=f"aim {k}, negative part")
-    for k in "xy":                                 # the target's actual lateral position, for the fire test
-        L1.unit(f"{k}+", {f"t{k}": 1}, note=f"target {k}, positive part")
-        L1.unit(f"{k}-", {f"t{k}": -1}, note=f"target {k}, negative part")
-    L1.sat_pair("up", aim["y"], 0.0, "target above the nose (after lead)")
-    L1.sat_pair("behind", {s: -v for s, v in aim["z"].items()}, 0.0, "target behind us (after lead)")
-    L1.sat_pair("zpos", {"tz": 1}, 0.0, "in front")
-    L1.sat_pair("znear", {"tz": -1}, FIRE_ZMAX, "within laser range")
-    L1.sat_pair("cool", {"hot": -1}, HOT, "laser cool enough to fire")
-    L1.sat_pair("mid", {"tz": 1}, -MID, "throttle band: past MID")
-    L1.sat_pair("far", {"tz": 1}, -FAR, "throttle band: past FAR")
-    L1.unit("fr", {"r": FIRE_R / 16.0}, note="hit radius in position units")
-    L1.unit("seen", {"seen": 1}, note="a target exists")
+    lead = P["lead"] / 16                                   # wx, wy are rad a loop x 16
+    lg = P["lead_guess"]
+    for k in "xy":
+        # the lead when the heading is seen; a share lead_guess of it when guessed: lead x (lg + (1 - lg) hseen) x w
+        # = lg lead w + (1 - lg) lead (hseen AND w): the product by a gate, split into its halves (w's halves x hseen)
+        L1.unit(f"l{k}+", {f"u{k}": 1, f"w{k}": lg * lead}, note=f"lead aim {k} on the view, positive half (the guessed-heading share)")
+        L1.unit(f"l{k}-", {f"u{k}": -1, f"w{k}": -lg * lead}, note=f"lead aim {k} on the view, negative half")
+        if lg < 1:
+            L1.unit(f"hw{k}+", {f"w{k}": (1 - lg) * lead, "hseen": 8.0}, -8.0, f"the rest of the lead {k}, positive half, only when the heading is seen")
+            L1.unit(f"hw{k}-", {f"w{k}": -(1 - lg) * lead, "hseen": 8.0}, -8.0, f"the rest of the lead {k}, negative half, only when the heading is seen")
+        L1.unit(f"c{k}+", {f"c{k}": 1}, note=f"clock {k}, positive half")
+        L1.unit(f"c{k}-", {f"c{k}": -1}, note=f"clock {k}, negative half")
+    L1.sat_pair("up", {"cy": 1, "jy": -P["hyst"]}, 0.0, "target above the nose (kept while the stick pitches that way)")
+    L1.sat_pair("offnose", {"th": 1}, -P["acq_th"], "target far off the nose: acquire it")
+    L1.sat_pair("aligned", {"th": -1}, P["turn_off"], "within turn_off of the nose")
+    for b in ["near", "mid", "far"]:
+        L1.sat_pair("d" + b, {"dist": 1}, -P[b], f"range past {b}")
+    frg = P["fire_r_guess"]
+    # the fire cone: th < fire_r rho/(16 pi) x (frg + (1 - frg) hseen); the hseen product as a gated pair one layer on
+    L1.unit("fcone", {"rho": frg * P["fire_r"] / (16 * math.pi)}, note="the fire cone, the guessed-type share")
+    L1.unit("fcone_h", {"rho": (1 - frg) * P["fire_r"] / (16 * math.pi), "hseen": 8.0}, -8.0, "the rest of the fire cone, only when the type is seen")
+    L1.unit("th", {"th": 1}, note="off angle, carried")
+    L1.sat_pair("outhold", {"th": 1, "rho": -P["nose_hold"] / (16 * math.pi)}, 0.0, "outside nose_hold hit radii of the nose: roll allowed", S=20000.0)
+    L1.sat_pair("ahead", {"uz": 1}, 0.0, "target ahead")
+    L1.sat_pair("inrange", {"dist": -1}, P["fire_range"], "within laser range")
+    L1.sat_pair("cool", {"hot": -1}, P["hot"], "laser cool enough")
+    L1.unit("seen", {"seen": 1}, note="a target")
 
-    # ------------------------------------------------------------------ layer 2: roll, pitch, fire geometry
+    # ------------------------------------------------------------------ layer 2: roll magnitude, pitch, behind, ANDs
     L2 = Layer(L1.names)
-    UP = sat_ref("up")
-    g_on = {k: M * v for k, v in UP.items()}; g_on_b = -M        # gate: v + M*up - M
-    g_off = {k: -M * v for k, v in UP.items()}; g_off_b = 0.0    # gate: v - M*up
-    # alpha = -ax when the target is above, +ax when below (each as a positive half)
-    L2.unit("roll_up+", {"ax-": 1, "ax+": -1, **g_on}, g_on_b, "relu(-ax) if up")
-    L2.unit("roll_up-", {"ax+": 1, "ax-": -1, **g_on}, g_on_b, "relu(+ax) if up")
-    L2.unit("roll_dn+", {"ax+": 1, "ax-": -1, **g_off}, g_off_b, "relu(+ax) if below")
-    L2.unit("roll_dn-", {"ax-": 1, "ax+": -1, **g_off}, g_off_b, "relu(-ax) if below")
-    # beta = relu(ay - |ax|) - relu(-ay - |ax|): pitch towards the target, eased while the roll error is large
-    L2.unit("pitch_up", {"ay+": 1, "ay-": -1, "ax+": -1, "ax-": -1}, note="relu(ay - |ax|)")
-    L2.unit("pitch_dn", {"ay-": 1, "ay+": -1, "ax+": -1, "ax-": -1}, note="relu(-ay - |ax|)")
-    # behind us: pitch hard on the chosen side (AND of two booleans)
-    L2.unit("behind_up", {**sat_ref("behind"), **UP, "seen": 1}, -2.0, "behind AND up AND seen")
-    L2.unit("behind_dn", {**sat_ref("behind"), **{k: -v for k, v in UP.items()}, "seen": 1}, -1.0, "behind AND NOT up AND seen")
-    # fire geometry: |x| < fr, |y| < fr as booleans
-    L2.sat_pair("in_x", {"fr": 1, "x+": -1, "x-": -1}, 0.0, "|x| inside the hit radius")
-    L2.sat_pair("in_y", {"fr": 1, "y+": -1, "y-": -1}, 0.0, "|y| inside the hit radius")
-    for n in ["zpos+", "zpos-", "znear+", "znear-", "cool+", "cool-", "mid+", "mid-", "far+", "far-", "seen"]:
-        L2.passthrough(n)
+    r0, cap = P["roll_ramp"], P["roll_cap"]
+    L2.passthrough("cx+", "cx-")
+    LX = {"lx+": 1, "lx-": -1}; LY = {"ly+": 1, "ly-": -1}       # the signed aim point, as read from its halves
+    if lg < 1:
+        LX = add(LX, {"hwx+": 1, "hwx-": -1}); LY = add(LY, {"hwy+": 1, "hwy-": -1})
+    L2.unit("lx+", LX, note="aim x, positive half (lead by confidence)"); L2.unit("lx-", neg(LX), note="aim x, negative half")
+    L2.passthrough("up+", "up-")
+    # |aim x| = relu(x) + relu(-x), from the signed value through two of this layer's own halves: built here as a pair
+    L2.unit("ax+", LX, note="|aim x|, positive half"); L2.unit("ax-", neg(LX), note="|aim x|, negative half")
+    L2.unit("ly+", LY, note="aim y, positive half"); L2.unit("ly-", neg(LY), note="aim y, negative half")
+    # (pitch needs |aim x| and aim y in one unit: one layer on, so the pitch units move to layer 3 with the roll)
+    absc = {"cx+": P["back_cone"], "cx-": P["back_cone"]}
+    L2.unit("b_up", add({"cy+": 1, "cy-": -1}, neg(absc), sat_ref("offnose", 2.0)), -2.0, "far off, above: pull up hard")
+    L2.unit("b_dn", add({"cy-": 1, "cy+": -1}, neg(absc), sat_ref("offnose", 2.0)), -2.0, "far off, below: push down hard")
+    L2.passthrough("aligned+", "aligned-")
+    for b in ["near", "mid", "far"]:
+        L2.unit("al_" + b, add(sat_ref("aligned"), sat_ref("d" + b)), -1.0, f"aligned AND range past {b}")
+    L2.sat_pair("fin", {"fcone": 1, "fcone_h": 1, "th": -1}, 0.0, "nose inside the fire cone", S=20000.0)
+    L2.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "outhold+", "outhold-")
 
-    # ------------------------------------------------------------------ layer 3: the fire decision; the rest carried
+    # ------------------------------------------------------------------ layer 3: the roll, on the side chosen
     L3 = Layer(L2.names)
-    L3.unit("fire", {**sat_ref("in_x"), **sat_ref("in_y"), **sat_ref("zpos"), **sat_ref("znear"), **sat_ref("cool"), "seen": 1},
-            -5.0, "AND of six booleans")
-    for n in ["behind_up", "behind_dn", "mid+", "mid-", "far+", "far-", "seen"]:
-        L3.passthrough(n)
-    # the gains should act on the angle, not the lateral offset: 1/z, as three range bands (forward pass 2 on the
-    # real game: full stick at the slightest error far out, too gentle close in). Each steering term gated by a band:
-    # near = NOT mid, middle = mid AND NOT far, far = far
-    MID_, FAR_ = sat_ref("mid"), sat_ref("far")
-    for n in ["roll_up+", "roll_up-", "roll_dn+", "roll_dn-", "pitch_up", "pitch_dn"]:
-        L3.unit(n + "@near", {n: 1, **{k: -M * v for k, v in MID_.items()}}, 0.0, f"{n} if z < MID")
-        L3.unit(n + "@mid", {n: 1, **{k: M * v for k, v in MID_.items()}, **{k: -M * v for k, v in FAR_.items()}}, -M, f"{n} if MID < z < FAR")
-        L3.unit(n + "@far", {n: 1, **{k: M * v for k, v in FAR_.items()}}, -M, f"{n} if z > FAR")
-    # Elite's stick has a dead zone (jstx_for/jsty_for never put it under 32 off centre), so any error at all
-    # gets a kick past it: a step on each signed steering term (forward pass 1 on the real game: 6 deg off, 7% hold)
-    for n in ["roll_up+", "roll_up-", "roll_dn+", "roll_dn-", "pitch_up", "pitch_dn"]:
-        L3.sat_pair("on_" + n, {n: 1}, -KICK_AT, f"{n} is non-zero")
+    UP = sat_ref("up")
+    for s in "+-":
+        L3.unit("over" + s, {"lx" + s: 1 / r0, "cx" + s: -cap}, note=f"how far aim x/roll_ramp exceeds the clock cap ({s})")
+    absx = {"ax+": 1, "ax-": 1}
+    L3.unit("p_up", add({"ly+": 1, "ly-": -1}, neg(absx, P["pitch_cone"])), note="relu(aim y - cone*|aim x|): pitch up onto it")
+    L3.unit("p_dn", add({"ly-": 1, "ly+": -1}, neg(absx, P["pitch_cone"])), note="relu(-aim y - cone*|aim x|): pitch down onto it")
+    L3.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), {"seen": 1}), -4.0,
+            "AND of five: in the sights, ahead, in range, cool, a target")
+    L3.passthrough("lx+", "lx-", "up+", "up-", "b_up", "b_dn", "aligned+", "aligned-", "al_near", "al_mid", "al_far", "outhold+", "outhold-")
+    L4 = Layer(L3.names)
+    OH = sat_ref("outhold")
+    for s in "+-":
+        m = {"lx" + s: 1 / r0, "over" + s: -1}                         # min(|aim x|/ramp, cap*|cx|)
+        # gated twice: by the side (up / below) and by being outside the nose hold: v + M(up) + M(outhold) - 2M
+        L4.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold")
+        L4.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -M, f"roll magnitude ({s}) if below, outside the nose hold")
+    L4.passthrough("p_up", "p_dn", "b_up", "b_dn", "aligned+", "aligned-", "al_near", "al_mid", "al_far", "fire")
+    L3_ = L3; L3 = L4
 
-    # ------------------------------------------------------------------ output: linear, read by the stick
-    OUT = Layer(L3.names, relu=False)
-    def banded(n, g):
-        return {n + "@near": g * BAND_GAIN[0], n + "@mid": g * BAND_GAIN[1], n + "@far": g * BAND_GAIN[2]}
-    OUT.unit("jstx", {**banded("roll_up+", ROLL_GAIN), **banded("roll_up-", -ROLL_GAIN), **banded("roll_dn+", ROLL_GAIN), **banded("roll_dn-", -ROLL_GAIN),
-                      **sat_ref("on_roll_up+", ROLL_KICK), **sat_ref("on_roll_up-", -ROLL_KICK),
-                      **sat_ref("on_roll_dn+", ROLL_KICK), **sat_ref("on_roll_dn-", -ROLL_KICK)},
-             128.0, "roll stick: 128 + ROLL_GAIN * alpha / range band, kicked past the dead zone")
-    OUT.unit("jsty", {**banded("pitch_up", -PITCH_GAIN), **banded("pitch_dn", PITCH_GAIN), "behind_up": -STICK, "behind_dn": STICK,
-                      **sat_ref("on_pitch_up", -PITCH_KICK), **sat_ref("on_pitch_dn", PITCH_KICK)},
-             128.0, "pitch stick: 128 - PITCH_GAIN * beta / range band, kicked past the dead zone (nose up is < 128)")
-    OUT.unit("fire", {"fire": 1.0}, 0.0, "press the laser when > 0.5")
-    OUT.unit("speed", {"seen": -25.0, **sat_ref("mid", 10.0), **sat_ref("far", 15.0)}, 40.0, "40 alone; 15/25/40 by range")
-    return [L1, L2, L3, OUT]
-
-
-def save(path="elite_pilot.npz"):
-    layers = build()
-    arrays, meta = {}, {}
-    for i, L in enumerate(layers):
-        W, b = L.W()
-        arrays[f"W{i}"], arrays[f"b{i}"] = W, b
-        meta[f"names{i}"] = np.array(L.names)
-        meta[f"notes{i}"] = np.array(L.notes)
-    np.savez(path, **arrays, **meta, features=np.array(FEATURES))
-    n = sum(W.size + b.size for W, b in (L.W() for L in layers))
-    return path, [L.W()[0].shape for L in layers], n
+    # ------------------------------------------------------------------ output: rates, fire, speed
+    OUT = Layer(L4.names, relu=False)
+    g = P["roll_gain"]
+    OUT.unit("alpha", {"roll_up+": -g, "roll_up-": g, "roll_dn+": g, "roll_dn-": -g}, note="roll rate (stick: jstx_for)")
+    OUT.unit("beta", {"p_up": P["pitch_gain"], "p_dn": -P["pitch_gain"], "b_up": P["back_gain"], "b_dn": -P["back_gain"]},
+             note="pitch rate, + nose up (stick: jsty_for)")
+    OUT.unit("fire", {"fire": 1.0}, note="press the laser when > 0.5")
+    st, sc, sn, sm, sf = P["spd_turn"], P["spd_close"], P["spd_near"], P["spd_mid"], P["spd_far"]
+    OUT.unit("speed", add({k: sc - st for k in []}, {"aligned+": sc - st, "aligned-": -(sc - st), "al_near": sn - sc,
+                                                       "al_mid": sm - sn, "al_far": sf - sm}), st,
+             "stop to turn; aligned, by range")
+    return [L1, L2, L3_, L4, OUT]
 
 
 if __name__ == "__main__":
-    path, shapes, n = save()
-    print(f"wrote {path}: layers {' -> '.join(str(s[1]) for s in shapes)} -> {shapes[-1][0]}, {n} weights, 0 trained")
+    from .export import save_all
+    print(save_all(build()))

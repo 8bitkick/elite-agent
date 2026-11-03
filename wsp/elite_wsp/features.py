@@ -1,66 +1,57 @@
-"""The input layer: Elite's RAM -> a feature vector.
+"""The senses: what the network is told about a fight, the same as cplayer/wsp_pilot.c's wsp_features.
 
-This is the only non-neural code on the path from RAM to stick. It does what
-cplayer/ships.c's parse_block does (decode the K% block's sign-magnitude
-numbers) and nothing else: no policy lives here. Every number below is a
-raw game quantity, scaled to roughly [-1, 1] so the hand-written weights can
-be reasoned about in round units.
+Coordinate changes only. The target's sightline as a pilot reads it: how far off the nose (th) and at what
+clock position (cx, cy), how fast it is moving across the sky (wx, wy), how big it looks (rho), the range,
+how fast it is closing; and our own state, and the stick under the hand. No constant here decides anything.
 
-Feature layout (index: name, scale):
-   0  tx     target x  (right)       / 4096   front-view ship space
-   1  ty     target y  (up)          / 4096
-   2  tz     target z  (forward)     / 4096
-   3  vx     target velocity x       / 64     = nosev[0] * 1.5 * speed  (game units per loop)
-   4  vy     target velocity y       / 64
-   5  vz     target velocity z       / 64
-   6  own    our speed               / 64
-   7  energy energy banks            / 255
-   8  fsh    front shield            / 255
-   9  hot    laser temperature       / 255
-  10  r      target hit radius       / 256    sqrt(blueprint area)
-  11  one    constant 1.0                     (the bias every gate needs)
-  12  seen   1.0 if a target exists else 0.0
+  0 ux  1 uy  2 uz    unit sightline to the target (x right, y up, z ahead)
+  3 wx  4 wy          sightline rate across the view, rad a game loop x 16
+  5 th                off-nose angle / pi (0 dead ahead, 1 dead astern)
+  6 cx  7 cy          clock position, a unit vector on the screen ((0, 1) at 12 o'clock)
+  8 rho               angular radius, hit radius / range x 16
+  9 dist              range / 4096 (to 8)
+ 10 close             closing speed / 64
+ 11 own               our speed / 64
+ 12 hot              laser temperature / 255
+ 13 energy           / 255
+ 14 ws               1 in witchspace
+ 15 jx  16 jy         the stick, -1..1 (jy < 0: nose up)
+ 17 seen             1 with a target
+ 18 one              the bias input
+ 19 hseen            1 if the target's heading was read from its wireframe, 0 if guessed from its motion (fair mode)
+ 20 age              seconds since the target was last measured, to 4 (0 in efficient mode)
+ 21 rsd              the range's uncertainty x 4 (1.0 = a 25% range error; 0 in efficient mode)
+ 22 vsd              the motion estimate's uncertainty / 16 units a loop (0 in efficient mode)
 """
+import math
 import numpy as np
 
-N_FEATURES = 13
-NAMES = ["tx", "ty", "tz", "vx", "vy", "vz", "own", "energy", "fsh", "hot", "r", "one", "seen"]
-POS_SCALE, VEL_SCALE, R_SCALE = 4096.0, 64.0, 256.0
+NAMES = ["ux", "uy", "uz", "wx", "wy", "th", "cx", "cy", "rho", "dist", "close", "own", "hot", "energy", "ws",
+         "jx", "jy", "seen", "one", "hseen", "age", "rsd", "vsd"]
+N = len(NAMES)
+IDX = {n: i for i, n in enumerate(NAMES)}
 
 
-def _sm24(lo, hi, sign):
-    v = (sign & 0x7F) << 16 | hi << 8 | lo
-    return -v if sign & 0x80 else v
-
-
-def _sm16(lo, hi):
-    v = (hi & 0x7F) << 8 | lo
-    return (-v if hi & 0x80 else v) / 24576.0
-
-
-def decode_ship(block):
-    """One K% block (bytes 0..36) -> dict, exactly as ships.c reads it."""
-    b = block
-    return dict(
-        x=_sm24(b[0], b[1], b[2]), y=_sm24(b[3], b[4], b[5]), z=_sm24(b[6], b[7], b[8]),
-        nosev=[_sm16(b[9 + 2 * i], b[10 + 2 * i]) for i in range(3)],
-        speed=b[27], flags31=b[31], energy=b[35],
-    )
-
-
-def features(target, own_speed, energy, fsh, laser_temp, hit_radius):
-    """target: dict from decode_ship (or None), the rest plain game bytes."""
-    f = np.zeros(N_FEATURES, dtype=np.float32)
-    f[11] = 1.0
-    f[6] = own_speed / VEL_SCALE
-    f[7] = energy / 255.0
-    f[8] = fsh / 255.0
-    f[9] = laser_temp / 255.0
-    if target is None:
-        return f
-    sp = 1.5 * target["speed"]
-    f[0:3] = np.clip(np.array([target["x"], target["y"], target["z"]]) / POS_SCALE, -8, 8)   # scanner range
-    f[3:6] = np.array(target["nosev"]) * sp / VEL_SCALE
-    f[10] = hit_radius / R_SCALE
-    f[12] = 1.0
+def features(x, y, z, vx, vy, vz, own, r, laser_temp=0, energy=255, witchspace=0, jstx=128, jsty=128,
+             heading_seen=1, age=0.0, range_sd=0.0, vel_sd=0.0):
+    f = np.zeros(N, dtype=np.float32)
+    d = max(1.0, math.sqrt(x * x + y * y + z * z))
+    ux, uy, uz = x / d, y / d, z / d
+    rx, ry, rz = vx, vy, vz - own
+    rd = rx * ux + ry * uy + rz * uz
+    wx, wy = (rx - rd * ux) / d, (ry - rd * uy) / d
+    h = math.sqrt(ux * ux + uy * uy)
+    th = math.acos(max(-1.0, min(1.0, uz)))
+    f[:] = [ux, uy, uz, wx * 16, wy * 16, th / math.pi,
+            ux / h if h > 1e-6 else 0.0, uy / h if h > 1e-6 else 1.0,
+            r / d * 16, min(d / 4096, 8), -rd / 64, abs(own) / 64, laser_temp / 255, energy / 255,
+            1.0 if witchspace else 0.0, (jstx - 128) / 128, (jsty - 128) / 128, 1.0, 1.0,
+            1.0 if heading_seen else 0.0, min(age / 50, 4.0), min(range_sd * 4, 4.0), min(vel_sd / 16, 4.0)]
     return f
+
+
+def from_log(line):
+    """A WSPLOG line from the splice: frame, the features, | the outputs."""
+    a, b = line.split("|")
+    t = a.split()
+    return int(t[0]), np.array([float(v) for v in t[1:]], dtype=np.float32), [int(v) for v in b.split()]

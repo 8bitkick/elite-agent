@@ -33,6 +33,9 @@ extern int g_fair_stay;
 void fair_reset(void);          // a new machine (player_init, the lab)
 void fair_begin_frame(void);    // player_frame: the perception update
 void fair_end_frame(void);      // ... and the hands
+// how sure the perception is of a ship it handed out (NULL: fair mode off, or not a tracked ship): for the network
+typedef struct { int valid, heading_seen, on_screen, age; double range_sd, vel_sd; } fair_conf_t;   // age in frames; range_sd as a fraction of the range; vel_sd in game units a loop
+const fair_conf_t *fair_confidence(int slot);
 int see_ships(ship_t out[NOSH]);    // the ships the decisions use: ships_read(), or in fair mode perceive()
 // (the buffer the decisions read them into, all of them: see_ships() gives the same ships all through a frame, the
 // RAM as the last frame left it, so a reader may share it as long as it reads before each use and holds nothing of

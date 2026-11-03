@@ -1,85 +1,116 @@
-"""The authored network against its spec, and against the C agent's angle law."""
-import numpy as np, os, sys
+"""The written v2 network against its spec, and the C forward pass against numpy."""
+import json, os, subprocess, sys, tempfile
+import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from elite_wsp import author, Net, policy, features, decode_ship
-from elite_wsp.reference import original_angle_law
+from elite_wsp import author
+from elite_wsp.features import features
+from elite_wsp.reference import policy, margin
 
-PATH = os.path.join(os.path.dirname(__file__), "..", "elite_pilot.npz")
-author.save(PATH)
-net = Net(PATH)
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 rng = np.random.default_rng(1)
 
 
+def forward(layers, f):
+    h = np.asarray(f, np.float32)
+    for i, L in enumerate(layers):
+        W, b = L.W()
+        h = W @ h + b
+        if i < len(layers) - 1:
+            h = np.maximum(h, 0)
+    return h
+
+
 def random_state():
-    """A fight state as the RAM would give it: a ship somewhere in the bubble, on some heading."""
-    pos = rng.integers(-30000, 30000, 3) if rng.random() < 0.7 else rng.integers(-600, 600, 3)
+    near = rng.random() < 0.5
+    pos = rng.normal(size=3) * (rng.uniform(200, 3000) if near else rng.uniform(1000, 30000))
+    if rng.random() < 0.4:
+        pos[2] = abs(pos[2]) * 20                       # often near the nose, where the law is finest
     n = rng.normal(size=3); n /= np.linalg.norm(n)
-    tgt = dict(x=pos[0], y=pos[1], z=pos[2], nosev=list(n), speed=int(rng.integers(0, 41)), flags31=0, energy=100)
-    return features(tgt, int(rng.integers(0, 41)), int(rng.integers(0, 256)), int(rng.integers(0, 256)),
-                    int(rng.integers(0, 256)), int(rng.integers(30, 100)))
+    sp = rng.uniform(0, 40) * 1.5
+    return features(*pos, *(n * sp), rng.uniform(-40, 40), rng.uniform(30, 100), int(rng.integers(0, 256)), int(rng.integers(100, 256)),
+                    int(rng.random() < 0.5), int(rng.integers(1, 256)), int(rng.integers(1, 256)),
+                    int(rng.random() < 0.6), rng.uniform(0, 2), rng.uniform(0, 0.5), rng.uniform(0, 20))
 
 
-def margin(f):
-    """Distance to the nearest decision boundary: a ReLU step is soft within 1/S of it."""
-    from elite_wsp.reference import LEAD_C, FIRE_R, FIRE_ZMAX, HOT, FAR, MID, KICK_AT
-    tx, ty, tz, vx, vy, vz, own, energy, fsh, hot, r = f[:11]
-    ay, az, fr = ty + LEAD_C * vy, tz + LEAD_C * (vz - own), FIRE_R * r / 16
-    ax = tx + LEAD_C * vx
-    beta = max(0.0, ay - abs(ax)) - max(0.0, -ay - abs(ax))
-    return min(abs(v) for v in [ay, az, tz, abs(ax) - KICK_AT, abs(beta) - KICK_AT, tz - FIRE_ZMAX, tz - MID, tz - FAR, hot - HOT, fr - abs(tx), fr - abs(ty)])
+def check_spec(P=None, n=20000):
+    layers = author.build(P)
+    worst, tested = np.zeros(4), 0
+    for _ in range(n):
+        f = random_state()
+        if margin(f, P) < 2:
+            continue
+        got = forward(layers, f)
+        want = np.array(policy(f, P))
+        got[0] = np.clip(got[0], -31, 31); want[0] = np.clip(want[0], -31, 31)        # the stick's range
+        got[1] = np.clip(got[1], -8, 8); want[1] = np.clip(want[1], -8, 8)
+        worst = np.maximum(worst, np.abs(got - want)); tested += 1
+    return worst, tested
 
 
 def test_matches_spec():
-    worst = np.zeros(4)
-    for _ in range(20000):
-        f = random_state()
-        if margin(f) < 2e-3:
+    worst, n = check_spec()
+    assert n > 10000
+    assert worst[0] < 0.1 and worst[1] < 0.1, f"rates differ by {worst[:2]}"      # (float32; the stick takes whole units)
+    assert worst[2] < 0.01 and worst[3] < 0.05, f"fire/speed differ by {worst[2:]}"
+    worst, n = check_spec(dict(lead_guess=0.3, fire_r_guess=0.6, nose_hold=2.0))     # the confidence gates and the nose hold on
+    assert n > 10000
+    assert worst[0] < 0.1 and worst[1] < 0.1, f"rates differ by {worst[:2]}"      # (float32; the stick takes whole units)
+    assert worst[2] < 0.01 and worst[3] < 0.05, f"fire/speed differ by {worst[2:]}"
+
+
+def test_matches_spec_evolved():
+    """The same with the evolved parameters, if there are any."""
+    p = os.path.join(ROOT, "wsp", "evolve", "es_params.json")
+    if not os.path.exists(p):
+        return
+    worst, n = check_spec(json.load(open(p)))
+    assert worst[0] < 0.1 and worst[1] < 0.1 and worst[2] < 0.01 and worst[3] < 0.05, worst     # (float rounding; the stick takes whole steps)
+
+
+def test_fire():
+    W = author.build()
+    assert forward(W, features(0, 0, 5000, 0, 0, 30, 30, 80, 0))[2] > 0.5      # dead ahead, cool: fire
+    assert forward(W, features(0, 0, 5000, 0, 0, 30, 30, 80, 250))[2] < 0.5    # hot: hold
+    assert forward(W, features(400, 0, 5000, 0, 0, 30, 30, 80, 0))[2] < 0.5    # 400 > 1.431 x 80 off the nose: hold
+    assert forward(W, features(0, 0, -5000, 0, 0, 30, 30, 80, 0))[2] < 0.5     # behind
+
+
+def test_roll_and_pitch_directions():
+    W = author.build()
+    a, b, _, _ = forward(W, features(500, 2000, 5000, 0, 0, 0, 30, 80))     # up and to the right
+    assert a < 0 and b > 0                                     # roll it into the vertical plane, pull up
+    a, b, _, _ = forward(W, features(500, -2000, 5000, 0, 0, 0, 30, 80))    # down and to the right
+    assert a > 0 and b < 0
+    a, b, _, _ = forward(W, features(0, 100, -5000, 0, 0, 0, 30, 80))       # behind, above
+    assert b > 0
+
+
+def test_c_matches_numpy():
+    """The C forward pass on every decision of a real fight, if the lab and a recorded fight are here."""
+    lab = os.path.join(ROOT, "cplayer", "lab_rl")
+    fights = [l.strip() for l in open(os.path.join(ROOT, "wsp", "evolve", "sets", "val.lst"))]
+    if not os.path.exists(lab) or not os.path.exists(os.path.join(ROOT, fights[0])):
+        return
+    from elite_wsp.export import arrays, save_wsp
+    layers = author.build()
+    d = tempfile.mkdtemp()
+    save_wsp(arrays(layers), os.path.join(d, "w.wsp")); open(os.path.join(d, "one.lst"), "w").write(fights[0] + "\n")
+    env = dict(os.environ, WSP="1", WSPW=os.path.join(d, "w.wsp"), WSPLOG=os.path.join(d, "log"))
+    subprocess.run([lab, os.path.join(d, "one.lst")], cwd=ROOT, env=env, capture_output=True, timeout=600)
+    n = bad = 0
+    for line in open(os.path.join(d, "log")):
+        if not line.startswith("D "):
             continue
-        got, want = net.forward(f), np.array(policy(f))
-        got[:2] = np.clip(got[:2], 1, 255)
-        worst = np.maximum(worst, np.abs(got - want))
-    assert worst[0] < 1.0 and worst[1] < 1.0, f"stick error {worst[:2]}"    # under one stick unit
-    assert worst[2] < 0.05 and worst[3] < 0.05, f"fire/speed error {worst[2:]}"
-
-
-def test_no_target():
-    f = features(None, 30, 255, 255, 0, 0)
-    jstx, jsty, fire, speed = net.act(f)
-    assert (jstx, jsty, fire, speed) == (128, 128, False, 40)
-
-
-def test_agrees_with_angle_law():
-    """Roll and pitch push the same way steer() would, whenever the net pushes at all."""
-    roll_ok = pitch_ok = n_roll = n_pitch = 0
-    for _ in range(20000):
-        f = random_state()
-        if margin(f) < 2e-3:          # (a soft step: no direction to speak of)
-            continue
-        jstx, jsty, _, _ = net.forward(f)
-        a_sign, b_sign = original_angle_law(f)
-        if abs(jstx - 128) > 2:
-            n_roll += 1; roll_ok += np.sign(jstx - 128) == a_sign
-        if abs(jsty - 128) > 2:
-            n_pitch += 1; pitch_ok += np.sign(128 - jsty) == b_sign    # nose up is jsty < 128
-    assert roll_ok == n_roll, f"roll direction disagreed {n_roll - roll_ok}/{n_roll}"
-    assert pitch_ok == n_pitch, f"pitch direction disagreed {n_pitch - pitch_ok}/{n_pitch}"
-
-
-def test_fire_cylinder():
-    ship = dict(x=0, y=0, z=5000, nosev=[0, 0, 1], speed=20, flags31=0, energy=100)
-    assert net.act(features(ship, 30, 200, 200, 0, 80))[2]                  # dead ahead, cool: fire
-    assert not net.act(features(ship, 30, 200, 200, 250, 80))[2]            # hot: hold
-    assert not net.act(features({**ship, "x": 400}, 30, 200, 200, 0, 80))[2]   # 400 > 1.431*80: miss
-    assert net.act(features({**ship, "x": 100}, 30, 200, 200, 0, 80))[2]
-    assert not net.act(features({**ship, "z": -5000}, 30, 200, 200, 0, 80))[2]   # behind
-
-
-def test_decode_matches_ships_c():
-    blk = bytes([0x34, 0x12, 0x80 | 0x01, 0, 0, 0, 0x10, 0x27, 0] + [0] * 28)
-    s = decode_ship(blk)
-    assert s["x"] == -(0x01 << 16 | 0x12 << 8 | 0x34) and s["z"] == 0x2710
+        a, b, _ = line[2:].split("|")
+        f = np.array([float(v) for v in a.split()[1:]], np.float32)
+        o = forward(layers, f)
+        alpha, beta, fire = [float(v) for v in b.split()[:3]]
+        n += 1
+        if abs(np.clip(o[0], -31, 31) - alpha) > 0.5 or abs(np.clip(o[1], -8, 8) - beta) > 0.5 or (o[2] > 0.5) != (fire > 0.5):
+            bad += 1
+    assert n > 500 and bad < n * 0.01, f"{bad} of {n} decisions differ"
 
 
 if __name__ == "__main__":
-    for t in [v for k, v in globals().items() if k.startswith("test_")]:
+    for t in [v for k, v in list(globals().items()) if k.startswith("test_")]:
         t(); print("ok", t.__name__)

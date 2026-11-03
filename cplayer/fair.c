@@ -21,6 +21,8 @@ long g_fair_chk[10][4];
 int g_fair_check;            // (the lab: count perception against the truth)
 double g_fair_q = 1;         // the tracks' process noise (variance of a ship's own change of motion a loop, units^2)
 double g_fair_lv = 1, g_fair_rv = 1, g_fair_sv = 1;     // measurement errors as modelled, x these (quantisation is correlated: a dot sits on a pixel)
+int g_fair_mem = 150;
+double g_fair_cont1 = 6000, g_fair_cont2 = 2500;   // the eye's continuity: a ship is the same track within this of where it was (same slot; any slot)          // a ship out of sight is remembered (where it should be now) this many frames (FAIRP=mem=n)
 int g_fair_stay = 3000;       // (combat.c) engaged, stay in the fight this much further out than it starts
 double g_fair_sdv = 0;        // ... and a ship seen only on the scanner
 double g_fair_dv = 1;         // a dot's estimated motion, scaled (it's poorly seen)
@@ -35,7 +37,7 @@ int g_fair_oracle;           // (diagnosis only, never in play: parts of the tru
 int fair_set_param(const char *name, double v) {
 #define P(n, var) if (!strcmp(name, n)) { var = (__typeof__(var)) v; return 1; }
     P("q", g_fair_q) P("rate", g_fair_stick_rate)
-    P("noise", g_fair_noise) P("cap", g_fair_key_cap) P("gap", g_fair_key_gap) P("mj", g_fair_misjump) P("oracle", g_fair_oracle) P("spd", g_fair_spd) P("qs", g_fair_qs) P("lv", g_fair_lv) P("rv", g_fair_rv) P("sv", g_fair_sv) P("dv", g_fair_dv) P("sdv", g_fair_sdv) P("stay", g_fair_stay) P("sz", g_fair_sz) P("cyan", g_fair_cyan) P("look", g_fair_look)
+    P("noise", g_fair_noise) P("cap", g_fair_key_cap) P("gap", g_fair_key_gap) P("mj", g_fair_misjump) P("oracle", g_fair_oracle) P("spd", g_fair_spd) P("qs", g_fair_qs) P("lv", g_fair_lv) P("rv", g_fair_rv) P("sv", g_fair_sv) P("dv", g_fair_dv) P("sdv", g_fair_sdv) P("stay", g_fair_stay) P("sz", g_fair_sz) P("cyan", g_fair_cyan) P("look", g_fair_look) P("mem", g_fair_mem) P("cont1", g_fair_cont1) P("cont2", g_fair_cont2)
 #undef P
     return 0;
 }
@@ -51,6 +53,7 @@ void fair_reloaded(void) {}
 void fair_missile_fired(void) {}
 int fair_lock_slot(void) { return -1; }
 int see_ships(ship_t out[NOSH]) { return ships_read(IO->ram, out); }
+const fair_conf_t *fair_confidence(int slot) { (void) slot; return NULL; }
 void fair_begin_frame(void) {}
 void fair_end_frame(void) {}
 #else
@@ -62,7 +65,7 @@ void fair_note_out(int jx, int jy, int fire) { (void) jx, (void) jy; s_ofire[IO-
 // game's own positions are used only to keep the same ship the same; what the player is given is
 // measured from the screen and the scanner and filtered)
 #define NT 24
-#define MEM_FRAMES 150          // a ship out of sight is remembered (where it should be now) this long
+#define MEM_FRAMES g_fair_mem      // a ship out of sight is remembered (where it should be now) this long (FAIRP=mem=n)
 typedef struct {
     int used, slot, rtype;
     double tp[3];               // (continuity only: where the game had it last frame)
@@ -88,6 +91,9 @@ static int s_last_mc = -1;
 static int s_place;             // where we were (galaxy, x, y, witchspace): a new place empties the bubble
 static ship_t s_out[NOSH];
 static int s_nout;
+// (the network's confidence view: how sure the tracker is of each ship it hands out, by slot)
+static fair_conf_t s_conf[NOSH];
+const fair_conf_t *fair_confidence(int slot) { return slot >= 0 && slot < NOSH && s_conf[slot].valid ? &s_conf[slot] : NULL; }
 static double s_tally_est, s_tally_saved = -1;
 static int s_tally_hi = -1;
 static uint32_t s_msl_fired_at;
@@ -353,7 +359,7 @@ static void perceive_update(void) {
         for (int i = 0; i < n; i++) {
             const ship_t *s = &raw[i];
             if (!ship_in_space(s) || rawk[i] >= 0) continue;
-            double best = pass ? 2500 : 6000;
+            double best = pass ? g_fair_cont2 : g_fair_cont1;
             int bk = -1;
             for (int k = 0; k < NT; k++) {
                 trk_t *t = &s_t[k];
@@ -376,7 +382,12 @@ static void perceive_update(void) {
             break;
         }
     }
-    for (int k = 0; k < NT; k++) if (s_t[k].used && !took[k]) s_t[k].used = 0;   // (gone from the bubble)
+    for (int k = 0; k < NT; k++) if (s_t[k].used && !took[k]) {
+        s_t[k].used = 0;   // (gone from the bubble)
+        // (diagnosis: a track dropped while its ship is still in the bubble is a break in continuity)
+        if (getenv("TRKLOSS")) for (int i = 0; i < n; i++) if (ship_in_space(&raw[i]) && !ship_dead(&raw[i]) && raw[i].type == s_t[k].rtype && rawk[i] >= 0 && rawk[i] != k) {
+            static long nb; nb++; if (nb % 1 == 0) fprintf(stderr, "TRKBREAK %u type %d\n", IO->frame, s_t[k].rtype); break; }
+    }
     for (int i = 0; i < n; i++) if (rawk[i] >= 0) {
         trk_t *t = &s_t[rawk[i]];
         const ship_t *s = &raw[i];
@@ -530,6 +541,7 @@ static void perceive_update(void) {
 
     // what we give the player: the planet, sun and station as they are (the view, the compass, the slot), and the
     // ships as estimated (a ship whose game loop hasn't come round yet this frame carried on to where it will be)
+    memset(s_conf, 0, sizeof s_conf);
     s_nout = 0;
     for (int i = 0; i < n && s_nout < NOSH; i++) {
         if (!ship_in_space(&raw[i])) {
@@ -612,6 +624,17 @@ static void perceive_update(void) {
         if (g_fair_oracle & 128) o.x = s->x, o.y = s->y, o.z = s->z;
         o.vis = (uint8_t) ((t->prov == 2 ? VIS_LOOK : 0) | (t->ident ? VIS_TYPE : 0) | (t->wire ? VIS_HEAD : 0) | (t->onscr ? VIS_SCREEN : 0) | (t->last_meas == IO->frame ? VIS_NOW : 0));
         o.cls = (uint8_t) t->cls;
+        {   // what the network may know about how sure this is: along the line of sight, and its motion
+            double d = sqrt(t->p[0] * t->p[0] + t->p[1] * t->p[1] + t->p[2] * t->p[2]) + 1;
+            double u3[3] = {t->p[0] / d, t->p[1] / d, t->p[2] / d}, vr = 0, vv = 0;
+            for (int a = 0; a < 3; a++) for (int b = 0; b < 3; b++) vr += u3[a] * t->P[a][b] * u3[b];
+            for (int a = 3; a < 6; a++) vv += t->P[a][a];
+            fair_conf_t *c = &s_conf[o.slot];
+            c->valid = 1, c->heading_seen = t->wire != 0, c->on_screen = t->onscr != 0;
+            c->age = (int) (IO->frame - t->last_meas);
+            c->range_sd = sqrt(vr > 0 ? vr : 0) / d;
+            c->vel_sd = sqrt(vv > 0 ? vv : 0);
+        }
         s_out[s_nout++] = o;
         // (the lab's check: perception against the game's own flags, for ships it has)
         if (g_fair_check) {

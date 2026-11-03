@@ -12,6 +12,13 @@
 // WSP=1: the weight-space pilot (wsp_pilot.c) flies the stick, fires and sets the throttle in a fight
 static int wsp_on(void) { static int v = -1; if (v < 0) { const char *e = getenv("WSP"); v = e && *e != '0'; } return v; }
 static wsp_out_t s_wsp;
+#if APP_LOADED
+static FILE *wsp_log(void) { return NULL; }      // (the Presto app: no files)
+#else
+static FILE *wsp_log(void) { static FILE *f; static int tried; if (!tried) { tried = 1; const char *e = getenv("WSPLOG"); if (e) f = fopen(e, "w"); } return f; }
+#endif
+// a new fight (the lab): mark the log, and forget the held action
+void wsp_episode(const char *name) { wsp_episode_reset(); if (wsp_log()) fprintf(wsp_log(), "E %s %.4f %d %d %d\n", name, tally(), energy(), fsh(), ash()), fflush(wsp_log()); }
 
 // (lead: aim this many game loops ahead of the target: the pitch gain's time constant (pitch_iters, 3) plus
 // the keys' lag (~1.5 loops), so the aim point's lead feeds the target's sightline rate forward exactly once.
@@ -320,16 +327,52 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         off = cfly_steer(aim, jx_, jy_, g_aim_tol, keys);
         { extern int g_cf_mode, g_cf_b; s_rr_cam = g_cf_mode; s_rr_cb = g_cf_b; }
     } else if (wsp_on()) {
-        // the network reads the same ship-space quantities the C law does (mirrored for the rear view), and writes
-        // the stick targets; keys towards them as steer() does, the joystick straight there
+        // the network sees the target as the C law does (mirrored for the rear view, our speed then backwards) and
+        // writes the stick; keys towards it as steer() does, the joystick straight there
         const shiptype_t *tt = ship_type(sh->type);
-        float nv[3] = {(float) (rear ? -sh->nosev[0] : sh->nosev[0]), (float) sh->nosev[1], (float) (rear ? -sh->nosev[2] : sh->nosev[2])};
-        s_wsp = wsp_pilot((int32_t) v.x, (int32_t) v.y, (int32_t) v.z, nv, sh->speed, speed(), energy(), fsh(), laser_temp(),
-                          (float) (tt && tt->area ? sqrt((double) tt->area) : 80), 1);
+        double tsp = 1.5 * sh->speed;
+        wsp_in_t wi = {v.x, v.y, v.z, (rear ? -1 : 1) * sh->nosev[0] * tsp, sh->nosev[1] * tsp, (rear ? -1 : 1) * sh->nosev[2] * tsp,
+                       rear ? -speed() : speed(), tt && tt->area ? sqrt((double) tt->area) : 80, laser_temp(), energy(), witchspace(), jx_, jy_,
+                       1, 0, 0, 0};
+        { const fair_conf_t *fc = fair_confidence(sh->slot);      // (fair mode: what the tracker knows about its own estimate)
+          if (fc) wi.heading_seen = fc->heading_seen, wi.age = fc->age, wi.range_sd = fc->range_sd, wi.vel_sd = fc->vel_sd; }
+        int decided;
+        float wf[WSP_NF];
+        s_wsp = wsp_pilot_at(&wi, IO->frame, &decided, wf);
         extern int g_want_jx, g_want_jy; g_want_jx = s_wsp.jstx, g_want_jy = s_wsp.jsty;
-        { static FILE *lf; static int tried; if (!tried) { tried = 1; const char *e = getenv("WSPLOG"); if (e) lf = fopen(e, "w"); }
-          if (lf) fprintf(lf, "%u %d %d %d %.5f %.5f %.5f %d %d %d %d %d %.1f %d %d %d %d\n", IO->frame, (int) v.x, (int) v.y, (int) v.z, nv[0], nv[1], nv[2],
-                          sh->speed, speed(), energy(), fsh(), laser_temp(), tt && tt->area ? sqrt((double) tt->area) : 80.0, s_wsp.jstx, s_wsp.jsty, s_wsp.fire, s_wsp.speed); }
+        // (the teacher: what the C's planner would do here, while acquiring - the same test as its own block below.
+        // WSPTEACH=1 logs it, for distil.py; WSPHYB=1 flies it, the ceiling for a perfect copy)
+        int plan_now = 0, pla = 0, plb = 0;
+        // (the shipped mode: the network flies, and in witchspace the C's planner turns onto each new target, the one
+        // thing it does better (wsp/README.md). WSPPLAN=0 the network alone, 1 the planner everywhere, 2 witchspace (the default))
+        { static int teach = -1, hyb; if (teach < 0) { const char *pe = getenv("WSPPLAN") ? getenv("WSPPLAN") : getenv("WSPHYB");
+              hyb = pe ? atoi(pe) : 2; teach = hyb || getenv("WSPTEACH") != NULL; }
+          if (teach && IO->analogue && R(A_JSTK)) {
+              double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
+              double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
+              static int got, gtype, gslot, last_mc = -1, pa, pb;
+              if (sh->type != gtype || sh->slot != gslot) got = 0, gtype = sh->type, gslot = sh->slot, last_mc = -1;
+              if (in_crosshairs(sh, rear)) got = 1;
+              if (offa > 10) got = 0;
+              if (!got && offa > fmax(g_plan_hand, 3 * atan2(r, d) * 180 / M_PI)) {
+                  if (mcnt() != last_mc) {
+                      last_mc = mcnt();
+                      vec_t tp = {v.x, v.y, v.z}, tv = {wi.vx, wi.vy, wi.vz};
+                      plan_stick(tp, tv, rear ? -speed() : speed(), r, jx_, jy_, &pa, &pb);
+                  }
+                  plan_now = 1, pla = pa, plb = pb;
+                  { static double hybr = -1; if (hybr < 0) hybr = getenv("WSPHYBR") ? atof(getenv("WSPHYBR")) : 0;    // (WSPHYBR=n: the planner only beyond this range)
+                    if (hyb && dist >= hybr && (hyb == 1 || witchspace())) g_want_jx = pa, g_want_jy = pb; }
+              }
+          } }
+        // (WSPLOG=file: each decision, its senses and action, with the score and the damage so far, for ppo.py)
+        if (decided && wsp_log()) {
+            fprintf(wsp_log(), "D %u", IO->frame);
+            for (int i = 0; i < WSP_NF; i++) fprintf(wsp_log(), " %.6g", wf[i]);
+            fprintf(wsp_log(), " | %.5g %.5g %d %.4g | %.4f %d %d %d\n", s_wsp.alpha, s_wsp.beta, s_wsp.fire, wsp_speed_sample(),
+                    tally(), energy(), fsh(), ash());
+            if (plan_now) fprintf(wsp_log(), "P %u %d %d\n", IO->frame, alpha_from_jstx(pla), beta_from_jsty(plb));
+        }
         if (s_wsp.jstx > jx_ + 3) ks_add(keys, K_ROLL_LEFT); else if (s_wsp.jstx < jx_ - 3) ks_add(keys, K_ROLL_RIGHT);
         if (s_wsp.jsty > jy_ + 6) ks_add(keys, K_DIVE); else if (s_wsp.jsty < jy_ - 6) ks_add(keys, K_CLIMB);
         off = atan2(hypot(v.x, v.y), v.z);

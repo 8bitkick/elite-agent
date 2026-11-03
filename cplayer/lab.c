@@ -328,6 +328,7 @@ int main(int argc, char **argv) {
         io.hold = p_hold, io.tap = p_tap, io.log = p_log, io.analogue = p_analogue;
         keyq_reset();
         player_lab_init(&io);
+        { extern void wsp_episode(const char *); wsp_episode(path); }
         s_aim.open = 0;
         {   // the scenario, for grouping results: where, how many, what, how strong we are, where they are
             static ship_t sh[NOSH];
