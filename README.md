@@ -12,46 +12,44 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 
 | | | |
 |---|---|---|
-| ![A pirate Python passing close in the right view](docs/img/shots/flyby-side.png) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
-| A flyby, watched from the side | Lasers on a Thargoid in witchspace | Elite |
-
-**[→ Fair mode's default pilot: an AI-authored custom model, inspired by MIT's Weight-Space Programming idea](wsp/README.md)**
-
-[![A Deadly-rank fight flown by the first version of the network, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md)
+| [![A Deadly-rank fight flown by the AI pilot model, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
+| [Fair mode's 8 KB AI pilot model](wsp/README.md) in a fight | Lasers on a Thargoid in witchspace | Elite |
 
 Fair mode's dogfights are flown by an 8 KB neural network whose 2,256 weights an AI wrote directly, unit by unit,
 then tuned by evolution; a plain C forward pass runs it. It scores 2.8% more points a fight minute than the C rules
 it replaced, over 450 held-out fights. After MIT CSAIL's
-[Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026).
+[Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026); how it
+was written and measured: [wsp/README.md](wsp/README.md).
 
 ## Modes
 
 | Mode | What it does | Switch | Jameson to Elite |
 |---|---|---|---|
-| **Optimal**<br>RAM peeks beyond human player knowledge | straight for Elite, farming where forced mis-jumps chain; reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **the default** in run_sim, the lab and the firmware build; `--efficient` for the Presto plugin | **14.4 game hours** (14.3-14.5 on two careers, 1 death between them) |
-| **Fair**<br>only uses what a player can view or derive from the screen | Optimal's career on what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)). Its dogfights are flown by the 8 KB AI pilot model ([`wsp/README.md`](wsp/README.md); `WSP=0` for the C rules it replaced) | `FAIR=1`; `--fair` on the Presto | **16.5 game hours** (16.5 on both of two careers, 2 deaths between them) |
-| **Curious**<br>maximum fun, exploration and dogfights | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | `CURIOUS=1`; **the default** for the Presto plugin | not tuned for time, but for style: **146.4 game hours** (139.2-155.3 on six careers, on v0.4) |
+| **Optimal**<br>RAM peeks beyond human player knowledge | straight for Elite, farming Thargoids in witchspace ([below](#where-the-time-goes)); reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **the default** in run_sim, the lab and the firmware build; `--efficient` for the Presto plugin | **14.3 game hours** (the best of two careers) |
+| **Fair**<br>only uses what a player can view or derive from the screen | Optimal's career on what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)). Its dogfights are flown by the 8 KB AI pilot model ([`wsp/README.md`](wsp/README.md); `WSP=0` for the C rules it replaced) | `FAIR=1`; `--fair` on the Presto | **16.5 game hours** (the best of two careers) |
+| **Curious**<br>maximum fun, exploration and dogfights | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | `CURIOUS=1`; **the default** for the Presto plugin | not tuned for time, but for style: **139.2 game hours** (the best of six careers, on v0.4) |
 
 All modes save at each dock (about 4 seconds; on the Presto Curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours, each mode's fastest career bold and its slowest faint: Optimal 14.3 to 14.5 hours, Fair (on-screen visible inputs, 8 KB AI pilot model) 16.5, Curious 139.2 to 155.3](docs/img/climb.svg)
+![Kill tally against game hours, each mode's fastest career bold and its slowest faint: Optimal 14.3 hours, Fair (on-screen visible inputs, 8 KB AI pilot model) 16.5, Curious 139.2](docs/img/climb.svg)
 
-**Careers in numbers** (the mean per career, Jameson to Elite; `tools/career_stats.py` on the journals in [`docs/careers`](docs/careers), seeds 13 and 101):
+**Careers in numbers**, Jameson to Elite: each mode's best career (`tools/career_stats.py` on the journals in
+[`docs/careers`](docs/careers)):
 
-| | Optimal (2) | Fair (2) | Curious (6, v0.4) |
-|---|---|---|---|
-| Game hours to Elite | 14.4 | 16.5 | 146.4 |
-| Star systems visited | 64 | 63 | 228 |
-| Galaxies | 3 | 3 | 7 |
-| Light years flown (dock to dock) | 508 | 522 | 2,909 |
-| Docks | 190 | 204 | 1,028 |
-| Fights | 1,637 | 2,148 | 5,807 |
-| Kills | 4,736 | 4,691 | 15,929 |
-| Witchspace sessions (Thargoids) | 67 | 74 | 62 |
-| Deaths (reloaded) | 0.5 | 1 | 224 |
-| Escape pods used | 0 | 0 | 2 |
-| Most credits held | 28,734 Cr | 25,931 Cr | 19,118 Cr |
+| | Optimal | Fair |
+|---|---|---|
+| Game hours to Elite | 14.3 | 16.5 |
+| Star systems visited | 63 | 66 |
+| Galaxies | 3 | 3 |
+| Light years flown (dock to dock) | 504 | 538 |
+| Docks | 188 | 208 |
+| Fights | 1,219 | 2,470 |
+| Kills | 4,653 | 4,599 |
+| Witchspace sessions (Thargoids) | 64 | 76 |
+| Deaths (reloaded) | 0 | 1 |
+| Escape pods used | 0 | 0 |
+| Most credits held | 26,264 Cr | 22,675 Cr |
 
 Fair counts more fights because a dot at the edge of range can turn out to be a trader once it's
 drawn, ending a fight that hadn't started.
@@ -65,12 +63,17 @@ as it can. Specks that are getting away are shot rather than chased. Optimal kil
 
 ## Where the time goes
 
-**Where Optimal's time went** (seed 13, before chain farming, in a 23.8-hour career): witchspace farming of Thargoids, by a forced mis-jump, was
-55% of the time and 81% of the points, about 5 a game minute; bounty hunting at anarchies makes a
-quarter of that. The early ranks take three hours, Deadly to Elite about 14. The two missions take 4
-hours and pay for themselves: without them it reaches Elite 4.7 hours later.
+**Optimal's strategy is farming Thargoids.** Elite has a hidden manual mis-jump: with the author credits switched on
+(X in the pause menu), holding CTRL as the hyperspace countdown ends drops the ship into witchspace among a swarm of
+Thargoids, the best-paying fight in the game (Moxon's annotated source,
+[TT18](https://elite.bbcelite.com/master/main/subroutine/tt18.html); [`docs/IO.md`](docs/IO.md) §1.6). With the swarm cleared and
+its shields back, it jumps again from witchspace, which mis-jumps again, and keeps going while the fuel covers another
+jump and a way out to a station. How many jumps it can string together depends on the map round its starting
+system, so it picks where to farm from a model of every system in the galaxy.
 
-![Share of game time and of points by activity: witchspace farming 55% of the time and 81% of the points](docs/img/time.svg)
+In its best career (14.3 game hours), witchspace was 53% of the time and 88% of the points, about 12 points a game
+minute; bounty hunting at anarchies scores an eighth of that. The rest of the time is travel, docking, shopping and
+the two missions. It reached Competent in 2.3 hours, Deadly in 9.6 and Elite in 14.3.
 
 **Why it's fast:**
 
@@ -119,7 +122,7 @@ and the shields among it) and zeroes the view byte while it draws the mission br
 reads both as the game has them; it pages its cold code into bank 7 mid-frame, borrowing more of zero page,
 which the player holds over too. It plays Solid Elite as it now is (its three-pass build, 262bfa6); run it
 with `DISC=` its disc (`5-compiled-game-discs/elite-master-sng47.ssd` in its repository). An Optimal career
-(seed 13, before chain farming) reached Elite in 26.6 game hours, against 23.5 on SNG47, mostly lost to reloads where the player
+(seed 13, on an earlier build) reached Elite in 26.6 game hours, against 23.5 on SNG47, mostly lost to reloads where the player
 misses Solid Elite's docked screens.
 
 ## The player (`cplayer/`)

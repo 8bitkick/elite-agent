@@ -5,8 +5,8 @@
 Fair mode (`FAIR=1`) flies its dogfights with a small neural network, and the player sees only what a human could
 (fair mode, [docs/FAIR.md](../docs/FAIR.md)): the screen, the scanner and the dashboard as drawn, no hidden RAM.
 It **outscores the C rules it replaced: 2.8% more points a fight minute on 450 held-out fights** (90% interval
-0.6-5.2%), ahead in every kind of fight. In careers to Elite it was ahead on all three seeds before the chain-farm
-strategy was merged (27.2 game hours against 27.8), and on the current build is level on two (16.5 against 16.4).
+0.6-5.2%), ahead in every kind of fight. In careers to Elite it was ahead on all three seeds on an earlier, slower build (27.2 game hours against 27.8),
+and on the current build is level on two (16.5 against 16.4).
 
 The network is **2,256 weights (8.8 KB), run by a forward pass of about 60 lines of plain C**
 ([cplayer/wsp_pilot.c](../cplayer/wsp_pilot.c)), with no ML library, like the rest of the agent. Its weights were
@@ -43,9 +43,8 @@ fights 7.34 against 6.97 (1.052). No deaths in any of the 450, for either pilot.
 
 ### Careers to Elite, fair mode
 
-Game hours when the tally reached 6,400, both pilots on the same seeds (`SKEW`) and build. On the current build,
-with chain-farm's strategy of farming where forced mis-jumps chain (the journals are in [../docs/careers](../docs/careers)
-and [careers/](careers)):
+Game hours when the tally reached 6,400, both pilots on the same seeds (`SKEW`) and build. On the current build
+(the journals are in [../docs/careers](../docs/careers) and [careers/](careers)):
 
 | seed | network | C rules (`WSP=0`) | |
 |---|---:|---:|---|
@@ -53,7 +52,7 @@ and [careers/](careers)):
 | 101 | 16.5 | 15.6 | C 0.8 h ahead |
 | **mean** | **16.5** | **16.4** | level |
 
-Before chain-farm was merged (the same network; the journals in [careers/](careers)):
+On an earlier build, before Optimal's current farming strategy (the same network; the journals in [careers/](careers)):
 
 | seed | network | C rules | |
 |---|---:|---:|---|
@@ -62,8 +61,8 @@ Before chain-farm was merged (the same network; the journals in [careers/](caree
 | 21 | 26.0 | 26.9 | network 0.9 h ahead |
 | **mean** | **27.2** | **27.8** | 2.0% faster |
 
-A career is one path, and a seed moves it by more than either pilot does (the C rules' two chain-farm careers are
-1.5 hours apart). Five careers say the network is at least the C rules' equal over a whole career; the lab's 450
+A career is one path, and a seed moves it by more than either pilot does (the C rules' two careers on the current build
+are 1.5 hours apart). Five careers say the network is at least the C rules' equal over a whole career; the lab's 450
 paired fights are what say it's better in a fight.
 
 ## Why fair mode

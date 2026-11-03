@@ -12,8 +12,8 @@ a paired comparison against the C pilot), kept only if points a minute go up wit
 | v2 as written: the C's steering law in angle space, every constant named | 92.4% | |
 | v2 evolved: CMA-ES on the 21 named parameters | 97.2% | 97.1% |
 | v2 evolved + the C's planner for witchspace acquisition (fair mode's pilot) | 98.6% | **102.8%** |
-| fair careers to Elite, before chain-farm, three seeds | | **27.2 h against 27.8** |
-| fair careers to Elite, with chain-farm, two seeds | | 16.5 h against 16.4 (level) |
+| fair careers to Elite, earlier build, three seeds | | **27.2 h against 27.8** |
+| fair careers to Elite, current build, two seeds | | 16.5 h against 16.4 (level) |
 
 Tried and dropped (wsp/README.md has the numbers): PPO on a residual, DAgger regression of the planner,
 stick dithering, confidence gates on lead and fire, a nose hold, fair-tracker settings.
