@@ -8,6 +8,10 @@
 #include "flight.h"
 #include "show.h"
 #include "ptime.h"
+#include "wsp_pilot.h"
+// WSP=1: the weight-space pilot (wsp_pilot.c) flies the stick, fires and sets the throttle in a fight
+static int wsp_on(void) { static int v = -1; if (v < 0) { const char *e = getenv("WSP"); v = e && *e != '0'; } return v; }
+static wsp_out_t s_wsp;
 
 // (lead: aim this many game loops ahead of the target: the pitch gain's time constant (pitch_iters, 3) plus
 // the keys' lag (~1.5 loops), so the aim point's lead feeds the target's sightline rate forward exactly once.
@@ -315,9 +319,23 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         if (sh->type != ctype || sh->slot != cslot) cfly_reset(), ctype = sh->type, cslot = sh->slot;
         off = cfly_steer(aim, jx_, jy_, g_aim_tol, keys);
         { extern int g_cf_mode, g_cf_b; s_rr_cam = g_cf_mode; s_rr_cb = g_cf_b; }
+    } else if (wsp_on()) {
+        // the network reads the same ship-space quantities the C law does (mirrored for the rear view), and writes
+        // the stick targets; keys towards them as steer() does, the joystick straight there
+        const shiptype_t *tt = ship_type(sh->type);
+        float nv[3] = {(float) (rear ? -sh->nosev[0] : sh->nosev[0]), (float) sh->nosev[1], (float) (rear ? -sh->nosev[2] : sh->nosev[2])};
+        s_wsp = wsp_pilot((int32_t) v.x, (int32_t) v.y, (int32_t) v.z, nv, sh->speed, speed(), energy(), fsh(), laser_temp(),
+                          (float) (tt && tt->area ? sqrt((double) tt->area) : 80), 1);
+        extern int g_want_jx, g_want_jy; g_want_jx = s_wsp.jstx, g_want_jy = s_wsp.jsty;
+        { static FILE *lf; static int tried; if (!tried) { tried = 1; const char *e = getenv("WSPLOG"); if (e) lf = fopen(e, "w"); }
+          if (lf) fprintf(lf, "%u %d %d %d %.5f %.5f %.5f %d %d %d %d %d %.1f %d %d %d %d\n", IO->frame, (int) v.x, (int) v.y, (int) v.z, nv[0], nv[1], nv[2],
+                          sh->speed, speed(), energy(), fsh(), laser_temp(), tt && tt->area ? sqrt((double) tt->area) : 80.0, s_wsp.jstx, s_wsp.jsty, s_wsp.fire, s_wsp.speed); }
+        if (s_wsp.jstx > jx_ + 3) ks_add(keys, K_ROLL_LEFT); else if (s_wsp.jstx < jx_ - 3) ks_add(keys, K_ROLL_RIGHT);
+        if (s_wsp.jsty > jy_ + 6) ks_add(keys, K_DIVE); else if (s_wsp.jsty < jy_ - 6) ks_add(keys, K_CLIMB);
+        off = atan2(hypot(v.x, v.y), v.z);
     } else off = steer(aim, jx_, jy_, P->roll_iters, P->pitch_iters, keys);
     { extern int g_want_jx, g_want_jy;
-      if (!cam && g_plan && g_want_jx >= 0 && IO->analogue && R(A_JSTK) && !show_flyby() && !weave) {     // (not in a flyby: it aims beside)
+      if (!cam && !wsp_on() && g_plan && g_want_jx >= 0 && IO->analogue && R(A_JSTK) && !show_flyby() && !weave) {     // (not in a flyby: it aims beside)
           const shiptype_t *tt = ship_type(sh->type);
           double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
           double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;
@@ -390,6 +408,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     else if (dist > P->near) want = P->spd_near;
     else want = P->spd_close;
     if (s_force_rear && !rc) want = 40;
+    if (wsp_on() && !rc && !ev) want = s_wsp.speed;
     // evade: shields down and another enemy's nose on us within range: jink out of its line. In
     // bursts (0.8 s, then 2.5 s of fighting: attacked from behind someone's always facing us, and
     // jinking for ever meant never shooting back), and not when our own shot's nearly lined up
@@ -419,6 +438,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     double r = ti && ti->area ? sqrt((double) ti->area) : 80;
     int near_ = v.z > 0 && hypot(v.x, v.y) < P->fire_r * r && v.z < 30000;
     int hot = laser_temp() > P->hot;
+    if (wsp_on()) near_ = s_wsp.fire, hot = 0;      // (the network's own fire gate, laser heat included)
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
