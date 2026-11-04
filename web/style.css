@@ -25,8 +25,6 @@ a.btn { text-decoration: none; }
 #credit b { color: var(--fg); font-weight: 600; }
 #netnote { position: absolute; left: 1016px; top: 979px; width: 880px; font-size: 13px; color: var(--dim); }
 #phone .small { font-size: 12px; }
-#speed { position: absolute; left: 1576px; top: 5px; width: 320px; z-index: 1; }   /* (in the toolbar row, over the panel) */
-#speed button { font-size: 13px; padding: 4px 0; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .seg button { flex: 1; background: var(--panel); color: var(--dim); border: 0; border-right: 1px solid var(--line); font-size: 11px; padding: 4px 0; cursor: pointer; }
 .seg button:last-child { border-right: 0; }
@@ -81,3 +79,10 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #tip i { display: block; font-style: normal; color: var(--dim); margin-top: 3px; }
 #phone .brand { white-space: nowrap; } #phone .brand .owner { display: none; }
 #phone .row { gap: 10px; } #phone .seg { flex: 1; width: auto; max-width: 250px; }
+#play { position: absolute; right: 24px; top: 4px; display: flex; gap: 8px; align-items: center; z-index: 1; }
+#play .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+#auto.on, #p-auto.on { border-color: var(--cyan); color: var(--cyan); background: rgb(10, 40, 46); }
+#speedbtn, #p-speedbtn { min-width: 84px; font-variant-numeric: tabular-nums; }
+#phone .ctl { display: flex; gap: 6px; }
+#phone .ctl .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+#phone .ctl #p-speedbtn { min-width: 66px; }
