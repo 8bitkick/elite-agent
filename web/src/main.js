@@ -17,7 +17,7 @@ const Q = new URLSearchParams(location.search);
 // ships; the build the player knows, pinned), each from its author's GitHub. start: the machine's state that many
 // million cycles after it's switched on, every visitor's (?start= to try another; the shipped one reaches Elite headless)
 const GAMES = {
-    flicker: { name: "Flicker-free Elite", start: 30,
+    flicker: { name: "Flicker-free Elite", start: 31,     // (flown headless to Elite in 18.9 game hours)
         disc: "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd" },
     solid: { name: "Solid Elite", start: 45,
         disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-bbc-master/262bfa61b69c3fb75ce2c004d4944bdc47c1abbd/5-compiled-game-discs/elite-master-sng47.ssd" },

@@ -44,4 +44,4 @@ workflow publishes it. `LOCAL_DISC=1` puts the disc in the site for testing wher
 
 Headless, on jsbeeb in Node: `node web/run_node.mjs MINUTES journal.jsonl log.txt` (`SKEW=n`), a career to Elite as a
 test that the WebAssembly player plays as the native one does (`CKPT=file` keeps a checkpoint every 10 game minutes and
-resumes from it). Seed 13 (`SKEW=13`): Elite after 18.22 game hours.
+resumes from it). The page's own start (`START=` its snapshot, at 31 M cycles): Elite after 18.90 game hours, as every visitor sees it.
