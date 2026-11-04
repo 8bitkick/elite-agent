@@ -30,6 +30,10 @@ flicker-free disc, fetched by the browser from his GitHub repository ([web/READM
 WebAssembly build, run headless on jsbeeb as a test, reached Elite in 18.2 game hours (seed 13; one death on the way,
 the save reloaded); jsbeeb's timing differs from the native emulator's, so the careers part ways.
 
+**Trading:** why the agent's earlier "sloppy" trading (thin margins, selling and buying straight back) reached Elite
+sooner than a tidier rewrite, with the money traced through 16 careers, and what would beat both:
+[docs/TRADING.md](docs/TRADING.md).
+
 ## Modes
 
 | Mode | What it does | Switch | Jameson to Elite |

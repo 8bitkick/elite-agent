@@ -3,7 +3,7 @@
 import { snapshotFromJSON, snapshotToJSON, createSnapshot } from "jsbeeb-src/snapshot.js";
 import { toSsdOrDsd } from "jsbeeb-src/disc.js";
 import { Agent } from "../agent.js";
-import { Panel } from "./panel.js";
+import { Panel, INPUT_NOTE, COL_NOTE } from "./panel.js";
 import { commanderSsd, addFile } from "./save.js";
 import { discFor } from "jsbeeb-src/fdc.js";
 
@@ -118,6 +118,20 @@ async function main() {
     ]);
     const gh = new Image(); gh.src = "gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
+    // hover notes on the network's units: what it is and its value now
+    const tip = $("tip");
+    $("panel").addEventListener("mousemove", (e) => {
+        const c = $("panel"), r = c.getBoundingClientRect();
+        const px = ((e.clientX - r.left) / r.width) * c.width + (1920 - c.width), py = ((e.clientY - r.top) / r.height) * c.height;
+        const h = panel.hit(px, py);
+        if (!h || !panel.net) { tip.classList.remove("show"); return; }
+        const note = h.c === 0 ? INPUT_NOTE[panel.net][h.r] : COL_NOTE[h.title];
+        const v = h.v === null || h.v === undefined ? "–" : (Math.abs(h.v) >= 100 ? h.v.toFixed(0) : h.v.toFixed(2));
+        tip.innerHTML = `<b>${h.name}</b> <span>${h.title.toLowerCase()} · now ${v}</span>${note ? `<i>${note}</i>` : ""}`;
+        tip.style.left = `${Math.min(innerWidth - 300, e.clientX + 14)}px`; tip.style.top = `${e.clientY + 16}px`;
+        tip.classList.add("show");
+    });
+    $("panel").addEventListener("mouseleave", () => tip.classList.remove("show"));
     const w = frame.contentWindow;
     for (let t = 0; !w.processor || !w.video || !w.processor.fdc?.drives?.[0]?.disc; t++) {
         loading(Math.min(0.3, 0.1 + t / 150), t >= 300 ? "Still waiting for Elite's disc from GitHub…" : title ? "Loading the agent…" : "Loading Elite's disc from Mark Moxon's GitHub…");
@@ -329,7 +343,7 @@ function phoneStrip() {
     $("p-note").textContent = s.view === "dock" ? s.note || "" : "";
     $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     // the chart and the network, cropped from the panel
-    for (const [id, y0, y1] of [["p-chart", 228, 404], ["p-net", 416, 940]]) {
+    for (const [id, y0, y1] of [["p-chart", 200, 300], ["p-net", 316, 946]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);

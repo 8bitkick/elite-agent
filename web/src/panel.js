@@ -5,9 +5,11 @@
 export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", DIM = "rgb(110,116,128)", FG = "rgb(232,234,238)";
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
-const PX = 1016, PW = 880, NET_Y = 428, GAP = 62, CH = 16, CW = Math.floor((PW - 5 * GAP) / 6);
+const PX = 1016, PW = 880, NET_Y = 322, GAP = 62, CH = 20, CW = Math.floor((PW - 5 * GAP) / 6);
 const GY = 36, GH = 1014, H = 1080, X0 = 1012;   // (GY, GH: the panel's own top and bottom, as the film's game)
-const CH_X = PX + 46, CH_Y = 262, CH_W = PW - 60, CH_H = 120, HMAX = 17, STATX = [0, 250, 410, 610];
+const CH_X = PX + 46, CH_Y = 236, CH_W = PW - 60, CH_H = 64, HMAX = 17, STATX = [0, 250, 410, 610];
+// the bottom band: the agent's note and log on the left, what this is on the right, below a rule
+const BOT = 954, CAP_X = 1560;
 const RANKS = [[0, "Harmless"], [8, "Mostly Harmless"], [16, "Poor"], [32, "Average"], [64, "Above Average"], [128, "Competent"],
     [512, "Dangerous"], [2560, "Deadly"], [6400, "ELITE"]];
 const NOTE = {
@@ -17,6 +19,39 @@ const NOTE = {
     "LINE-UP": "Nearly on the axis: the aim slides from the mark onto the slot itself.",
     FINAL: "Rolling with the station, the slot trimmed level and pitched onto the nose.",
     SWERVE: "A collision course: the escape heading, out to the side it will miss on.",
+};
+// what each input says, and each column does (the panel's hover notes)
+export const INPUT_NOTE = {
+    fight: ["left or right of the nose: where the target is drawn", "above or below the nose", "ahead or behind: the view it is drawn in",
+        "moving across the view, frame to frame", "moving up or down the view", "how far off the nose",
+        "clock position round the crosshairs, across", "clock position round the crosshairs, up", "how big it is drawn",
+        "range: from its drawn size or its scanner dot", "closing speed: the range changing", "our speed: the speed bar",
+        "laser temperature: the LT bar", "our energy: the four energy banks", "witchspace or not",
+        "our own stick, left and right: the roll indicator", "our own stick, up and down: the pitch indicator",
+        "a target or none", "a constant: the bias", "its heading read from its wireframe, or guessed from how it moves",
+        "seconds since it was last measured", "how uncertain the range is", "how uncertain its motion is"],
+    dock: ["the planet ahead (+) or behind (−)", "our height above the planet", "1 with the station in sight",
+        "the slot's direction: right (+) or left (−)", "the slot's direction: up (+) or down (−)", "the slot ahead (+) or behind (−)",
+        "the approach mark on the slot's axis, ahead of us: across", "the approach mark: up or down",
+        "the side mark, to go round the station by: across", "the side mark: up or down",
+        "on a collision course, the escape heading: across", "1 on a collision course (anything but the station)",
+        "our distance out along the slot's axis (negative behind the station)", "our distance off the slot's axis",
+        "range to the station", "the slot's centre as drawn: across", "the slot's centre as drawn: up or down",
+        "the slot's roll off level", "the station's roll: one way or the other", "the turn to face into the slot",
+        "the angle to the station's centre", "the angle to the slot's centre", "1 with nothing in the way before the slot",
+        "our own stick, up and down", "last loop: steering from above", "last loop: in the final", "last loop: committed"],
+};
+export const COL_NOTE = {
+    INPUTS: "what the network is told, read off the screen",
+    TESTS: "yes-or-no tests on the inputs, each made of ReLU units",
+    REGIME: "which part of the approach applies now",
+    "THE AIM": "the point to steer for, for that part",
+    RATES: "how hard to roll and pitch onto the aim",
+    OUTPUT: "what goes to the game: the stick, the throttle and the switches",
+    "LAYER 1": "hidden units, written by hand: features of the target's motion",
+    "LAYER 2": "hidden units: combinations of layer 1",
+    "LAYER 3": "hidden units: the choice of manoeuvre",
+    "LAYER 4": "hidden units: the stick commands, shaped",
 };
 export const rankOf = (t) => RANKS.filter(([k]) => t >= k).pop()[1];
 const rgb = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
@@ -106,32 +141,26 @@ export class Panel {
         this.text(Math.floor(s.tally).toLocaleString("en"), PX + STATX[1], 176, `600 26px ${SANS}`, FG);
         this.text(`${s.cash.toLocaleString("en", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Cr`, PX + STATX[2], 176, `600 26px ${SANS}`, FG);
         this.text(s.system, PX + STATX[3], 176, `600 26px ${SANS}`, s.system === "Witchspace" ? rgb(CYAN) : FG);
-        // the chart
-        const g = this.ctx;
-        this.text("KILL TALLY AGAINST GAME HOURS", PX, 236, `600 14px ${SANS}`, DIM);
-        g.strokeStyle = "rgb(26,30,38)"; g.lineWidth = 1;
-        for (let t = 0; t <= 7000; t += 1000) { g.beginPath(); g.moveTo(CH_X, cy(t) + 0.5); g.lineTo(CH_X + CH_W, cy(t) + 0.5); g.stroke(); }
-        for (let hh = 0; hh < 18; hh += 2) {
-            g.beginPath(); g.moveTo(cx(hh) + 0.5, CH_Y); g.lineTo(cx(hh) + 0.5, CH_Y + CH_H); g.stroke();
-            this.text(String(hh), cx(hh), CH_Y + CH_H + 6, `11px ${MONO}`, DIM, "center");
+        // the ranks: a meter from Harmless to Elite, a section a rank (equal widths: the low ranks are a few kills
+        // each), filled to the kill tally
+        const g = this.ctx, MY = 246, MH = 12, seg = PW / (RANKS.length - 1);
+        this.text("PROGRESS TO ELITE", PX, 222, `600 14px ${SANS}`, DIM);
+        for (let i = 0; i < RANKS.length - 1; i++) {
+            const lo = RANKS[i][0], hi = RANKS[i + 1][0], x = PX + i * seg;
+            const fr = Math.max(0, Math.min(1, (s.tally - lo) / (hi - lo)));
+            g.fillStyle = "rgb(26,30,38)"; g.fillRect(x + 1, MY, seg - 2, MH);
+            if (fr > 0) { g.fillStyle = fr >= 1 ? "rgb(27,140,100)" : GREEN; g.fillRect(x + 1, MY, (seg - 2) * fr, MH); }
+            const here = s.tally >= lo && s.tally < hi;
+            this.text(RANKS[i][1], x + 2, MY + MH + 8, `${here ? 600 : 400} 12px ${SANS}`, here ? FG : DIM);
+            this.text(lo.toLocaleString("en"), x + 2, MY + MH + 25, `11px ${MONO}`, "rgb(80,86,98)");
         }
-        g.strokeStyle = "rgb(90,94,104)"; g.setLineDash([4, 4]);
-        for (const [t, n] of [[2560, "Deadly"], [6400, "Elite"]]) {
-            g.beginPath(); g.moveTo(CH_X, cy(t) + 0.5); g.lineTo(CH_X + CH_W, cy(t) + 0.5); g.stroke();
-            this.text(n, CH_X - 6, cy(t), `11px ${MONO}`, FG, "right", "middle");
-        }
-        g.setLineDash([]);
-        const pts = s.tallyPts.map(([f, t]) => [cx(f / 180000), cy(t)]).concat([[cx(s.frame / 180000), cy(s.tally)]]);
-        g.strokeStyle = GREEN; g.lineWidth = 3; g.beginPath();
-        pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
-        const [lx, ly] = pts[pts.length - 1];
-        g.fillStyle = GREEN; g.beginPath(); g.arc(lx, ly, 5, 0, 7); g.fill();
-        g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 412.5); g.lineTo(PX + PW, 412.5); g.stroke();
+        this.text("ELITE", PX + PW, MY + MH + 8, `600 12px ${SANS}`, s.tally >= 6400 ? rgb(YEL) : DIM, "right");
+        this.text("6,400", PX + PW, MY + MH + 25, `11px ${MONO}`, "rgb(80,86,98)", "right");
+        g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 304.5); g.lineTo(PX + PW, 304.5); g.stroke();
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
         const net = s.view === "dock", fight = s.view === "fight";
         const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW, cyc = 88, h = 40;
-        this.text(`SPEED  ·  ${s.phase}`, right, 36, `600 14px ${SANS}`, DIM, "right");
         const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
         this.text(txt, right, 52, `700 60px ${MONO}`, col, "right");
         g.font = `700 60px ${MONO}`;
@@ -142,18 +171,20 @@ export class Panel {
         g.fill();
     }
 
-    drawCells(cols, vals, lit, color, outRows) {
+    drawCells(cols, vals, lit, color, outRows, valOf) {
+        this.hits = [];
         cols.forEach(([title, names], c) => {
             const x = colX(c);
             this.text(title, x, NET_Y, `600 14px ${SANS}`, DIM);
             names.forEach((name, r) => {
                 const y = rowY(c, r);
+                this.hits.push({ x, y, w: CW, h: rowH(c), c, r, name, title, v: valOf ? valOf(c, r) : null });
                 if (c === 5) { outRows(x, y, r, name); return; }
                 const L = lit(c, r);
                 const g = this.ctx;
                 g.fillStyle = L > 0.02 ? rgb(mix(PANEL, color(c, r), 0.12 + 0.88 * L)) : rgb(PANEL);
                 g.fillRect(x, y, CW, CH); g.strokeStyle = LINE; g.strokeRect(x + 0.5, y + 0.5, CW, CH);
-                this.text(name.slice(0, 12), x + 4, y + 2, `11px ${MONO}`, L > 0.55 ? "rgb(6,18,22)" : L > 0.02 ? FG : DIM);
+                this.text(name.slice(0, 12), x + 5, y + CH / 2 + 1, `12px ${MONO}`, L > 0.55 ? "rgb(6,18,22)" : L > 0.02 ? FG : DIM, "left", "middle");
             });
         });
     }
@@ -165,8 +196,8 @@ export class Panel {
             const fr = Math.max(-1, Math.min(1, v / sc)), mid = centred ? x + CW / 2 : x, end = mid + fr * (centred ? CW / 2 : CW);
             g.fillStyle = rgb(color); g.fillRect(Math.min(mid, end), y + CH + 6, Math.abs(end - mid), CH - 8);
         }
-        this.text(name, x + 4, y + 2, `11px ${MONO}`, FG);
-        this.text(txt, x + CW - 4, y + 2, `11px ${MONO}`, rgb(color), "right");
+        this.text(name, x + 5, y + CH / 2 + 1, `12px ${MONO}`, FG, "left", "middle");
+        this.text(txt, x + CW - 5, y + CH / 2 + 1, `12px ${MONO}`, rgb(color), "right", "middle");
     }
 
     drawRoutes(segs) {
@@ -195,7 +226,8 @@ export class Panel {
             const v = vals ? Math.max(-F.outscale[r], Math.min(F.outscale[r], vals[5][r])) : 0;
             const txt = r < 2 ? (v >= 0 ? "+" : "") + Math.round(v) : r === 2 ? (v > 0.5 ? "FIRE" : "") : String(Math.round(v));
             this.drawOut(x, y, name, v, F.outscale[r], r < 2, YEL, txt);
-        });
+        }, (c, r) => (vals ? vals[c][r] : null));
+        this.net = "fight";
         this.status(s, f ? null : "No target: the C agent is flying. The model takes over in a fight.", DIM);
     }
 
@@ -232,24 +264,30 @@ export class Panel {
             const [v0] = V(5, r), sc = D.outscale[r], v = Math.max(-sc, Math.min(sc, v0));
             const txt = r < 2 ? (v >= 0 ? "+" : "") + Math.round(v) : r === 2 ? String(Math.round(v)) : v > 0.5 ? "YES" : "";
             this.drawOut(x, y, name, v, sc, r < 2, CYAN, txt, r < 3 || v > 0.5);
-        });
+        }, (c, r) => (A ? V(c, r)[0] : null));
+        this.net = "dock";
         this.status(s, s.note, rgb(CYAN));
     }
 
     status(s, note, color) {
-        const yb = GY + GH, lines = s.log.slice(-2);
+        // the bottom band's left: the agent's note (what the network is doing), then its log
+        const g = this.ctx, lines = s.log.slice(note ? -3 : -4);
+        g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, BOT - 8.5); g.lineTo(PX + PW, BOT - 8.5); g.stroke();
+        let y = BOT;
+        if (note) { this.text(note, PX, y, `14px ${SANS}`, color); y += 26; }
+        else { this.text("THE AGENT'S LOG", PX, y + 2, `600 13px ${SANS}`, DIM); y += 26; }
         lines.forEach(([f, t], k) => {
             const mm = Math.floor(f / 3000), hh = Math.floor(mm / 60);
-            this.text(`${String(hh).padStart(2)}:${String(mm % 60).padStart(2, "0")}  ${t.slice(0, 56)}`, PX, yb - (lines.length - 1 - k) * 20,
-                `15px ${MONO}`, k === lines.length - 1 ? GREEN : "rgb(150,156,166)", "left", "bottom");
+            this.text(`${String(hh).padStart(2)}:${String(mm % 60).padStart(2, "0")}`, PX, y, `14px ${MONO}`, DIM);
+            this.text(t.length <= 50 ? t : t.slice(0, 49) + "…", PX + 56, y, `14px ${MONO}`, k === lines.length - 1 ? GREEN : "rgb(170,176,186)");
+            y += 22;
         });
-        if (note) this.text(note, PX, yb - lines.length * 20 - 4, `14px ${SANS}`, color, "left", "bottom");
     }
 
     drawDocked(s) {
-        const capTop = GY + GH - 152, g = this.ctx;
+        const g = this.ctx;
         // the galaxy chart
-        const box = [PX, NET_Y + 24, PX + PW, capTop - 50];
+        const box = [PX, NET_Y + 24, PX + PW, BOT - 24];
         const here = s.visits[s.visits.length - 1], gi = here[0];
         g.fillStyle = "rgb(5,7,9)"; g.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
         g.strokeStyle = LINE; g.strokeRect(box[0] + 0.5, box[1] + 0.5, box[2] - box[0], box[3] - box[1]);
@@ -264,27 +302,22 @@ export class Panel {
         g.strokeStyle = rgb(YEL); g.lineWidth = 2; g.beginPath(); g.arc(hx, hy, 7, 0, 7); g.stroke(); g.lineWidth = 1;
         const nm = (this.gal[gi].find(([x, y]) => x === here[1] && y === here[2]) || [0, 0, ""])[2];
         this.text(nm, hx + 11, hy - 7, `14px ${SANS}`, rgb(YEL));
-        // the log
-        this.text("DOCKED: THE AGENT LOG", PX, capTop - 24, `600 14px ${SANS}`, DIM);
-        const lb = [PX, capTop, colX(4) - 24, H - 30];
-        g.fillStyle = "rgb(5,7,9)"; g.fillRect(lb[0], lb[1], lb[2] - lb[0], lb[3] - lb[1]);
-        g.strokeStyle = LINE; g.strokeRect(lb[0] + 0.5, lb[1] + 0.5, lb[2] - lb[0], lb[3] - lb[1]);
-        const n = Math.floor((lb[3] - lb[1] - 20) / 21), lines = s.log.slice(-n);
-        let y = lb[3] - 14 - 21 * lines.length;
-        lines.forEach(([f, t], k) => {
-            const mm = Math.floor(f / 3000), hh = Math.floor(mm / 60);
-            this.text(`${String(hh).padStart(2)}:${String(mm % 60).padStart(2, "0")}`, lb[0] + 12, y, `15px ${MONO}`, DIM);
-            this.text(t.length <= 50 ? t : t.slice(0, 49) + "…", lb[0] + 72, y, `15px ${MONO}`, k === lines.length - 1 ? GREEN : "rgb(170,176,186)");
-            y += 21;
-        });
+        this.hits = []; this.net = null;
+        this.status(s, null);
     }
 
     drawCaption() {
-        const bx = colX(4), by = GY + GH - 152;
-        this.text("Acornsoft Elite, BBC Master", bx, by, `600 16px ${SANS}`, FG);
-        ["Fair mode: only what a player", "can see on the screen.", "Flown by two AI models:", "dogfights 8 KB, docking 1.5 KB."]
-            .forEach((t, k) => this.text(t, bx, by + 30 + k * 20, `14px ${SANS}`, DIM));
-        if (this.gh.complete) this.ctx.drawImage(this.gh, bx, by + 128, 24, 24);
-        this.text("8bitkick/elite-agent", bx + 32, by + 140, `15px ${MONO}`, FG, "left", "middle");
+        // the bottom band's right: what this is, and the repository (a link over it on the page)
+        const x = CAP_X;
+        this.text("Acornsoft Elite, BBC Master", x, BOT, `600 15px ${SANS}`, FG);
+        this.text("Fair mode: only what a player can see.", x, BOT + 24, `14px ${SANS}`, DIM);
+        this.text("Two AI models: fights 8 KB, docking 1.5 KB.", x, BOT + 44, `14px ${SANS}`, DIM);
+        if (this.gh.complete) this.ctx.drawImage(this.gh, x, BOT + 70, 22, 22);
+        this.text("8bitkick/elite-agent", x + 30, BOT + 81, `15px ${MONO}`, FG, "left", "middle");
+    }
+
+    /** the cell under a point in the panel's coordinates (the film's frame), or null */
+    hit(px, py) {
+        return (this.hits || []).find((h) => px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h) || null;
     }
 }
