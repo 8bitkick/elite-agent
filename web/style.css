@@ -71,3 +71,5 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
 #phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
+#repo { position: absolute; left: 1666px; top: 1020px; width: 236px; height: 38px; z-index: 1; border-radius: 6px; }   /* (over the panel's drawn 8bitkick/elite-agent) */
+#repo:hover { background: rgba(255,255,255,.06); }
