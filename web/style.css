@@ -40,7 +40,7 @@ body.phone #phone { display: block; }
 #phone header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 12px; }
 #phone .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 #phone .brand { font-weight: 600; font-size: 15px; }
-#phone .seg { width: 230px; }
+#phone .seg { width: 250px; }
 #phone .strip { display: flex; justify-content: space-between; gap: 8px; }
 #phone .strip div { display: flex; flex-direction: column; min-width: 0; }
 #phone .strip span { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -50,7 +50,7 @@ body.phone #phone { display: block; }
 #phone .tools .btn { white-space: nowrap; }
 #phone .tools { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
 #p-chart, #p-net { display: block; width: 100%; }
-#p-note { color: var(--cyan); font-size: 13px; padding: 8px 12px 0; min-height: 1.2em; }
+#p-note { color: var(--cyan); font-size: 13px; line-height: 18px; padding: 4px 12px 0; height: 44px; overflow: hidden; }   /* (two lines, always: no jumps) */
 #p-log { color: var(--green); font: 12px 'JetBrains Mono', ui-monospace, monospace; padding: 4px 12px; margin: 0; white-space: pre-wrap; }
 #phone footer { padding: 12px; color: var(--dim); font-size: 13px; }
 #phone footer b { color: var(--fg); }
@@ -68,3 +68,6 @@ body.phone #phone { display: block; }
 .ff { letter-spacing: -0.25em; margin-right: 0.25em; }
 a.brand { color: inherit; text-decoration: none; }
 a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+#phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
+#phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
+#p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
