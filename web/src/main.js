@@ -219,7 +219,8 @@ async function main() {
         agent.frame();
         // the action worth real time: the dogfight network deciding, or the docking network flying its final
         const f = agent.frameNo;
-        if (f - agent.x.wasm_fight_when() < 30 || (agent.action === 2 && f - agent.x.wasm_dock_when() < 30)) s.lastAction = f;
+        const fw = agent.x.wasm_fight_when(), dw = agent.x.wasm_dock_when();      // (0: never yet)
+        if ((fw > 0 && f - fw < 30) || (agent.action === 2 && dw > 0 && f - dw < 30)) s.lastAction = f;
         const now = performance.now();
         if (now - lastUi > 50) { lastUi = now; grab(this.fb32); s.shot = true; ui(); }
         return paint.apply(this, args);
@@ -231,6 +232,7 @@ async function main() {
         const action = speed.auto && f - s.lastAction < HOLD;
         setRate(w, cpu, !s.started ? Infinity : action ? 1 : speed.sel);
         s.turbo = turbo.on && !paused;
+        s.paused = paused;
         // the speed the game is running at, over the last 2 s: game frames (50 a second) a second of the page's clock
         const now = performance.now();
         (s.rates ||= []).push([now, f]);
@@ -250,8 +252,8 @@ async function main() {
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = agent.senses("fight"), dock = agent.senses("dock");
         if (s.lastDock > s.lastDepart) { s.view = "docked"; s.senses = null; }
-        else if (f - fight.when < 30) { s.view = "fight"; s.senses = fight.f; }
-        else { s.view = "dock"; s.senses = f - dock.when < 30 ? dock.f : null; }
+        else if (fight.when > 0 && f - fight.when < 30) { s.view = "fight"; s.senses = fight.f; }
+        else { s.view = "dock"; s.senses = dock.when > 0 && f - dock.when < 30 ? dock.f : null; }
         panel.draw(s);
         phoneStrip();
         if (window.EA_DEBUG && f - (s.dbgAt || 0) >= 100) { s.dbgAt = f; console.log("EA " + JSON.stringify({ f, turbo: s.turbo, sel: speed.sel, auto: speed.auto, view: s.view, tag: s.tag, tally: s.tally, t: Math.round(performance.now()) })); }
