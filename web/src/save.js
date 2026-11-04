@@ -67,4 +67,15 @@ export function addFile(img, name, dir, data) {
     return out;
 }
 
+/** a copy of the disc image `img` without the file `dir`.`name` (the catalogue closed up; its sectors left as they are) */
+export function removeFile(img, name, dir) {
+    const files = catalogue(img), k = files.findIndex((f) => f.name.toUpperCase() === name.toUpperCase() && f.dir === dir);
+    if (k < 0) return img;
+    const out = img.slice(), n = files.length, a = 8 * (k + 1);
+    out.copyWithin(a, a + 8, 8 + 8 * n); out.copyWithin(SECTOR + a, SECTOR + a + 8, SECTOR + 8 + 8 * n);
+    out.fill(0, 8 * n, 8 * n + 8); out.fill(0, SECTOR + 8 * n, SECTOR + 8 * n + 8);
+    out[SECTOR + 5] = (n - 1) * 8;
+    return out;
+}
+
 export { catalogue };

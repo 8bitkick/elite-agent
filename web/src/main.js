@@ -4,7 +4,7 @@ import { snapshotFromJSON, snapshotToJSON, createSnapshot } from "jsbeeb-src/sna
 import { toSsdOrDsd } from "jsbeeb-src/disc.js";
 import { Agent } from "../agent.js";
 import { Panel, INPUT_NOTE, COL_NOTE } from "./panel.js";
-import { commanderSsd, addFile } from "./save.js";
+import { commanderSsd, addFile, removeFile, catalogue } from "./save.js";
 import { discFor } from "jsbeeb-src/fdc.js";
 
 const $ = (id) => document.getElementById(id);
@@ -38,7 +38,7 @@ const OFF = CH ? CH.frame : 0;
 
 const s = {
     frame: 0, tally: 0, cash: 100, system: "Lave", tallyPts: [[0, 0]], log: [], visits: [[0, 20, 173]], view: "docked",
-    senses: null, speedLabel: "", mode: "adaptive", turbo: false, lastAction: -1e9, lastDock: 0, lastDepart: -1, started: false,
+    senses: null, speedLabel: "", turbo: false, lastAction: -1e9, lastDock: 0, lastDepart: -1, started: false,
 };
 if (CH) Object.assign(s, { frame: OFF, tally: CH.tally, cash: CH.cash, system: CH.system, tallyPts: [[OFF, CH.tally]], visits: [CH.visit] });
 window.eliteAgent = s;
@@ -57,33 +57,48 @@ function layout() {
 addEventListener("resize", layout);
 layout();
 
-// ---- the speed: 1x, adaptive (turbo except in a fight or the docking's final) or turbo. 1x is jsbeeb's own loop, sound
-// and all; turbo is ours: jsbeeb's loop paused and the machine run from the page's animation frames for TURBO_SHARE of
-// each, so the rest of the CPU is left to the browser (jsbeeb's own turbo takes all of it, ahead of the page)
-function setMode(m) {
-    s.mode = m;
-    document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+// ---- the speed: a chosen speed (1x, 2x, 4x, 8x or MAX) and Auto, which plays fights and the docking's final at 1x.
+// 1x is jsbeeb's own loop, sound and all; faster is the page's: jsbeeb's loop paused and the machine run from the page's
+// animation frames, at most TURBO_SHARE of each (the rest of the CPU left to the browser; jsbeeb's own turbo takes all)
+const SPEEDS = [1, 2, 4, 8, Infinity];
+const QS = new URLSearchParams(location.search).get("speed");     // (the old ?speed= kept: 1x, turbo, adaptive)
+const speed = { sel: QS === "1x" ? 1 : Infinity, auto: QS !== "1x" && QS !== "turbo" };
+const speedName = (n) => (n === Infinity ? "MAX" : `${n}×`);
+function speedButtons() {
+    for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`; }
+    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); b.textContent = speed.auto ? "AUTO ●" : "AUTO ○"; } }
 }
-document.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
-setMode(["1x", "adaptive", "turbo"].includes(new URLSearchParams(location.search).get("speed")) ? new URLSearchParams(location.search).get("speed") : "adaptive");
+for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.onclick = () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; speedButtons(); }; }
+for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () => { speed.auto = !speed.auto; speedButtons(); }; }
+speedButtons();
 
 const TURBO_SHARE = 0.8;
-const turbo = { on: false, pending: null };
-function setTurbo(w, cpu, on) {
-    if (on === turbo.on || turbo.pending !== null) return;
-    turbo.pending = on;
+const turbo = { on: false, rate: 1, pending: null };
+let paused = false;
+/** run the machine at `rate` times real time (1: jsbeeb's own loop; Infinity: as fast as the page's share allows) */
+function setRate(w, cpu, rate) {
+    if (paused) return;
+    if (rate !== 1 && turbo.on) { turbo.rate = rate; return; }      // (the page's loop reads it each frame)
+    if (rate === 1 && !turbo.on) return;
+    if (turbo.pending !== null) return;
+    turbo.pending = rate;
     setTimeout(() => {                       // (not from inside a frame jsbeeb is running)
         turbo.pending = null;
-        if (on === turbo.on) return;
-        turbo.on = on;
-        if (!on) { w.go(); return; }
+        if (paused) return;
+        turbo.rate = rate;
+        if (rate === 1) { if (turbo.on) { turbo.on = false; w.go(); } return; }
+        if (turbo.on) return;
+        turbo.on = true;
         w.stop(false);
-        let last = performance.now();
+        let last = performance.now(), owe = 0;
         const run = (now) => {
             if (!turbo.on) return;
-            const budget = Math.min(40, Math.max(4, (now - last) * TURBO_SHARE)), t0 = performance.now();
+            const dt = Math.min(100, now - last), budget = Math.min(40, Math.max(4, dt * TURBO_SHARE)), t0 = performance.now();
             last = now;
-            while (turbo.on && performance.now() - t0 < budget) cpu.execute(40000);    // (a frame's cycles at a time)
+            // cycles due at this speed (2 MHz), or as many as the time allows at MAX
+            owe = turbo.rate === Infinity ? Infinity : Math.min(owe + (dt / 1000) * 2e6 * turbo.rate, 8e6);
+            while (turbo.on && owe > 0 && performance.now() - t0 < budget) { cpu.execute(40000); if (owe !== Infinity) owe -= 40000; }
+            if (owe === Infinity) owe = 0;
             requestAnimationFrame(run);
         };
         requestAnimationFrame(run);
@@ -203,7 +218,7 @@ async function main() {
     video.paint_ext = function (...args) {
         if (!s.started) {
             booting();
-            if (performance.now() - lastUi > 100) { lastUi = performance.now(); setTurbo(w, cpu, true); grab(this.fb32); s.shot = true; }
+            if (performance.now() - lastUi > 100) { lastUi = performance.now(); setRate(w, cpu, Infinity); grab(this.fb32); s.shot = true; }
             return paint.apply(this, args);
         }
         agent.frame();
@@ -218,9 +233,9 @@ async function main() {
         // the speed jsbeeb should run at; a toggle is given 20 frames to show before another
         const f = agent.frameNo;
         if (s.arrive && f >= s.arrive[0]) { s.system = s.arrive[1]; s.arrive = null; }
-        const want = !s.started || s.mode === "turbo" || (s.mode === "adaptive" && f - s.lastAction >= HOLD);
-        setTurbo(w, cpu, want);
-        s.turbo = turbo.on;
+        const action = speed.auto && f - s.lastAction < HOLD;
+        setRate(w, cpu, !s.started ? Infinity : action ? 1 : speed.sel);
+        s.turbo = turbo.on && !paused;
         // the speed the game is running at, over the last 2 s: game frames (50 a second) a second of the page's clock
         const now = performance.now();
         (s.rates ||= []).push([now, f]);
@@ -244,7 +259,7 @@ async function main() {
         else { s.view = "dock"; s.senses = f - dock.when < 30 ? dock.f : null; }
         panel.draw(s);
         phoneStrip();
-        if (window.EA_DEBUG && f - (s.dbgAt || 0) >= 100) { s.dbgAt = f; console.log("EA " + JSON.stringify({ f, turbo: s.turbo, mode: s.mode, view: s.view, tag: s.tag, tally: s.tally, t: Math.round(performance.now()) })); }
+        if (window.EA_DEBUG && f - (s.dbgAt || 0) >= 100) { s.dbgAt = f; console.log("EA " + JSON.stringify({ f, turbo: s.turbo, sel: speed.sel, auto: speed.auto, view: s.view, tag: s.tag, tally: s.tally, t: Math.round(performance.now()) })); }
     };
     // (and on the page's own frames, when jsbeeb is paused or between its frames)
     const tick = (now) => { if (now - lastUi > 200) { lastUi = now; ui(); } requestAnimationFrame(tick); };
@@ -277,6 +292,31 @@ async function main() {
         }
     }
     for (const id of ["credit", "p-credit"]) { const c = $(id); if (c && GAME === "solid") c.innerHTML = c.innerHTML.replace(/flicker-free (Master Elite|disc) from <a[^>]*>([^<]*)<\/a>/, 'Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon\'s source'); }
+    // pause: jsbeeb's loop and the page's turbo both stopped, and started again as the speed has them
+    const pause = () => {
+        paused = !paused;
+        if (paused) { turbo.on = false; w.stop(false); } else { turbo.on = false; turbo.pending = null; w.go(); }
+        for (const id of ["pause", "p-pause"]) { $(id).textContent = paused ? (id === "pause" ? "▶ Resume" : "▶") : id === "pause" ? "❚❚ Pause" : "❚❚"; $(id).classList.toggle("on", paused); }
+    };
+    $("pause").onclick = pause; $("p-pause").onclick = pause;
+    // load a commander: a save on an .ssd of the visitor's (as Save writes, or any Master Elite save), put on the game's
+    // disc under its own name for the agent to load when it next docks
+    const pick = $("loadfile");
+    $("load").onclick = $("p-load").onclick = () => { if (!s.started) { flash("Wait for the agent to start, then load a commander."); return; } pick.click(); };
+    pick.onchange = async () => {
+        const f = pick.files[0]; pick.value = "";
+        if (!f) return;
+        let img; try { img = new Uint8Array(await f.arrayBuffer()); } catch { flash("Couldn't read that file."); return; }
+        let saves = [];
+        try { saves = catalogue(img).filter((x) => x.dir === "E" && x.length === 256); } catch {}
+        if (!saves.length) { flash("No Elite commander on that disc (a 256-byte file in directory E)."); return; }
+        const c = saves[0], data = img.slice(c.start * 256, c.start * 256 + 256);
+        let game = toSsdOrDsd(cpu.fdc.drives[0].disc, { force: true });
+        game = addFile(removeFile(game, c.name, "E"), c.name, "E", data);
+        cpu.fdc.loadDisc(0, discFor("elite.ssd", game));
+        agent.load = c.name;
+        flash(`Commander ${c.name} goes in at the next docking.`);
+    };
     // the chapters: from the start (Jameson at Lave) or from a save at Deadly
     for (const id of ["chapter", "p-chapter"]) {
         const a = $(id), q = new URLSearchParams(location.search);
@@ -329,17 +369,6 @@ function phoneStrip() {
     $("p-kills").textContent = Math.floor(s.tally).toLocaleString("en");
     $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
     $("p-system").textContent = s.system;
-    // the speed, in the phone's highlighted speed button: Auto shows what it's running at
-    const pb = document.querySelector("#phone [data-mode].on");
-    if (pb) {
-        const lab = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
-        const name = { "1x": "", adaptive: "Auto ", turbo: "" }[s.mode];
-        if (pb.textContent !== name + lab) pb.textContent = name + lab;
-    }
-    document.querySelectorAll("#phone [data-mode]:not(.on)").forEach((b) => {
-        const t = { "1x": "▶ 1×", adaptive: "Auto", turbo: "▶▶ Turbo" }[b.dataset.mode];
-        if (b.textContent !== t) b.textContent = t;
-    });
     $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     // the chart and the network, cropped from the panel
     for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
