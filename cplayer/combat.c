@@ -348,10 +348,10 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         // (the teacher: what the C's planner would do here, while acquiring - the same test as its own block below.
         // WSPTEACH=1 logs it, for distil.py; WSPHYB=1 flies it, the ceiling for a perfect copy)
         int plan_now = 0, pla = 0, plb = 0;
-        // (the shipped mode: the network flies, and in witchspace the C's planner turns onto each new target, the one
-        // thing it does better (wsp/README.md). WSPPLAN=0 the network alone, 1 the planner everywhere, 2 witchspace (the default))
+        // (the shipped mode: the network flies every fight on its own. WSPPLAN=2 lets the C's planner turn onto each
+        // new target in witchspace, the one thing it does better (wsp/README.md); 1 the planner everywhere; 0 (the default) never)
         { static int teach = -1, hyb; if (teach < 0) { const char *pe = getenv("WSPPLAN") ? getenv("WSPPLAN") : getenv("WSPHYB");
-              hyb = pe ? atoi(pe) : 2; teach = hyb || getenv("WSPTEACH") != NULL; }
+              hyb = pe ? atoi(pe) : 0; teach = hyb || getenv("WSPTEACH") != NULL; }
           if (teach && IO->analogue && R(A_JSTK)) {
               double r = tt && tt->area ? sqrt((double) tt->area) : 80, d = dist + 1;
               double offa = atan2(hypot(v.x, v.y), v.z) * 180 / M_PI;

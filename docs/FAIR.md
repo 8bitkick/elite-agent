@@ -1,6 +1,6 @@
 # Fair mode: information-fair
 
-The player normally reads Elite's RAM: every ship in the bubble, exactly, every frame, with bytes no screen
+The Optimal player agent reads Elite's RAM: every ship in the bubble, exactly, every frame, with bytes no screen
 shows (a ship's energy, whether it's hostile). [IO.md](IO.md) sorts every read into visible, static, derivable
 and hidden. **Fair mode is fair in terms of information**: the player knows only what a human could see on the
 screen, the scanner and the dashboard, plus the game's fixed rules and its own notes. No hidden RAM. It's still
@@ -53,7 +53,7 @@ What it still reads from RAM, and why that's fair:
 
 | Read | Stands for |
 |---|---|
-| the planet, sun and station: position, and the station's axes | the planet and station are on the screen or the compass (the compass shows the planet's direction, the station's in the safe zone); the station's slot axis always points at the planet (NWSPS), so it follows from the two positions; its roll is only used in the final approach, with the slot dead ahead on the screen. Their distances aren't quantised: a simplification (§5) |
+| the planet, sun and station: position, and the station's axes | the planet and station are on the screen or the compass (the compass shows the planet's direction, the station's in the safe zone); the station's slot axis always points at the planet (NWSPS), so it follows from the two positions; its roll is only used in the final approach, with the slot dead ahead on the screen. Their distances aren't quantised: a simplification (§5). The docking network (wsp/README.md) reads exactly these, as unit sightlines and the slot's drawn position |
 | MCNT (the main-loop counter) | the screen redrawing: each game loop draws a new frame of the ships, so a watcher counts them |
 | JSTX / JSTY (only to carry tracks over a game loop) | how fast the view is turning: seen on the screen, and known from our own stick |
 | QQ11, VIEW, QQ12, MJ, ECMA, MSAR, MSTG = &FF, SSPR, the hyperspace count, cash, fuel, cargo, equipment, FIST | on the screen or the dashboard, or a docked screen |

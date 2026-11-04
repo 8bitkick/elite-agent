@@ -142,6 +142,14 @@ int main(int argc, char **argv)
     uint8_t *px = malloc(2048 * (size_t) h), *rgb = NULL;
     static const uint8_t PAL[8][3] = {{0,0,0},{255,0,0},{0,255,0},{255,255,0},{0,0,255},{255,0,255},{0,255,255},{255,255,255}};
     fprintf(stderr, "from snapshot %ld\n", best);
+    // FRAMES=file: only these frames (ascending, one a line), for a film at more than one speed
+    uint32_t *fl = NULL; size_t nfl = 0, ifl = 0;
+    if (getenv("FRAMES")) {
+        FILE *ff = fopen(getenv("FRAMES"), "r"); unsigned x; size_t cap = 1 << 16;
+        fl = malloc(cap * 4);
+        while (ff && fscanf(ff, "%u", &x) == 1) { if (nfl == cap) fl = realloc(fl, (cap *= 2) * 4); fl[nfl++] = x; }
+        if (ff) fclose(ff);
+    }
     for (uint32_t fr = (uint32_t) best; fr <= to; fr++) {
         while (have && r.frame == fr) {
             if (r.type == 0) beeb_key(B, r.a, r.v);
@@ -151,7 +159,7 @@ int main(int argc, char **argv)
         if (getenv("SCAN")) {
             beeb_frames(B, 1);
             if (fr >= from) { if (atoi(getenv("SCAN")) == 2) scan2(fr + 1, beeb_ram(B)); else scan(fr + 1, beeb_ram(B)); }
-        } else if (fr >= from && (fr - from) % step == 0) {
+        } else if (fl ? (ifl < nfl && fl[ifl] == fr && ++ifl) : (fr >= from && (fr - from) % step == 0)) {
             int w = beeb_shot(B, px, 1);
             if (!rgb) { rgb = malloc((size_t) w * h * 3); fprintf(stderr, "%dx%d\n", w, h); }
             for (int i = 0; i < w * h; i++) memcpy(rgb + i * 3, PAL[px[i] & 7], 3);

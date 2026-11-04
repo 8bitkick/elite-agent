@@ -7,6 +7,47 @@
 #include "keyq.h"
 #include "flight.h"
 #include "galaxy.h"
+#include "wsp_dock.h"
+// (WSPAPP=1: the docking network flies from the hyperspace exit to docked (wsp_dock.c, wsp/elite_wsp/dock_author.py): the
+// roll and pitch rates, the speed, the jump, the final and the commit, in place of to_station_step's and dock_step's laws. The
+// C keeps the hands (the stick maps), the eye (which ship is the planet and the station), the step aside from traffic in the
+// slot, the planet's collision cone as a guard on the aim, and the fights on the way (the dogfight network))
+static int wsp_app_on(void) {        // (fair mode's default, as the dogfight network's: WSPAPP=0 the C laws, WSPAPP=1 in Optimal mode too)
+    static int v = -1;
+    if (v < 0) { const char *e = getenv("WSPAPP"); v = e ? *e != '0' : -2; }
+    return v == -2 ? g_fair != 0 : v;
+}
+static int s_app_up = 1, s_app_final, s_app_commit;
+// (WAPLOG=file: each frame's senses and outputs, a line a frame, for the film's panel)
+static void app_log(const float *f, const wsp_dock_out_t *o) {
+    static FILE *fp; static int tried;
+    if (!tried) { tried = 1; const char *e = getenv("WAPLOG"); if (e) fp = fopen(e, "w"); }
+    if (!fp) return;
+    fprintf(fp, "%u", now());
+    for (int i = 0; i < WSPD_N; i++) fprintf(fp, " %.5g", f[i]);
+    fprintf(fp, " | %.2f %.2f %d %d %d %d %d\n", o->alpha, o->beta, o->speed, o->jump, o->up, o->final, o->commit);
+}
+// (the threat the network swerves from: pilot's collision_ahead, anything but the station within 452 of our path)
+static int app_threat(const ship_t *sh, int n, double miss[3]) {
+    extern const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss);
+    vec_t q; const ship_t *o = collision_ahead(sh, n, 452, &q);
+    if (!o || o->type == SHIP_SST) return 0;
+    miss[0] = q.x, miss[1] = q.y, miss[2] = q.z;
+    return 1;
+}
+static uint32_t s_app_last_mc = 0xFFFFFFFF;
+static wsp_dock_out_t s_app_out;
+static int jstx_for(double alpha); static int jsty_for(double beta); static int jsty_nose_up(double u);
+static void app_hands(double alpha, double beta, int final) {
+    extern int g_want_jx, g_want_jy;
+    if (final) {     // (the final's stick: the middle of the ALPHA band, the pitch by the nose-up map, as the law's own)
+        int a8 = (int) lround(fabs(alpha)), jt = a8 == 0 ? 0 : a8 >= 8 ? a8 * 4 + 2 : a8 * 8 + 4;
+        if (jt > 127) jt = 127;
+        g_want_jx = 128 + (alpha < 0 ? -jt : jt); g_want_jy = jsty_nose_up(beta);
+    } else {
+        g_want_jx = jstx_for(alpha); g_want_jy = jsty_for(beta);
+    }
+}
 
 #define PLANET_R 24576.0
 
@@ -567,6 +608,23 @@ static __attribute__((noinline)) void to_station_step(void)
                 vec_t P = pos_of(pl);
                 double off;
                 int want = 40;
+                if (wsp_app_on() && IO->analogue && R(A_JSTK)) {
+                    {   // (every frame, as the law's own steer: the main-loop counter can sit still on the way in)
+                        wsp_dock_in_t in = {{P.x, P.y, P.z}, altitude(), 0, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, 1, speed(), fsh(), ash(), 1,
+                                            0, {0, 0, 0}, s_app_up, 0, 0};
+                        in.col = app_threat(sh, n, in.miss);
+                        float f[WSPD_N];
+                        s_app_out = wsp_dock_at(&in, jsty(), f);
+                        s_app_up = s_app_out.up; s_app_final = 0; s_app_commit = 0;
+                        app_log(f, &s_app_out);
+                    }
+                    vec_t g = {s_app_out.goal[0], s_app_out.goal[1], s_app_out.goal[2]};
+                    off = atan2(hypot(g.x, g.y), g.z) * 180 / M_PI;
+                    app_hands(s_app_out.alpha, s_app_out.beta, 0);
+                    want = s_app_out.speed;
+                    speed_keys(speed(), want, &keys);
+                    if (s_app_out.jump && jump_allowed(sh, n)) ks_add(&keys, K_JUMP);
+                } else {
                 if (altitude() < 60) {
                     off = steer(vneg(P), jstx(), jsty(), 3, 3, &keys);
                     want = 20;
@@ -575,7 +633,12 @@ static __attribute__((noinline)) void to_station_step(void)
                 }
                 speed_keys(speed(), want, &keys);
                 if (off < 10 && jump_allowed(sh, n)) ks_add(&keys, K_JUMP);
-                {        // anything on a collision course but the station (an asteroid: we flew into one for 15 s)
+                }
+                { static int on = -1; static int last_mc = -1;
+                  if (on < 0) on = getenv("APLOG") != NULL;
+                  if (on && mcnt() != last_mc) { last_mc = mcnt(); extern int g_want_jx, g_want_jy;
+                      fprintf(stderr, "AP %u C %.1f %.1f %.1f %d %d | %d %d %d %d\n", now(), P.x, P.y, P.z, altitude(), alpha_from_jstx(jstx()), g_want_jx, g_want_jy, want, off < 10 && jump_allowed(sh, n)); } }
+                if (!wsp_app_on()) {        // anything on a collision course but the station (an asteroid: we flew into one for 15 s); the network has its own
                     extern const ship_t *collision_ahead(const ship_t *s, int n, int margin, vec_t *miss);
                     vec_t q;
                     const ship_t *obst = collision_ahead(sh, n, 452, &q);
@@ -696,6 +759,50 @@ static __attribute__((noinline)) int dock_step(void)
             // (on the arc: the final takes over only once the arc has brought us onto the axis: handed over at 8% of along,
             // halfway round, the final's re-aim swung the nose 39 deg)
             if (!c_dk.final && c_dk.arcon && lat > g_dk_arc_end) lined = 0;
+            if (wsp_app_on() && IO->analogue && R(A_JSTK)) {
+                // the approach network: the aim, the rates, the speed and the bits, once a game loop. The C guards it: the step
+                // aside from traffic leaving the slot and the planet's collision cone act on its aim as on the law's own
+                if (now() != s_app_last_mc) {        // (once a frame; the law's own runs each frame too)
+                    s_app_last_mc = now();
+                    int clear = 1;
+                    for (int i = 0; i < n; i++) { const ship_t *q = &sh[i]; if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128) continue; vec_t p = pos_of(q); if (p.z > 0 && p.z < dist + 400 && hypot(p.x, p.y) < g_dk_clr) clear = 0; }
+                    vec_t rvn = vnorm(fvec(st->roofv));
+                    const ship_t *pl = find_planet(sh, n);
+                    vec_t P = pl ? pos_of(pl) : (vec_t){0, 0, 1};
+                    wsp_dock_in_t in = {{P.x, P.y, P.z}, altitude(), 1, {S.x, S.y, S.z}, {nv.x, nv.y, nv.z}, {rvn.x, rvn.y, rvn.z},
+                                        st->roll < 0 ? -1 : 1, speed(), fsh(), ash(), clear, 0, {0, 0, 0}, s_app_up, s_app_final, s_app_commit};
+                    in.col = app_threat(sh, n, in.miss);
+                    float f[WSPD_N];
+                    s_app_out = wsp_dock_at(&in, jy, f);
+                    s_app_up = s_app_out.up; s_app_final = s_app_out.final; s_app_commit = s_app_out.commit;
+                    app_log(f, &s_app_out);
+                    if (in.col && g_dock_log) dbgf_("WA swerve: miss %.0f %.0f %.0f", in.miss[0], in.miss[1], in.miss[2]);
+                    c_dk.final = s_app_out.final; c_dk.commit = s_app_out.commit;
+                    c_dk.xhold = 0; c_dk.vf = 0; c_dk.arcon = 0;
+                    if (g_dock_log) dbgf_("WA a %.1f b %.2f v %d final %d cm %d", s_app_out.alpha, s_app_out.beta, s_app_out.speed, c_dk.final, c_dk.commit);
+                }
+                goal = (vec_t){s_app_out.goal[0], s_app_out.goal[1], s_app_out.goal[2]};
+                want = s_app_out.speed;
+                app_hands(s_app_out.alpha, s_app_out.beta, c_dk.final);
+                off = atan2(hypot(goal.x, goal.y), goal.z) * 180 / M_PI;
+                // the step aside from traffic (the final only, as the law's own)
+                if (c_dk.final && g_dk_evade_x > 0) {
+                    int threat = 0; double tx = 0;
+                    for (int i = 0; i < n; i++) {
+                        const ship_t *q = &sh[i];
+                        if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128) continue;
+                        vec_t p = pos_of(q);
+                        if (p.z > -100 && p.z < dist + 400 && hypot(p.x, p.y) < 450) threat = 1, tx = p.x;
+                    }
+                    c_dk.evade = threat ? (tx > 0 ? -1 : 1) : 0;
+                    if (c_dk.evade && dist > g_dk_ev_min) {
+                        vec_t aimp = vadd(goal, (vec_t){1, 0, 0}, c_dk.evade * g_dk_evade_x);
+                        steer(aimp, jx, jy, 3, 3, &keys);           // (the step aside re-aims: the law's own steering onto the offset aim)
+                        c_dk.commit = 0; if (want > g_dk_ev_spd) want = (int) g_dk_ev_spd;
+                    }
+                }
+                goto app_done;
+            }
             if (!lined) {
                 if (along < 600) {
                     vec_t side = vnorm(fvec(st->roofv));
@@ -1069,7 +1176,20 @@ static __attribute__((noinline)) int dock_step(void)
                 if (off > 8 && want > 4 && !c_dk.commit && !(c_dk.vf && dist > 4000)) want = 4;     // (far out the turn is room enough at 40: the field's hand-over is ~26 deg)
                 c_dk.final = 1;
             }
+        app_done:
             speed_keys(speed(), want, &keys);
+            { static int on = -1; static int last_mc = -1;
+              if (on < 0) on = getenv("APLOG") != NULL;
+              if (on && (mcnt() != last_mc || wsp_app_on())) {      // (APLOG: the law's inputs and its decision, once a game loop; every frame with the network)
+                  last_mc = mcnt();
+                  extern int g_want_jx, g_want_jy;
+                  int clear = 1;
+                  for (int i = 0; i < n; i++) { const ship_t *q = &sh[i]; if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128) continue; vec_t p = pos_of(q); if (p.z > 0 && p.z < dist + 400 && hypot(p.x, p.y) < g_dk_clr) clear = 0; }
+                  fprintf(stderr, "AP %u D %.1f %.1f %.1f %.6f %.6f %.6f %.6f %.6f %.6f %d %d %d %d %d %d %d %d | %d %d %d %d %d %d %d\n", now(), S.x, S.y, S.z,
+                          nv.x, nv.y, nv.z, fvec(st->roofv).x / vlen(fvec(st->roofv)), fvec(st->roofv).y / vlen(fvec(st->roofv)), fvec(st->roofv).z / vlen(fvec(st->roofv)),
+                          st->roll < 0 ? -1 : 1, alpha_from_jstx(jx), fsh(), ash(), clear, c_dk.final, c_dk.xhold, c_dk.commit,
+                          g_want_jx, g_want_jy, want, c_dk.vf, c_dk.arcaim, c_dk.evade, speed());
+              } }
             // (curious: the front view when flying in. A fight left on the rear view stayed there: 1.5 minutes of an
             // empty starfield on the way to the station)
             { extern int g_curious; if (g_curious && space_view() != 0) ks_add(&keys, K_F0); }

@@ -1,6 +1,6 @@
 # Weight-space roadmap
 
-Where the weight-space pilot stands (3 Nov 2026), and the steps that would take it further, each with the
+Where the weight-space pilots stand (4 Nov 2026), and the steps that would take it further, each with the
 measure that decides it: the fight lab on `evolve/sets/big.lst` (450 held-out fights, one process a fight,
 a paired comparison against the C pilot), kept only if points a minute go up with no more deaths.
 
@@ -11,9 +11,11 @@ a paired comparison against the C pilot), kept only if points a minute go up wit
 | v1: 2,053 AI-authored weights, lateral-offset steering | ~72% of the C rules (hard set) | |
 | v2 as written: the C's steering law in angle space, every constant named | 92.4% | |
 | v2 evolved: CMA-ES on the 21 named parameters | 97.2% | 97.1% |
-| v2 evolved + the C's planner for witchspace acquisition (fair mode's pilot) | 98.6% | **102.8%** |
+| v2 evolved + the C's planner for witchspace acquisition (`WSPPLAN=2`, off by default) | 98.6% | 102.8% |
 | fair careers to Elite, earlier build, three seeds | | **27.2 h against 27.8** |
-| fair careers to Elite, current build, two seeds | | 16.5 h against 16.4 (level) |
+| fair careers to Elite, current build, two seeds, the planner on | | 16.5 h against 16.4 (level) |
+| the docking network: hyperspace exit to docked, written in the network's own terms, evolved | | 175.4 against the C's 180.5 (cost on 69 held-out dockings) |
+| fair careers to Elite, both networks, the planner off | | 16.7 and 17.0 h against 16.8 and 17.5 |
 
 Tried and dropped (wsp/README.md has the numbers): PPO on a residual, DAgger regression of the planner,
 stick dithering, confidence gates on lead and fire, a nose hold, fair-tracker settings.
@@ -40,5 +42,6 @@ stick dithering, confidence gates on lead and fire, a nose hold, fair-tracker se
 
 ## Not on the list
 
-- Replacing the career loop, docking or trading: sequences over screens, not control laws.
+- Replacing the career loop or trading: sequences over screens, not control laws. (Docking was on this list; it
+  is a control law, and it's done.)
 - Training from scratch. The point is the written network as the starting point.

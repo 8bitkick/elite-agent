@@ -15,37 +15,39 @@ plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkic
 | [![A Deadly-rank fight flown by the AI pilot model, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
 | [Fair mode's 8 KB AI pilot model](wsp/README.md) in a fight | Lasers on a Thargoid in witchspace | Elite |
 
-Fair mode's dogfights are flown by an 8 KB neural network whose 2,256 weights an AI wrote directly, unit by unit,
-then tuned by evolution; a plain C forward pass runs it. It scores 2.8% more points a fight minute than the C rules
-it replaced, over 450 held-out fights. After MIT CSAIL's
-[Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026); how it
-was written and measured: [wsp/README.md](wsp/README.md).
+Fair mode's dogfights and dockings are flown by two small neural networks whose weights an AI wrote directly, unit
+by unit, then tuned by evolution; a plain C forward pass runs each. The dogfight network (8 KB) scores 97% of the
+C rules' points a fight minute over 450 held-out fights, every fight its own; the docking network (1.5 KB) flies
+from the hyperspace exit to docked and docks 2.8% cheaper than the C law it replaced, over 69 held-out dockings,
+with a sixth of its stick reversals. After MIT CSAIL's
+[Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026); how they
+were written and measured: [wsp/README.md](wsp/README.md).
 
 ## Modes
 
 | Mode | What it does | Switch | Jameson to Elite |
 |---|---|---|---|
 | **Optimal**<br>RAM peeks beyond human player knowledge | straight for Elite, farming Thargoids in witchspace ([below](#where-the-time-goes)); reads any RAM it needs, even bytes the screen never shows, like an enemy's energy ([`docs/IO.md`](docs/IO.md)) | **the default** in run_sim, the lab and the firmware build; `--efficient` for the Presto plugin | **14.3 game hours** (the best of two careers) |
-| **Fair**<br>only uses what a player can view or derive from the screen | Optimal's career on what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)). Its dogfights are flown by the 8 KB AI pilot model ([`wsp/README.md`](wsp/README.md); `WSP=0` for the C rules it replaced) | `FAIR=1`; `--fair` on the Presto | **16.5 game hours** (the best of two careers) |
+| **Fair**<br>only uses what a player can view or derive from the screen | Optimal's career on what a player could see: the screen, scanner and dashboard as drawn, the game's rules, its own notes; no hidden RAM ([`docs/FAIR.md`](docs/FAIR.md)). Its dogfights and its dockings are flown by two AI pilot models, 8 KB and 1.5 KB ([`wsp/README.md`](wsp/README.md); `WSP=0` and `WSPAPP=0` for the C rules they replaced) | `FAIR=1`; `--fair` on the Presto | **16.7 game hours** (the best of two careers) |
 | **Curious**<br>maximum fun, exploration and dogfights | explores every galaxy, meets every ship type, both missions; more stylish piloting: enemies close and big on screen, flybys watched from the side, strafing runs, Thargoid swarms, losses up to 5% accepted ([`docs/FIGHTING.md`](docs/FIGHTING.md)) | `CURIOUS=1`; **the default** for the Presto plugin | not tuned for time, but for style: **139.2 game hours** (the best of six careers, on v0.4) |
 
 All modes save at each dock (about 4 seconds; on the Presto Curious runs the save in turbo), so a death loses only the trip since. Times are game
 hours on the native emulator at the real machine's speed.
 
-![Kill tally against game hours, each mode's fastest career bold and its slowest faint: Optimal 14.3 hours, Fair (on-screen visible inputs, 8 KB AI pilot model) 16.5, Curious 139.2](docs/img/climb.svg)
+![Kill tally against game hours, each mode's fastest career bold and its slowest faint: Optimal 14.3 hours, Fair (on-screen visible inputs, two AI pilot models) 16.7, Curious 139.2](docs/img/climb.svg)
 
 **Careers in numbers**, Jameson to Elite: each mode's best career (`tools/career_stats.py` on the journals in
 [`docs/careers`](docs/careers)):
 
 | | Optimal | Fair |
 |---|---|---|
-| Game hours to Elite | 14.3 | 16.5 |
+| Game hours to Elite | 14.3 | 16.7 |
 | Star systems visited | 63 | 66 |
 | Galaxies | 3 | 3 |
-| Light years flown (dock to dock) | 504 | 538 |
-| Docks | 188 | 208 |
-| Fights | 1,219 | 2,470 |
-| Kills | 4,653 | 4,599 |
+| Light years flown (dock to dock) | 504 | 537 |
+| Docks | 188 | 200 |
+| Fights | 1,219 | 1,562 |
+| Kills | 4,653 | 4,788 |
 | Witchspace sessions (Thargoids) | 64 | 76 |
 | Deaths (reloaded) | 0 | 1 |
 | Escape pods used | 0 | 0 |
@@ -109,7 +111,11 @@ the axis it rolls with the station to hold the slot level, and holds the slot's 
 or below the nose so the roll carries it across onto the nose (`cplayer/pilot.c`). Over 12 two-hour
 careers: 81 s from the station's safe zone to docked (the median; 98 s on v0.3), entries within 21 of
 the axis, half the stick reversals of v0.3. Its old line-up flew into the planet four times in five
-careers to Elite; this one hasn't in ten.
+careers to Elite; this one hasn't in ten. In fair mode the docking is the AI-authored docking network's instead
+([`wsp/README.md`](wsp/README.md)): five sightlines from the screen (the slot, a mark on its axis ahead, a mark round
+the station, the planet, an escape heading), a gate for each, the dogfight network's steering onto the one chosen,
+and the same final; 1,471 weights, written in the network's own terms rather than transcribed from the C law, and
+2.8% cheaper than it on 69 held-out dockings.
 
 ## Which Elites
 
@@ -165,7 +171,7 @@ line per event (docks, fights, sessions, deaths, ranks) to the journal. Options,
 |---|---|
 | `SKEW=n` | start n frames late: a different career |
 | `CURIOUS=1` | Curious (with no mode switch: Optimal) |
-| `FAIR=1` | Fair: the dogfights flown by the AI-authored network (`WSP=0`: the C rules; `FAIRHANDS=1` adds limits on the stick and keys) |
+| `FAIR=1` | Fair: the dogfights and the dockings flown by the AI-authored networks (`WSP=0` / `WSPAPP=0`: the C rules; `FAIRHANDS=1` adds limits on the stick and keys) |
 | `STOPFAIL=1` | stop at the first death or restart |
 | `SAVE=0` | never save (a death ends the career) |
 | `FIGHTS=dir` | record each fight's starting snapshot, for the lab |

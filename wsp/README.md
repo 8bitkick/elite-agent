@@ -1,26 +1,33 @@
-# Fair mode's pilot: an AI-authored custom model
+# Fair mode's pilots: two AI-authored custom models
 
 ![A Deadly-rank fight flown by the first version of the network, its units lit beside the game](../docs/img/weight-space.gif)
 
-Fair mode (`FAIR=1`) flies its dogfights with a small neural network, and the player sees only what a human could
-(fair mode, [docs/FAIR.md](../docs/FAIR.md)): the screen, the scanner and the dashboard as drawn, no hidden RAM.
-It **outscores the C rules it replaced: 2.8% more points a fight minute on 450 held-out fights** (90% interval
-0.6-5.2%), ahead in every kind of fight. In careers to Elite it was ahead on all three seeds on an earlier, slower build (27.2 game hours against 27.8),
-and on the current build is level on two (16.5 against 16.4).
-
-The network is **2,256 weights (8.8 KB), run by a forward pass of about 60 lines of plain C**
-([cplayer/wsp_pilot.c](../cplayer/wsp_pilot.c)), with no ML library, like the rest of the agent. Its weights were
-**authored directly by an AI**, unit by unit, every one named, then **tuned by evolution** in the fight lab. No gradient ever
-touched them. It follows MIT CSAIL's
+Fair mode (`FAIR=1`) flies its dogfights and its dockings with two small neural networks, and the player sees only
+what a human could (fair mode, [docs/FAIR.md](../docs/FAIR.md)): the screen, the scanner and the dashboard as drawn,
+no hidden RAM. Their weights were **authored directly by an AI**, unit by unit, every one named, then **tuned by
+evolution** in a lab. No gradient ever touched them. They follow MIT CSAIL's
 [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026):
-a frontier LLM writing network weights directly, as a program, rather than training them.
+a frontier LLM writing network weights directly, as a program, rather than training them. Each is run by a forward
+pass of about 60 lines of plain C, with no ML library, like the rest of the agent.
+
+- **The dogfight network** (`wsp_pilot.c`, **2,256 weights, 8.8 KB**) scores **97.1% of the C rules' points a fight
+  minute on 450 held-out fights** (90% interval 94.5-99.7%) flying every fight on its own, as it does by default. With
+  the C's acquisition planner borrowed for witchspace swarms (`WSPPLAN=2`) it outscores them, 102.8%; that is off by
+  default so that in fair mode every fight is the network's.
+- **The docking network** (`wsp_dock.c`, **1,471 non-zero weights, about 1.5 KB**) flies from the hyperspace exit to
+  docked: the cruise to the planet, the way round the station, the approach onto the slot's axis, the final with the
+  roll matched to the station's spin. On 69 held-out dockings it is **2.8% cheaper than the C law it replaced** (the
+  time to dock plus a penalty for ugly flying: 175.4 against 180.5), with a sixth of the C's stick reversals, no
+  crawling and no deaths.
+
+In careers to Elite on the current build, both networks flying, fair mode takes **16.7 and 17.0 game hours** on its
+two seeds, with no deaths, against 16.8 and 17.5 with the C docking law on the same seeds.
 
 | | |
 |---|---|
-| **Switch** | on in fair mode (`FAIR=1`); `WSP=0` puts the C rules back for comparisons, `WSP=1` flies the network in Optimal mode too. Optimal mode is unchanged: a career's journal is byte-identical without it |
-| **What it flies** | the stick, the laser and the throttle in a fight. Target choice, missiles, ECM, evasion, docking, trading and the career stay the C agent's |
-| **One part it borrows** | in witchspace, the C's acquisition planner (pilot.c `plan_stick`) turns onto each new Thargoid (below). `WSPPLAN=0` turns it off |
-| **Size** | 23 inputs, 4 hidden layers (30, 26, 16, 14), 4 outputs: 2,256 weights, 187 of them non-zero |
+| **Switch** | on in fair mode (`FAIR=1`); `WSP=0` / `WSPAPP=0` put the C rules back for comparisons (the dogfights / the docking), `WSP=1` / `WSPAPP=1` fly them in Optimal mode too. Optimal mode is unchanged: a career's journal is byte-identical without them |
+| **What they fly** | the dogfight network: the stick, the laser and the throttle in a fight. The docking network: the stick, the throttle and the in-system jump from the hyperspace exit to docked, and when to commit. Target choice, missiles, ECM, evasion in a fight, trading and the career stay the C agent's |
+| **Size** | dogfights: 23 inputs, 4 hidden layers (30, 26, 16, 14), 4 outputs: 2,256 weights, 187 non-zero. Docking: 47 inputs, 4 hidden layers (112, 179, 42, 30), 7 outputs: 1,471 non-zero weights |
 
 ## The results
 
@@ -35,22 +42,26 @@ with a 90% paired-bootstrap interval:
 |---|---:|---|---:|---|
 | C rules | 20.32 | | 18.15 | |
 | network, as written (the C's numbers) | 18.77 | 0.924 (0.901-0.948) | | |
-| network, evolved | 19.76 | 0.972 (0.949-0.997) | 17.62 | 0.971 (0.945-0.997) |
-| **network + the planner in witchspace (fair mode's pilot)** | **20.03** | **0.986 (0.966-1.006)** | **18.66** | **1.028 (1.006-1.052)** |
+| **network, evolved (fair mode's pilot)** | **19.76** | **0.972 (0.949-0.997)** | **17.62** | **0.971 (0.945-0.997)** |
+| network + the C's planner in witchspace (`WSPPLAN=2`) | 20.03 | 0.986 (0.966-1.006) | 18.66 | 1.028 (1.006-1.052) |
 
-By kind, fair mode: witchspace 20.50 against 20.06 (1.022), pirate packs 12.29 against 11.74 (1.047), small
+By kind, fair mode with the planner: witchspace 20.50 against 20.06 (1.022), pirate packs 12.29 against 11.74 (1.047), small
 fights 7.34 against 6.97 (1.052). No deaths in any of the 450, for either pilot.
 
 ### Careers to Elite, fair mode
 
-Game hours when the tally reached 6,400, both pilots on the same seeds (`SKEW`) and build. On the current build
-(the journals are in [../docs/careers](../docs/careers) and [careers/](careers)):
+Game hours to the rank of Elite, on the same seeds (`SKEW`) and build. On the current build (the journals are in
+[../docs/careers](../docs/careers) and [careers/](careers)):
 
-| seed | network | C rules (`WSP=0`) | |
-|---|---:|---:|---|
-| 13 | 16.5 | 17.1 | network 0.6 h ahead |
-| 101 | 16.5 | 15.6 | C 0.8 h ahead |
-| **mean** | **16.5** | **16.4** | level |
+| seed | both networks (the default) | dogfight network, C docking (`WSPAPP=0`) | dogfight network + planner, C docking (`WSPPLAN=2 WSPAPP=0`) | C rules (`WSP=0 WSPAPP=0`) |
+|---|---:|---:|---:|---:|
+| 13 | **16.7** | 16.8 | 16.5 | 17.1 |
+| 101 | **17.0** | 17.5 | 16.5 | 15.6 |
+| **mean** | **16.8** | 17.1 | 16.5 | 16.4 |
+
+The docking network gains 0.1 and 0.5 hours over the C law on its own. The planner would gain 0.3 more in the mean
+and is off by default (above). A career is one path, and a seed moves it by more than any of these pilots do (the C
+rules' two careers are 1.5 hours apart); the labs' held-out sets are what say which pilot is better.
 
 On an earlier build, before Optimal's current farming strategy (the same network; the journals in [careers/](careers)):
 
@@ -71,7 +82,7 @@ Optimal mode reads exact positions, headings and energies from RAM; fair mode ge
 a tracker (fair.c), and every pilot loses about 11% to that (both: 0.893 and 0.892 of their Optimal selves). The C rules steer with the tracker's estimates as if they were exact. The network is the better tracker of a target
 (below) and holds its lead over the C in normal space when the information gets worse, where the C's lead in
 witchspace comes from a planner that works equally well either way. So in fair mode the network's strengths count
-for more, and with the planner for the swarms it comes out ahead.
+for more, and with the planner borrowed for the swarms it would come out ahead; on its own it is within 3%.
 
 ## How it was built
 
@@ -104,12 +115,65 @@ to slew onto a target (1.42 s), the same in the sights (0.46 s), the same betwee
 one phase, the capture from 10 degrees into the sights (0.58 s against 0.47). There the C flies a planner that
 searches Elite's exact rotation, including the gaps in the stick's rates (pitch has no rate 2, roll none from 4 to 7).
 The network is the better tracker (hold 83% against 80%, aim 1.2 degrees off against 1.9) and the slower acquirer. In
-a swarm, a fight is forty acquisitions, so the planner flies those in witchspace and the network everything else.
+a swarm, a fight is forty acquisitions, which is where `WSPPLAN=2` would borrow the planner; by default the network
+flies them itself.
 
 **Four inputs about the senses' confidence** (fair.c's tracker): whether the heading was seen on a wireframe or
 guessed from motion, how stale the sighting is, the range's and the motion's uncertainty. In Optimal mode they
 read "seen, fresh, exact". The written law doesn't use them yet: gating the lead and the fire cone by them was
 tried and cost points. They're there for what comes next.
+
+## The docking network
+
+[elite_wsp/dock_author.py](elite_wsp/dock_author.py) writes it; [elite_wsp/dock_features.py](elite_wsp/dock_features.py)
+is its senses; [cplayer/wsp_dock.c](../cplayer/wsp_dock.c) runs it. The same method as the dogfight network's, and a
+different lesson learned on the way.
+
+**The first version transcribed the C law.** pilot.c's docking is seven regimes (the cruise, the plain line-up, the way
+round from behind, a vector field, an approach circle, a hand-over blend, the final) with hysteresis bits, piecewise
+trigonometry and special cases. Written faithfully as ReLU units it came to 12,500 weights in 10- and 13-layer heads,
+85% of its units copies carrying values down the layers, and it inherited every one of the C's ugly manoeuvres: the
+detours behind the station, the stick reversals in the line-up, the crawl near the marks. It worked (63 of 69 held-out
+dockings) and it was thrown away.
+
+**The second was written for the network.** Five sightlines from the senses, pure geometry: the planet, the slot, an
+*approach mark* on the slot's axis a fixed lead ahead of us (further out when we are far off the axis, so the approach
+is never steeper than `chi`), a *side mark* out in front of the station and off to our own side (the way round from
+behind), and the escape heading from a collision course. The network's whole job is to choose between them and to
+steer:
+
+- **where to aim** (layers 1-2): a gate for each sightline, from saturating tests of where we are (behind, in front,
+  nearly lined up, lined up, low over the planet, a collision course). Each gate *clips* its sightline, min(u, g),
+  rather than switching it, so at a regime's edge two aims add and the steering flies their mean: no jumps
+- **the steering** (layers 3-4): the dogfight network's law on the chosen aim, roll into the vertical plane (above or
+  below, with hysteresis), pitch onto it; the roll held to the station's spin rate
+- **the final**: the roll at the station's spin trimmed to level the slot; the pitch onto the slot's drawn centre
+  through Elite's rotation (y - a x), with the sideways hold; the commit as an AND of six tests, kept with hysteresis
+- **the speed**: by the room left for the turn still needed; the final's bands by range; 40 once committed
+- **the bits** carried between loops: above/below, the final, the commit
+
+As written, with the C's own numbers, it was level with the C in the lab (63 of 69 docked against 62, median
+164 s against 160) and the crawl was gone. Evolution over its 45 named parameters ([evolve/es_dock.py](evolve/es_dock.py),
+12 generations of 30 training starts, scored on time plus a penalty for stick reversals, crawling and swings of the
+aim) took it to 175.4 against the C's 180.5 on the 69 held-out starts. What it changed: a gentler roll (gain
+-33%), a longer lead on the approach mark (+22%), a tighter way round, and a stricter commit (centred within 3
+degrees, level within 4.4). The parameters are [evolve/es_dock_best.json](evolve/es_dock_best.json); the weights
+[elite_dock.npz](elite_dock.npz) and [elite_dock.wsp](elite_dock.wsp); [tests/test_dock.py](tests/test_dock.py) holds
+the C's senses and forward pass to the Python's and checks what the written network decides in plain situations.
+
+| 69 held-out dockings | cost | docked | median s | stick reversals | crawl s | swings |
+|---|---:|---:|---:|---:|---:|---:|
+| C law | 180.5 | 62 | 159.9 | 12 | 3.6 | 0.62 |
+| network, as written | 183.7 | 63 | 164.1 | 12 | 0.2 | 0.90 |
+| **network, evolved** | **175.4** | 62 | 161.1 | 10 | 0.2 | 0.94 |
+
+(cost: seconds to dock, a timeout 300, a death 360, plus 0.5 a stick reversal, 1 a second of crawling far out, 3 a
+swing of the aim past 60 degrees. The lab: `LABDOCK=1 cplayer/lab starts.lst`, on starts recorded by
+`DOCKSNAP=dir run_sim`.)
+
+What it does not do yet: the C's approach circle from behind (a banked turn onto the axis), which the first version
+carried and this one replaced with the side mark and the turn-room speed rule; and the C's step aside from traffic
+leaving the slot, which the C still applies around the network's aim.
 
 ## What didn't work
 
@@ -147,6 +211,7 @@ FAIR=1 SKEW=13 cplayer/run_sim 3000 "" journal.jsonl           # a fair career, 
 python3 -m elite_wsp.author                                     # write the weights from author.py's defaults
 python3 -m elite_wsp.inspect elite_pilot.npz                    # read them back, unit by unit
 python3 tests/test_pilot.py                                      # the weights against their spec, C against numpy
+python3 -m elite_wsp.dock_export && python3 tests/test_dock.py   # the docking network: write it, C against numpy
 cd evolve && python3 -c "import lab; print(lab.fmt(lab.score(lab.run(lab.read_set('big'), wsp='written_es14.wsp', extra_env={'FAIR':'1'})[0], by_kind=True)))"
 ```
 
@@ -157,7 +222,8 @@ The fight sets in [evolve/sets/](evolve/sets) name recorded fights: `FIGHTS=figh
 | Switch | |
 |---|---|
 | `WSP=0` / `WSP=1` | the C rules in fair mode / the network in Optimal mode (the default: the network in fair mode only) |
-| `WSPPLAN=0/1/2` | the C's planner for acquisition: never, always, in witchspace (the default) |
+| `WSPAPP=0` / `WSPAPP=1` | the same for the docking network; `WSPAPPW=file.wsp` other docking weights, `WAPLOG=file` its senses and outputs a frame |
+| `WSPPLAN=0/1/2` | the C's planner for acquisition: never (the default), always, in witchspace |
 | `WSPW=file.wsp` | other weights at run time (evolution's candidates) |
 | `WSPLOG=file` | each decision: the senses, the action, the score |
 | `WSPN`, `WSPR`, `WSPTEACH` | exploration noise, a learned residual, the planner's labels (ppo.py, distil.py) |
@@ -170,6 +236,10 @@ elite_wsp/layers.py     writing a ReLU layer unit by unit, by name
 elite_wsp/author.py     the network, written: every unit named and annotated, every constant a parameter
 elite_wsp/reference.py  the same law as plain arithmetic, the spec the tests hold the weights to
 elite_wsp/export.py     .npz (with names), .wsp (run time), cplayer/pilot_weights.h (compiled in)
+elite_wsp/dock_features.py  the docking network's senses: the sightlines to the slot, the marks, the planet; the station as drawn
+elite_wsp/dock_author.py    the docking network, written: where to aim, the steering, the final, the speed, the bits
+elite_wsp/dock_export.py    its .npz, .wsp (WSPAPPW=file) and cplayer/dock_weights.h
+evolve/es_dock.py       CMA-ES over the docking network's parameters, in the docking lab
 evolve/lab.py           the fight lab in parallel, one process a fight; scores and paired comparisons
 evolve/es.py            CMA-ES over the named parameters
 evolve/ppo.py           PPO on a residual (tried; see above)

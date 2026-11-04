@@ -13,7 +13,7 @@ X0, X1, Y0, Y1 = 64, 640, 352, 24          # plot area
 HMAX, TMAX = int(os.environ.get('HMAX', 140)), 7000      # (HMAX=hours: the x axis)
 STYLE = {   # colour, label (validated: violet / aqua / orange, every line direct-labelled)
     'efficient': ('#6250d6', 'Optimal (RAM peeks beyond a player)'),
-    'fair': ('#1baf7a', 'Fair (on-screen visible inputs, 8 KB AI pilot model)'),
+    'fair': ('#1baf7a', 'Fair (on-screen visible inputs, two AI pilot models)'),
     'cfair': ('#8a8a96', 'Fair, C rules (WSP=0)'),
     'fairnet': ('#1baf7a', 'Fair, network (the default)'),
     'curious': ('#eb6834', 'Curious (exploration and dogfights)'),
