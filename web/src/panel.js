@@ -144,7 +144,6 @@ export class Panel {
         // the ranks: a meter from Harmless to Elite, a section a rank (equal widths: the low ranks are a few kills
         // each), filled to the kill tally
         const g = this.ctx, MY = 246, MH = 12, seg = PW / (RANKS.length - 1);
-        this.text("PROGRESS TO ELITE", PX, 222, `600 14px ${SANS}`, DIM);
         for (let i = 0; i < RANKS.length - 1; i++) {
             const lo = RANKS[i][0], hi = RANKS[i + 1][0], x = PX + i * seg;
             const fr = Math.max(0, Math.min(1, (s.tally - lo) / (hi - lo)));
