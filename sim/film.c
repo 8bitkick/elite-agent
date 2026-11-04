@@ -150,7 +150,16 @@ int main(int argc, char **argv)
         while (ff && fscanf(ff, "%u", &x) == 1) { if (nfl == cap) fl = realloc(fl, (cap *= 2) * 4); fl[nfl++] = x; }
         if (ff) fclose(ff);
     }
+    // RAMAT=frame:path: the 32 KB of main RAM after that frame, to path, then stop (a commander's save made from it: web/)
+    uint32_t ram_at = 0; const char *ram_path = NULL;
+    if (getenv("RAMAT")) { static char spec[600]; snprintf(spec, sizeof spec, "%s", getenv("RAMAT")); char *c = strchr(spec, ':'); if (c) { *c = 0; ram_at = (uint32_t) atol(spec); ram_path = c + 1; } }
     for (uint32_t fr = (uint32_t) best; fr <= to; fr++) {
+        if (ram_path && fr == ram_at) {
+            FILE *rf = fopen(ram_path, "wb");
+            if (rf) { fwrite(beeb_ram(B), 1, 0x8000, rf); fclose(rf); }
+            fprintf(stderr, "RAM at frame %u to %s\n", fr, ram_path);
+            break;
+        }
         while (have && r.frame == fr) {
             if (r.type == 0) beeb_key(B, r.a, r.v);
             else beeb_analogue(B, r.a, r.v);

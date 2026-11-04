@@ -37,6 +37,7 @@ static int app_threat(const ship_t *sh, int n, double miss[3]) {
 }
 static uint32_t s_app_last_mc = 0xFFFFFFFF;
 static wsp_dock_out_t s_app_out;
+float g_dock_last_f[WSPD_N]; uint32_t g_dock_last_frame;  // (the senses of the last decision, for the web page's panel)
 static int jstx_for(double alpha); static int jsty_for(double beta); static int jsty_nose_up(double u);
 static void app_hands(double alpha, double beta, int final) {
     extern int g_want_jx, g_want_jy;
@@ -615,6 +616,7 @@ static __attribute__((noinline)) void to_station_step(void)
                         in.col = app_threat(sh, n, in.miss);
                         float f[WSPD_N];
                         s_app_out = wsp_dock_at(&in, jsty(), f);
+                        memcpy(g_dock_last_f, f, sizeof f); g_dock_last_frame = now();
                         s_app_up = s_app_out.up; s_app_final = 0; s_app_commit = 0;
                         app_log(f, &s_app_out);
                     }
@@ -708,6 +710,7 @@ PT_THREAD(to_station(float seconds)) {
 static struct {
     CO; uint32_t end, last_log, f0; int final, fought, have_spin, spin_mc, commit, xhold, lroll, vf, evade, arcaim, arcon, ff0; double spin, spin_psi; int spin_jx; int32_t left;
 } c_dk;
+int pilot_dock_final(void) { return c_dk.final; }      // (the web page's adaptive speed: real time for the docking's final)
 int g_dock_log;              // (DOCKLOG: the approach, frame by frame)
 int g_dock_centre = 1;       // (DOCKC=0: the old aim, for comparison)
 int g_dock_fast = 1;         // (DOCKFAST=0: the braking profile always)
@@ -774,6 +777,7 @@ static __attribute__((noinline)) int dock_step(void)
                     in.col = app_threat(sh, n, in.miss);
                     float f[WSPD_N];
                     s_app_out = wsp_dock_at(&in, jy, f);
+                    memcpy(g_dock_last_f, f, sizeof f); g_dock_last_frame = now();
                     s_app_up = s_app_out.up; s_app_final = s_app_out.final; s_app_commit = s_app_out.commit;
                     app_log(f, &s_app_out);
                     if (in.col && g_dock_log) dbgf_("WA swerve: miss %.0f %.0f %.0f", in.miss[0], in.miss[1], in.miss[2]);

@@ -17,6 +17,7 @@ static int wsp_on(void) {
     return v == -2 ? g_fair != 0 : v;
 }
 static wsp_out_t s_wsp;
+float g_wsp_last_f[WSP_NF]; uint32_t g_wsp_last_frame;     // (the senses of the last decision, for the web page's panel)
 #if APP_LOADED
 static FILE *wsp_log(void) { return NULL; }      // (the Presto app: no files)
 #else
@@ -344,6 +345,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         int decided;
         float wf[WSP_NF];
         s_wsp = wsp_pilot_at(&wi, IO->frame, &decided, wf);
+        memcpy(g_wsp_last_f, wf, sizeof g_wsp_last_f); g_wsp_last_frame = IO->frame;
         extern int g_want_jx, g_want_jy; g_want_jx = s_wsp.jstx, g_want_jy = s_wsp.jsty;
         // (the teacher: what the C's planner would do here, while acquiring - the same test as its own block below.
         // WSPTEACH=1 logs it, for distil.py; WSPHYB=1 flies it, the ceiling for a perfect copy)

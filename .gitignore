@@ -53,3 +53,9 @@ rp2350-bbc-micro/
 /*.err
 wsp/evolve/*.pt
 sim/film
+
+# the web page (web/build_site.sh)
+web/_site/
+web/.jsbeeb
+web/node_modules/
+web/player.wasm

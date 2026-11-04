@@ -1,0 +1,62 @@
+:root { --bg: rgb(9, 11, 15); --panel: rgb(16, 19, 25); --line: rgb(40, 45, 56); --dim: rgb(110, 116, 128); --fg: rgb(232, 234, 238);
+  --yel: rgb(242, 209, 58); --cyan: rgb(56, 214, 232); --green: rgb(27, 175, 122); }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: Inter, system-ui, sans-serif; overflow: hidden; height: 100%; }
+button { font: inherit; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* the machine, out of sight but running (a hidden frame would stop its animation frames) */
+#beeb { position: fixed; left: 0; bottom: 0; width: 320px; height: 240px; border: 0; opacity: 0; pointer-events: none; z-index: -1; }
+
+/* landscape: the film's 1920x1080 frame, scaled */
+#stage { position: absolute; width: 1920px; height: 1080px; transform-origin: 0 0; background: var(--bg); }
+#game { position: absolute; left: 24px; top: 36px; width: 1047px; height: 1014px; background: #000; }
+#screen { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+#panel { position: absolute; left: 1096px; top: 0; width: 824px; height: 1080px; }
+#bar { position: absolute; left: 24px; top: 0; height: 36px; width: 1047px; display: flex; align-items: center; gap: 10px; }
+#bar .brand { font-weight: 600; font-size: 16px; margin-right: auto; color: var(--dim); }
+.btn { background: var(--panel); border: 1px solid var(--line); color: var(--fg); font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+a.btn { text-decoration: none; }
+.btn:hover { border-color: var(--dim); }
+.btn.on { border-color: var(--green); color: var(--green); }
+#credit { position: absolute; left: 24px; top: 1052px; width: 1047px; font-size: 13px; color: var(--dim); }
+#credit a, #phone .small a { color: var(--dim); }
+#phone .small { font-size: 12px; }
+#speed { position: absolute; left: 1576px; top: 112px; width: 320px; z-index: 1; }
+#speed button { font-size: 15px; padding: 6px 0; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; background: var(--panel); color: var(--dim); border: 0; border-right: 1px solid var(--line); font-size: 11px; padding: 4px 0; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: rgb(10, 40, 46); color: var(--cyan); }
+#status { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#status.show { opacity: 1; }
+
+/* portrait */
+#phone { display: none; }
+html:has(body.phone), body.phone { overflow: auto; height: auto; }
+body.phone #stage { display: none; }
+body.phone #phone { display: block; }
+#phone header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 12px; }
+#phone .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+#phone .brand { font-weight: 600; font-size: 15px; }
+#phone .seg { width: 230px; }
+#phone .strip { display: flex; justify-content: space-between; gap: 8px; }
+#phone .strip div { display: flex; flex-direction: column; min-width: 0; }
+#phone .strip span { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+#phone .strip b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#phone .tag { font: 600 11px 'JetBrains Mono', monospace; color: var(--cyan); margin-top: 4px; min-height: 14px; }
+#p-screen { display: block; width: 100%; aspect-ratio: 512 / 496; image-rendering: pixelated; background: #000; }
+#phone .tools .btn { white-space: nowrap; }
+#phone .tools { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
+#p-chart, #p-net { display: block; width: 100%; }
+#p-note { color: var(--cyan); font-size: 13px; padding: 8px 12px 0; min-height: 1.2em; }
+#p-log { color: var(--green); font: 12px 'JetBrains Mono', ui-monospace, monospace; padding: 4px 12px; margin: 0; white-space: pre-wrap; }
+#phone footer { padding: 12px; color: var(--dim); font-size: 13px; }
+#phone footer b { color: var(--fg); }
+#phone footer a { color: var(--fg); }
+#phone footer .gh { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; text-decoration: none; }
+#loading { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: var(--bg); color: var(--dim);
+  font-size: 15px; z-index: 5; padding: 24px; text-align: center; }
+#loading.show { display: flex; }
+.ff { letter-spacing: -0.25em; margin-right: 0.25em; }

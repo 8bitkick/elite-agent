@@ -23,6 +23,14 @@ with a sixth of its stick reversals. After MIT CSAIL's
 [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026); how they
 were written and measured: [wsp/README.md](wsp/README.md).
 
+**Watch it live in your browser: [8bitkick.github.io/elite-agent](https://8bitkick.github.io/elite-agent/).** The same
+C player, compiled to WebAssembly, flies Fair mode on [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, from
+Jameson to Elite, beside the film's panel with both networks' units lit as they decide. ▶ 1×, Auto (real time in fights
+and the docking's final, turbo between) or ▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own
+Elite. Elite itself comes from Mark Moxon's site, as his own "Play online" link loads it ([web/README.md](web/README.md)).
+The WebAssembly build, run headless on jsbeeb as a test, reached Elite in 18.2 game hours (seed 13; one death on the
+way, the save reloaded); jsbeeb's timing differs from the native emulator's, so the careers part ways.
+
 ## Modes
 
 | Mode | What it does | Switch | Jameson to Elite |

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>elite-agent</title>
+<meta name="description" content="An AI agent plays Acornsoft Elite on an emulated BBC Master, live in your browser, from Jameson to Elite.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- the machine: jsbeeb's own page, out of sight; the agent and the screen are drawn here from it -->
+<iframe id="beeb" allow="autoplay" title="jsbeeb, a BBC Master emulator" tabindex="-1"></iframe>
+
+<!-- landscape: the film's frame -->
+<div id="stage">
+  <div id="game"><canvas id="screen" aria-label="Acornsoft Elite, flown by the agent"></canvas></div>
+  <div id="bar">
+    <span class="brand">elite-agent</span>
+    <a id="chapter" class="btn"></a>
+    <button id="sound" class="btn">Sound</button>
+    <button id="save" class="btn" title="An .ssd with the commander's save file, to load in your own Elite">Save commander (.ssd)</button>
+  </div>
+  <div id="credit">Elite © Ian Bell and David Braben · disc from <a href="https://elite.bbcelite.com/">Mark Moxon's site</a> ·
+    emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>) · <a href="LICENSES.txt">licences</a></div>
+  <div id="speed" class="seg" role="group" aria-label="Speed">
+    <button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button>
+  </div>
+  <canvas id="panel"></canvas>
+</div>
+
+<!-- portrait: a top bar, the screen, the chart and the network -->
+<div id="phone">
+  <header>
+    <div class="row"><span class="brand">elite-agent</span>
+      <div class="seg" role="group" aria-label="Speed"><button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button></div></div>
+    <div class="strip">
+      <div><span>Time</span><b id="p-time" class="mono">00:00:00</b></div>
+      <div><span>Rank</span><b id="p-rank">Harmless</b></div>
+      <div><span>Kills</span><b id="p-kills">0</b></div>
+      <div><span>Credits</span><b id="p-cash">100 Cr</b></div>
+      <div><span>System</span><b id="p-system">Lave</b></div>
+    </div>
+    <div class="tag" id="p-tag"></div>
+  </header>
+  <canvas id="p-screen"></canvas>
+  <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-sound">Sound</button><button class="btn" id="p-save">Save (.ssd)</button></div>
+  <canvas id="p-chart"></canvas>
+  <canvas id="p-net"></canvas>
+  <div id="p-note"></div>
+  <pre id="p-log"></pre>
+  <footer>
+    <b>Acornsoft Elite, BBC Master</b>
+    <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
+    <p class="small">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://elite.bbcelite.com/">Mark Moxon's site</a>.
+    Emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>). <a href="LICENSES.txt">Licences</a>.</p>
+    <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
+  </footer>
+</div>
+<div id="status" role="status"></div>
+<div id="loading" role="status">Loading Elite from elite.bbcelite.com and booting the BBC Master…</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

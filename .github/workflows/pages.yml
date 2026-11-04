@@ -1,0 +1,39 @@
+name: pages
+# The web page (web/): the C player as WebAssembly beside jsbeeb, built and published to GitHub Pages. Elite itself is
+# not part of it: the page loads Mark Moxon's flicker-free disc from elite.bbcelite.com in the visitor's browser.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "cplayer/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: clang's wasm32-wasi target
+        run: sudo apt-get update -q && sudo apt-get install -y -q clang lld wasi-libc libclang-rt-18-dev-wasm32
+      - name: build the site (the player as WebAssembly, jsbeeb at its pinned commit, the page)
+        run: web/build_site.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/_site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
