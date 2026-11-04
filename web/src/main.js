@@ -310,8 +310,8 @@ function phoneStrip() {
     // the chart and the network, cropped from the panel
     for (const [id, y0, y1] of [["p-chart", 228, 404], ["p-net", 416, 940]]) {
         const c = $(id), g = c.getContext("2d");
-        if (c.width !== 824) { c.width = 824; c.height = y1 - y0; }
-        g.drawImage($("panel"), 0, y0, 824, y1 - y0, 0, 0, 824, y1 - y0);
+        if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
+        g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
 }
 const RANKS = [[0, "Harmless"], [8, "Mostly Harmless"], [16, "Poor"], [32, "Average"], [64, "Above Average"], [128, "Competent"],

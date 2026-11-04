@@ -1,12 +1,12 @@
 // The right-hand panel, as the film draws it (the film scripts' render.py and render_app.py), on a canvas in the film's
-// own coordinates: the frame is 1920x1080 and the panel is its right part, from x = 1096. The clock, rank, tally,
+// own coordinates: the frame is 1920x1080 and the panel is its right part, from x = 1012 (the page's game a touch smaller than the film's, the network wider). The clock, rank, tally,
 // credits and system; the tally chart; then the dogfight network (yellow) in a fight, the docking network (cyan) on the
 // way in, or the galaxy map and the agent's log when docked; the status lines and the credits.
 export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", DIM = "rgb(110,116,128)", FG = "rgb(232,234,238)";
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
-const PX = 1100, PW = 796, NET_Y = 428, GAP = 62, CH = 16, CW = Math.floor((PW - 5 * GAP) / 6);
-const GY = 36, GH = 1014, H = 1080, X0 = 1096;
+const PX = 1016, PW = 880, NET_Y = 428, GAP = 62, CH = 16, CW = Math.floor((PW - 5 * GAP) / 6);
+const GY = 36, GH = 1014, H = 1080, X0 = 1012;   // (GY, GH: the panel's own top and bottom, as the film's game)
 const CH_X = PX + 46, CH_Y = 262, CH_W = PW - 60, CH_H = 120, HMAX = 17, STATX = [0, 250, 410, 610];
 const RANKS = [[0, "Harmless"], [8, "Mostly Harmless"], [16, "Poor"], [32, "Average"], [64, "Above Average"], [128, "Competent"],
     [512, "Dangerous"], [2560, "Deadly"], [6400, "ELITE"]];

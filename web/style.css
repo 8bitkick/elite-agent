@@ -10,16 +10,16 @@ button { font: inherit; }
 
 /* landscape: the film's 1920x1080 frame, scaled */
 #stage { position: absolute; width: 1920px; height: 1080px; transform-origin: 0 0; background: var(--bg); }
-#game { position: absolute; left: 24px; top: 36px; width: 1047px; height: 1014px; background: #000; }
+#game { position: absolute; left: 24px; top: 36px; width: 963px; height: 933px; background: #000; }
 #screen { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
-#panel { position: absolute; left: 1096px; top: 0; width: 824px; height: 1080px; }
-#bar { position: absolute; left: 24px; top: 0; height: 36px; width: 1047px; display: flex; align-items: center; gap: 10px; }
+#panel { position: absolute; left: 1012px; top: 0; width: 908px; height: 1080px; }
+#bar { position: absolute; left: 24px; top: 0; height: 36px; width: 963px; display: flex; align-items: center; gap: 10px; }
 #bar .brand { font-weight: 600; font-size: 16px; margin-right: auto; color: var(--dim); }
 .btn { background: var(--panel); border: 1px solid var(--line); color: var(--fg); font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
 a.btn { text-decoration: none; }
 .btn:hover { border-color: var(--dim); }
 .btn.on { border-color: var(--green); color: var(--green); }
-#credit { position: absolute; left: 24px; top: 1052px; width: 1047px; font-size: 13px; color: var(--dim); }
+#credit { position: absolute; left: 24px; top: 979px; width: 963px; font-size: 13px; color: var(--dim); }
 #credit a, #phone .small a { color: var(--dim); }
 #phone .small { font-size: 12px; }
 #speed { position: absolute; left: 1576px; top: 112px; width: 320px; z-index: 1; }
@@ -71,5 +71,5 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
 #phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
-#repo { position: absolute; left: 1666px; top: 1020px; width: 236px; height: 38px; z-index: 1; border-radius: 6px; }   /* (over the panel's drawn 8bitkick/elite-agent) */
+#repo { position: absolute; left: 1640px; top: 1020px; width: 236px; height: 38px; z-index: 1; border-radius: 6px; }   /* (over the panel's drawn 8bitkick/elite-agent) */
 #repo:hover { background: rgba(255,255,255,.06); }
