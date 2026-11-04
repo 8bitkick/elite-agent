@@ -14,7 +14,10 @@ const COMMANDER = "BITKICK";
 // The title screen's snapshot is made in the visitor's browser on the first visit and kept there.
 const Q = new URLSearchParams(location.search);
 const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
-const CACHE = `elite-agent-start2:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
+// the start: the machine's state START_M million cycles after it's switched on (?start= to try another; the shipped one
+// is the fastest of those tried headless to Elite)
+const START_M = +(Q.get("start") || 30);
+const CACHE = `elite-agent-start2:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
 // chapters: a later save of the film's career (Fair mode, seed 13), loaded at the first docking; the clock and the chart
@@ -141,7 +144,7 @@ async function main() {
     // up by ~17 M), caught at that frame's end; it's kept in the browser, and every visit, the first too, restores it
     // and starts the agent at the next frame's end. So every visitor watches the same career, the one tested to Elite
     // headless (web/run_node.mjs START=, from this snapshot)
-    const START_CYCLES = 30e6;
+    const START_CYCLES = START_M * 1e6;
     const cycles = () => cpu.cycleSeconds * 2e6 + cpu.currentCycles;
     let bootF = 0, ready = !!title, pending = false;
     function booting() {
@@ -291,7 +294,17 @@ function phoneStrip() {
     $("p-kills").textContent = Math.floor(s.tally).toLocaleString("en");
     $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
     $("p-system").textContent = s.system;
-    $("p-tag").textContent = s.tag || "";
+    // the speed, in the phone's highlighted speed button: Auto shows what it's running at
+    const pb = document.querySelector("#phone [data-mode].on");
+    if (pb) {
+        const lab = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
+        const name = { "1x": "", adaptive: "Auto ", turbo: "" }[s.mode];
+        if (pb.textContent !== name + lab) pb.textContent = name + lab;
+    }
+    document.querySelectorAll("#phone [data-mode]:not(.on)").forEach((b) => {
+        const t = { "1x": "▶ 1×", adaptive: "Auto", turbo: "▶▶ Turbo" }[b.dataset.mode];
+        if (b.textContent !== t) b.textContent = t;
+    });
     $("p-note").textContent = s.view === "dock" ? s.note || "" : "";
     $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     // the chart and the network, cropped from the panel

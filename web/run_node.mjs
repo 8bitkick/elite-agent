@@ -1,9 +1,12 @@
 // The agent on jsbeeb in Node, headless, as a test that it plays: node web/run_node.mjs MINUTES [journal.jsonl] [log.txt]
 // (SKEW=n frames before it starts, as run_sim's; MODE=0/1/2 Optimal/Fair/Curious, Fair by default)
+// START=snapshot.json: the web page's own start (the snapshot it keeps, from its localStorage), flown as the page flies
+// it: the agent started at the frame after, named BITKICK, on the jsbeeb the page is built from (JSBEEB=its source)
 import { readFileSync, writeFileSync, renameSync, existsSync, createWriteStream } from "fs";
-import { MachineSession } from "jsbeeb";
-import { createSnapshot, snapshotToJSON, snapshotFromJSON } from "jsbeeb/src/snapshot.js";
 import { Agent } from "./agent.js";
+const JS = process.env.JSBEEB ? `${process.env.JSBEEB}/src` : "jsbeeb/src";
+const { MachineSession } = await import(`${JS}/machine-session.js`);
+const { createSnapshot, snapshotToJSON, snapshotFromJSON } = await import(`${JS}/snapshot.js`);
 
 const here = new URL(".", import.meta.url).pathname;
 const minutes = +(process.argv[2] || 10), jpath = process.argv[3], lpath = process.argv[4];
@@ -32,6 +35,9 @@ if (resume) {
     new Uint8Array(m.buffer).set(mem);
     fr0 = resume.fr;
     console.log(`resumed at ${(fr0 / 3000).toFixed(1)} min`);
+} else if (process.env.START) {
+    cpu.restoreState(snapshotFromJSON(readFileSync(process.env.START, "utf8")).state);
+    console.log(`starting from ${process.env.START}`);
 } else {
     await s.autoboot();
     let ok = false;
@@ -47,7 +53,27 @@ const checkpoint = () => {
 };
 const end = minutes * 3000;
 let t1 = Date.now();
-for (fr = fr0; fr < end && !elite; fr++) {
+if (process.env.START) {
+    // as the page: the agent inside the video's end-of-frame paint (mid-instruction, where the page's hook runs it),
+    // started at the first paint after the start is restored, then once a frame
+    let started = !!resume, last = Date.now();
+    const v = s._video, paint = v.paint_ext;
+    v.paint_ext = function (...a) {
+        if (!started) {
+            if (!agent.start(+(process.env.MODE ?? 1))) { console.error("no Elite at the start"); process.exit(1); }
+            agent.name = process.env.COMMANDER || "BITKICK";
+            started = true;
+        } else if (!elite) { agent.frame(); fr++; }
+        return paint.apply(this, a);
+    };
+    fr = fr0;
+    while (fr < end && !elite) {
+        const f0 = fr;
+        await s.runFrames(50);
+        if (CKPT && Math.floor(fr / EVERY) > Math.floor(f0 / EVERY)) checkpoint();
+        if (Math.floor(fr / 30000) > Math.floor(f0 / 30000)) { console.log(stamp(), `[${((fr - f0) * 0 + 30000 / ((Date.now() - last) / 1000) / 50).toFixed(1)}x real time]`); last = Date.now(); }
+    }
+} else for (fr = fr0; fr < end && !elite; fr++) {
     agent.frame();
     await s.runFrames(1);
     if (CKPT && fr % EVERY === EVERY - 1) { fr++; checkpoint(); fr--; }
