@@ -173,7 +173,7 @@ export class Panel {
         const net = s.view === "dock", fight = s.view === "fight";
         const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW;
         let cyc, h;
-        const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
+        const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = s.paused ? "PAUSED" : `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
         this.text(txt, right, 52, `700 60px ${MONO}`, col, "right");
         // the mark centred on the digits as this browser draws them (fonts differ: measured, not assumed)
         g.font = `700 60px ${MONO}`; g.textBaseline = "top";
@@ -181,7 +181,8 @@ export class Panel {
         cyc = (top + bot) / 2; h = (bot - top) * 0.9;
         const tx = right - m.width - 18;
         g.fillStyle = col; g.beginPath();
-        if (!s.turbo) { g.moveTo(tx - 34, cyc - h / 2); g.lineTo(tx, cyc); g.lineTo(tx - 34, cyc + h / 2); }
+        if (s.paused) { g.rect(tx - 30, cyc - h / 2, h * 0.28, h); g.rect(tx - 30 + h * 0.45, cyc - h / 2, h * 0.28, h); }
+        else if (!s.turbo) { g.moveTo(tx - 34, cyc - h / 2); g.lineTo(tx, cyc); g.lineTo(tx - 34, cyc + h / 2); }
         else for (const k of [0, 1]) { g.moveTo(tx - 30 * k - 30, cyc - h / 2); g.lineTo(tx - 30 * k, cyc); g.lineTo(tx - 30 * k - 30, cyc + h / 2); }
         g.fill();
     }
