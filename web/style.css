@@ -14,13 +14,16 @@ button { font: inherit; }
 #screen { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 #panel { position: absolute; left: 1012px; top: 0; width: 908px; height: 1080px; }
 #bar { position: absolute; left: 24px; top: 0; height: 36px; width: 963px; display: flex; align-items: center; gap: 10px; }
-#bar .brand { font-weight: 600; font-size: 16px; margin-right: auto; color: var(--dim); }
+#bar .brand { font: 600 16px 'JetBrains Mono', ui-monospace, monospace; margin-right: auto; color: var(--fg); }
+.brand { display: inline-flex; align-items: center; gap: 8px; }
 .btn { background: var(--panel); border: 1px solid var(--line); color: var(--fg); font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
 a.btn { text-decoration: none; }
 .btn:hover { border-color: var(--dim); }
 .btn.on { border-color: var(--green); color: var(--green); }
 #credit { position: absolute; left: 24px; top: 979px; width: 963px; font-size: 13px; color: var(--dim); }
-#credit a, #phone .small a { color: var(--dim); }
+#credit a, #phone .small a, #netnote a { color: var(--dim); }
+#credit b { color: var(--fg); font-weight: 600; }
+#netnote { position: absolute; left: 1016px; top: 979px; width: 880px; font-size: 13px; color: var(--dim); }
 #phone .small { font-size: 12px; }
 #speed { position: absolute; left: 1576px; top: 5px; width: 320px; z-index: 1; }   /* (in the toolbar row, over the panel) */
 #speed button { font-size: 13px; padding: 4px 0; }
@@ -39,7 +42,7 @@ body.phone #stage { display: none; }
 body.phone #phone { display: block; }
 #phone header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 12px; }
 #phone .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-#phone .brand { font-weight: 600; font-size: 15px; }
+#phone .brand { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; }
 #phone .seg { width: 250px; }
 #phone .strip { display: flex; justify-content: space-between; gap: 8px; }
 #phone .strip div { display: flex; flex-direction: column; min-width: 0; }
@@ -71,8 +74,6 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
 #phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
-#repo { position: absolute; left: 1554px; top: 1020px; width: 230px; height: 30px; z-index: 1; border-radius: 6px; }   /* (over the panel's drawn 8bitkick/elite-agent) */
-#repo:hover { background: rgba(255,255,255,.06); }
 .games { display: inline-flex; }
 .games a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
 .games a:last-child { border-right: 0; }

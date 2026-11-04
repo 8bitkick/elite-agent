@@ -5,11 +5,13 @@
 export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", DIM = "rgb(110,116,128)", FG = "rgb(232,234,238)";
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
-const PX = 1016, PW = 880, NET_Y = 322, GAP = 62, CH = 20, CW = Math.floor((PW - 5 * GAP) / 6);
+const PX = 1016, PW = 880, NET_Y = 322, GAP = 62, CW = Math.floor((PW - 5 * GAP) / 6);
+// the units' height: each network's tallest column fills the space down to the game screen's bottom
+let CH = 20;
+const fitRows = (n) => { CH = Math.max(14, Math.floor((BOT - NET_Y - 24 + 2) / n) - 2); };
 const GY = 36, GH = 1014, H = 1080, X0 = 1012;   // (GY, GH: the panel's own top and bottom, as the film's game)
 const CH_X = PX + 46, CH_Y = 236, CH_W = PW - 60, CH_H = 64, HMAX = 17, STATX = [0, 250, 410, 610];
-// the bottom band: the agent's note and log on the left, what this is on the right, below a rule
-const BOT = 954, CAP_X = 1560;
+const BOT = 969;   // (the game screen's bottom: the galaxy map's too)
 const RANKS = [[0, "Harmless"], [8, "Mostly Harmless"], [16, "Poor"], [32, "Average"], [64, "Above Average"], [128, "Competent"],
     [512, "Dangerous"], [2560, "Deadly"], [6400, "ELITE"]];
 const NOTE = {
@@ -129,7 +131,6 @@ export class Panel {
         if (s.view === "docked") this.drawDocked(s);
         else if (s.view === "fight") this.drawFight(s);
         else this.drawDock(s);
-        this.drawCaption(s);
     }
 
     drawTop(s) {
@@ -143,7 +144,7 @@ export class Panel {
         this.text(s.system, PX + STATX[3], 176, `600 26px ${SANS}`, s.system === "Witchspace" ? rgb(CYAN) : FG);
         // the ranks: a meter from Harmless to Elite, a section a rank (equal widths: the low ranks are a few kills
         // each), filled to the kill tally
-        const g = this.ctx, MY = 246, MH = 12, seg = PW / (RANKS.length - 1);
+        const g = this.ctx, MY = 222, MH = 12, seg = PW / (RANKS.length - 1);
         for (let i = 0; i < RANKS.length - 1; i++) {
             const lo = RANKS[i][0], hi = RANKS[i + 1][0], x = PX + i * seg;
             const fr = Math.max(0, Math.min(1, (s.tally - lo) / (hi - lo)));
@@ -155,11 +156,18 @@ export class Panel {
         }
         this.text("ELITE", PX + PW, MY + MH + 8, `600 12px ${SANS}`, s.tally >= 6400 ? rgb(YEL) : DIM, "right");
         this.text("6,400", PX + PW, MY + MH + 25, `11px ${MONO}`, "rgb(80,86,98)", "right");
+        // the agent's latest log line
+        const last = s.log[s.log.length - 1];
+        if (last) {
+            const mm = Math.floor(last[0] / 3000), hh = Math.floor(mm / 60);
+            this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
+            this.text(last[1].length <= 80 ? last[1] : last[1].slice(0, 79) + "…", PX + 50, 282, `14px ${MONO}`, GREEN);
+        }
         g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 304.5); g.lineTo(PX + PW, 304.5); g.stroke();
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
         const net = s.view === "dock", fight = s.view === "fight";
-        const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW, cyc = 88, h = 40;
+        const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW, cyc = 80, h = 38;   // (cyc: the digits' middle)
         const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
         this.text(txt, right, 52, `700 60px ${MONO}`, col, "right");
         g.font = `700 60px ${MONO}`;
@@ -211,6 +219,7 @@ export class Panel {
 
     drawFight(s) {
         const F = this.d.fight, f = s.senses;
+        fitRows(Math.max(...F.cols.map(([, names], c) => names.length * (c === 5 ? 2 : 1))));
         const vals = f ? acts(F.layers, f) : null;
         const base = [30, 34, 44];
         const segs = this.fightLinks.map(([i, j, o, w]) => {
@@ -227,7 +236,6 @@ export class Panel {
             this.drawOut(x, y, name, v, F.outscale[r], r < 2, YEL, txt);
         }, (c, r) => (vals ? vals[c][r] : null));
         this.net = "fight";
-        this.status(s, f ? null : "No target: the C agent is flying. The model takes over in a fight.", DIM);
     }
 
     dockPhase(f, A) {
@@ -244,6 +252,7 @@ export class Panel {
 
     drawDock(s) {
         const D = this.d.dock, f = s.senses;
+        fitRows(Math.max(...D.cols.map(([, , rows], c) => rows.length * (c === 5 ? 2 : 1))));
         const A = this.dockActs;
         // each shown cell's value and scale: (column, row)
         const V = (c, r) => {
@@ -265,28 +274,12 @@ export class Panel {
             this.drawOut(x, y, name, v, sc, r < 2, CYAN, txt, r < 3 || v > 0.5);
         }, (c, r) => (A ? V(c, r)[0] : null));
         this.net = "dock";
-        this.status(s, s.note, rgb(CYAN));
-    }
-
-    status(s, note, color) {
-        // the bottom band's left: the agent's note (what the network is doing), then its log
-        const g = this.ctx, lines = s.log.slice(note ? -3 : -4);
-        g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, BOT - 8.5); g.lineTo(PX + PW, BOT - 8.5); g.stroke();
-        let y = BOT;
-        if (note) { this.text(note, PX, y, `14px ${SANS}`, color); y += 26; }
-        else { this.text("THE AGENT'S LOG", PX, y + 2, `600 13px ${SANS}`, DIM); y += 26; }
-        lines.forEach(([f, t], k) => {
-            const mm = Math.floor(f / 3000), hh = Math.floor(mm / 60);
-            this.text(`${String(hh).padStart(2)}:${String(mm % 60).padStart(2, "0")}`, PX, y, `14px ${MONO}`, DIM);
-            this.text(t.length <= 50 ? t : t.slice(0, 49) + "…", PX + 56, y, `14px ${MONO}`, k === lines.length - 1 ? GREEN : "rgb(170,176,186)");
-            y += 22;
-        });
     }
 
     drawDocked(s) {
         const g = this.ctx;
         // the galaxy chart
-        const box = [PX, NET_Y + 24, PX + PW, BOT - 24];
+        const box = [PX, NET_Y + 24, PX + PW, BOT];
         const here = s.visits[s.visits.length - 1], gi = here[0];
         g.fillStyle = "rgb(5,7,9)"; g.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
         g.strokeStyle = LINE; g.strokeRect(box[0] + 0.5, box[1] + 0.5, box[2] - box[0], box[3] - box[1]);
@@ -302,17 +295,6 @@ export class Panel {
         const nm = (this.gal[gi].find(([x, y]) => x === here[1] && y === here[2]) || [0, 0, ""])[2];
         this.text(nm, hx + 11, hy - 7, `14px ${SANS}`, rgb(YEL));
         this.hits = []; this.net = null;
-        this.status(s, null);
-    }
-
-    drawCaption() {
-        // the bottom band's right: what this is, and the repository (a link over it on the page)
-        const x = CAP_X;
-        this.text("Acornsoft Elite, BBC Master", x, BOT, `600 15px ${SANS}`, FG);
-        this.text("Fair mode: only what a player can see.", x, BOT + 24, `14px ${SANS}`, DIM);
-        this.text("Two AI models: fights 8 KB, docking 1.5 KB.", x, BOT + 44, `14px ${SANS}`, DIM);
-        if (this.gh.complete) this.ctx.drawImage(this.gh, x, BOT + 70, 22, 22);
-        this.text("8bitkick/elite-agent", x + 30, BOT + 81, `15px ${MONO}`, FG, "left", "middle");
     }
 
     /** the cell under a point in the panel's coordinates (the film's frame), or null */
