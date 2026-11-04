@@ -22,7 +22,12 @@ static void load(void) {
     done = 1;
     net_t *n = &s_net;
     n->nl = DOCK_LAYERS;
-    for (int i = 0; i <= n->nl; i++) { n->shape[i] = DOCK_SHAPE[i]; if (n->shape[i] > MAXW) { fprintf(stderr, "docking network: layer %d has %d units, MAXW %d\n", i, n->shape[i], MAXW); exit(1); } }
+    for (int i = 0; i <= n->nl; i++) {
+        n->shape[i] = DOCK_SHAPE[i];
+#if !APP_LOADED     // (the Presto app has no exit: its compiled-in weights fit, as this build's do)
+        if (n->shape[i] > MAXW) { fprintf(stderr, "docking network: layer %d has %d units, MAXW %d\n", i, n->shape[i], MAXW); exit(1); }
+#endif
+    }
     for (int i = 0; i < n->nl; i++) n->I[i] = DOCK_I[i], n->V[i] = DOCK_V[i], n->B[i] = DOCK_B[i], n->N[i] = DOCK_N[i];
     for (int i = 0; i < 5; i++) s_G[i] = DOCK_SENSES[i];
 #if !APP_LOADED

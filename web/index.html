@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>elite-agent</title>
 <meta name="description" content="An AI agent plays Acornsoft Elite on an emulated BBC Master, live in your browser, from Jameson to Elite.">
+<meta property="og:title" content="elite-agent: Elite on the BBC Master, flown live by two tiny AI models">
+<meta property="og:description" content="Jameson to Elite in 16.7 game hours (probably a world record), using only what a player can see on the screen. Watch it fly live in your browser.">
+<meta property="og:image" content="https://8bitkick.cc/elite-agent/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://8bitkick.cc/elite-agent/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#090b0f">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -22,7 +30,7 @@
     <button id="sound" class="btn">Sound</button>
     <button id="save" class="btn" title="An .ssd with the commander's save file, to load in your own Elite">Save commander (.ssd)</button>
   </div>
-  <div id="credit">Elite © Ian Bell and David Braben · disc from <a href="https://elite.bbcelite.com/">Mark Moxon's site</a> ·
+  <div id="credit">Elite © Ian Bell and David Braben · flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon</a> (<a href="https://elite.bbcelite.com/">elite.bbcelite.com</a>) ·
     emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>) · <a href="LICENSES.txt">licences</a></div>
   <div id="speed" class="seg" role="group" aria-label="Speed">
     <button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button>
@@ -53,13 +61,18 @@
   <footer>
     <b>Acornsoft Elite, BBC Master</b>
     <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
-    <p class="small">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://elite.bbcelite.com/">Mark Moxon's site</a>.
+    <p class="small">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon's source repository</a> (<a href="https://elite.bbcelite.com/">elite.bbcelite.com</a>).
     Emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>). <a href="LICENSES.txt">Licences</a>.</p>
     <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
   </footer>
 </div>
 <div id="status" role="status"></div>
-<div id="loading" role="status">Loading Elite from elite.bbcelite.com and booting the BBC Master…</div>
+<div id="loading" role="status"><div class="card">
+  <canvas id="cobra" width="660" height="360" aria-hidden="true"></canvas>
+  <div class="lbrand">elite-agent</div>
+  <div class="bar"><i id="lbar"></i></div>
+  <div id="ltext">Loading…</div>
+</div></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

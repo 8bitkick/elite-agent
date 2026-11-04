@@ -22,7 +22,7 @@ cp -r "$J/dist" _site/jsbeeb && rm -rf _site/jsbeeb/discs _site/jsbeeb/benchmark
 [ -n "$LOCAL_DISC" ] && cp ../rp2350-bbc-micro/discs/elite-master-flicker-free-sng47.ssd _site/jsbeeb/discs/elite.ssd
 npx esbuild src/main.js --bundle --format=esm --minify --outfile=_site/app.js --define:JSBEEB_COMMIT="\"$JSBEEB_COMMIT\"" --alias:jsbeeb-src="$(cd "$J" && pwd)/src" \
   --external:fs --external:path --external:url --external:assert --external:util --external:'node:*' --log-level=warning
-cp index.html style.css player.wasm panel.json galaxies.json gh.png _site/ && cp -r chapters _site/
+cp index.html style.css player.wasm panel.json galaxies.json gh.png og.png _site/ && cp -r chapters _site/
 # jsbeeb is GPL-3.0-or-later: its licence beside its build, and where its source is (the commit this site was built from).
 # The page's own bundle (app.js) includes two of jsbeeb's modules, so the page as a whole is offered under the GPL too
 cp "$J/LICENSE" _site/jsbeeb/LICENSE

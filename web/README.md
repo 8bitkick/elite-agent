@@ -1,14 +1,16 @@
 # The web page
 
-[8bitkick.github.io/elite-agent](https://8bitkick.github.io/elite-agent/): the agent flying Fair mode live in the browser.
+[8bitkick.cc/elite-agent](https://8bitkick.cc/elite-agent/): the agent flying Fair mode live in the browser.
 
 - **The machine** is [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, its own page built unchanged from its
   repository at a pinned commit and run in a same-origin iframe, out of sight (`?embed&model=Master`). Its sound,
   timing and keyboard are its own.
-- **Elite** is Mark Moxon's flicker-free Master Elite (SNG47), loaded by the browser from elite.bbcelite.com as his own
-  "Play online" link loads it into jsbeeb. This site serves none of it. On the first visit the page boots the disc (in
-  turbo, behind a loading card), takes a jsbeeb snapshot at the title screen with the Cobra turning, and keeps it in
-  the browser; later visits restore it.
+- **Elite** is Mark Moxon's flicker-free Master Elite (SNG47), loaded by the browser from his source repository on
+  GitHub (`markmoxon/elite-source-code-bbc-master`, the `flicker-free` branch at a pinned commit: the same bytes as
+  elite.bbcelite.com's disc; that site doesn't let other sites' pages fetch it). This site serves none of it. On the first
+  visit the page boots the disc (in turbo, behind a loading card with Elite's Cobra Mk III turning in lines, from its
+  ship blueprint), takes a jsbeeb snapshot at the title screen with the Cobra turning, and keeps it in the browser;
+  later visits restore it.
 - **The agent** is cplayer/, the same C as `run_sim`, compiled to WebAssembly by clang's wasm32-wasi target
   ([player_wasm.c](player_wasm.c), [build.sh](build.sh)): 680 KB with both networks' weights. [agent.js](agent.js) runs it
   once a frame from jsbeeb's end-of-frame paint (where the native emulator calls the player): the 32 KB of main RAM in,
@@ -37,7 +39,7 @@ as a whole is offered under the GPL too (`LICENSES.txt`); elite-agent's own code
 Braben is not part of the site.
 
 Build: `web/build_site.sh` (clang with the wasm32 target and wasi-libc, Node 22) writes `web/_site`; the `pages`
-workflow publishes it. `LOCAL_DISC=1` puts the disc in the site for testing where elite.bbcelite.com can't be reached
+workflow publishes it. `LOCAL_DISC=1` puts the disc in the site for testing where GitHub can't be reached
 (open it with `?disc=elite.ssd`). `?speed=1x|adaptive|turbo` sets the speed; `?fresh` boots from the disc again.
 
 Headless, on jsbeeb in Node: `node web/run_node.mjs MINUTES journal.jsonl log.txt` (`SKEW=n`), a career to Elite as a

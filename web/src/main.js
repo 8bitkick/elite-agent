@@ -9,10 +9,11 @@ import { discFor } from "jsbeeb-src/fdc.js";
 
 const $ = (id) => document.getElementById(id);
 const COMMANDER = "BITKICK";
-// Elite comes from Mark Moxon's site, as his own "Play online" link loads it into jsbeeb; this site serves none of it.
+// Elite comes from Mark Moxon's source repository on GitHub (his flicker-free Master Elite, the disc his site has, at a
+// pinned commit: GitHub serves it to any page, his site to his own); this site serves none of it.
 // The title screen's snapshot is made in the visitor's browser on the first visit and kept there.
 const Q = new URLSearchParams(location.search);
-const DISC = Q.get("disc") || "https://elite.bbcelite.com/versions/flicker_free_elite/elite-master-flicker-free-sng47.ssd";
+const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
 const CACHE = `elite-agent-title:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
@@ -99,7 +100,7 @@ async function main() {
     // jsbeeb: the Master with Elite in drive 0; booted on a first visit, or restored to its title screen after
     const frame = $("beeb");
     frame.src = `jsbeeb/index.html?embed&model=Master&disc1=${encodeURIComponent(DISC)}${title ? "" : "&autoboot"}`;
-    $("loading").classList.toggle("show", true);
+    loading(0.02, title ? "Loading the agent…" : "Loading the agent and Elite's disc from Mark Moxon's GitHub…");
     const [panelData, galaxies, wasm, cmdr] = await Promise.all([
         fetch("panel.json").then((r) => r.json()), fetch("galaxies.json").then((r) => r.json()), fetch("player.wasm").then((r) => r.arrayBuffer()),
         CH ? fetch(CH.file).then((r) => r.arrayBuffer()) : null,
@@ -108,7 +109,7 @@ async function main() {
     const panel = new Panel($("panel"), panelData, galaxies, gh);
     const w = frame.contentWindow;
     for (let t = 0; !w.processor || !w.video || !w.processor.fdc?.drives?.[0]?.disc; t++) {
-        if (t === 300) $("loading").textContent = "Still waiting for Elite's disc from elite.bbcelite.com…";
+        loading(Math.min(0.3, 0.1 + t / 150), t >= 300 ? "Still waiting for Elite's disc from GitHub…" : title ? "Loading the agent…" : "Loading Elite's disc from Mark Moxon's GitHub…");
         await new Promise((r) => setTimeout(r, 100));
     }
     const cpu = w.processor, video = w.video;
@@ -140,8 +141,12 @@ async function main() {
     let bootF = 0, seen = -1;
     function booting() {
         bootF++;
-        if (seen < 0) { if ((title || bootF % 25 === 0) && agent.start(1)) seen = bootF; return; }
-        if (!title && bootF - seen < 150) return;
+        if (seen < 0) {
+            if (!title && bootF % 10 === 0) loading(0.3 + 0.5 * Math.min(1, bootF / 700), "Booting the BBC Master and loading Elite…");
+            if ((title || bootF % 25 === 0) && agent.start(1)) seen = bootF;
+            return;
+        }
+        if (!title && bootF - seen < 150) { if (bootF % 10 === 0) loading(0.8 + 0.2 * (bootF - seen) / 150, "Elite is up: the Cobra turning, the agent at the controls…"); return; }
         if (!title) setTimeout(() => { try { localStorage.setItem(CACHE, snapshotToJSON(createSnapshot(cpu, cpu.model, {}))); } catch (e) { console.warn("no title snapshot kept", e); } }, 0);
         if (CH) {
             // the chapter's save, on the game's disc as E.BITKICK, for the player to load when it first docks (the start)
@@ -152,7 +157,7 @@ async function main() {
         agent.name = COMMANDER;
         if (CH) agent.load = COMMANDER;
         s.started = true;
-        $("loading").classList.remove("show");
+        loading(1, "");
     }
 
     // the agent, once a frame, at jsbeeb's end-of-frame paint (the native player's place: between frames). The page's own
@@ -232,6 +237,37 @@ async function main() {
         else { q.set("chapter", "deadly"); a.textContent = short ? "Jump to Deadly" : "Jump to Deadly (10.6 h in)"; }
         a.href = "?" + q.toString();
     }
+}
+
+// the loading card: Elite's own Cobra Mk III (its ship blueprint's vertices and edges), turning in lines, and a bar
+const COBRA_V = [[32,0,76],[-32,0,76],[0,26,24],[-120,-3,-8],[120,-3,-8],[-88,16,-40],[88,16,-40],[128,-8,-40],[-128,-8,-40],[0,26,-40],[-32,-24,-40],[32,-24,-40],[-36,8,-40],[-8,12,-40],[8,12,-40],[36,8,-40],[36,-12,-40],[8,-16,-40],[-8,-16,-40],[-36,-12,-40],[0,0,76],[0,0,90],[-80,-6,-40],[-80,6,-40],[-88,0,-40],[80,6,-40],[88,0,-40],[80,-6,-40]];
+const COBRA_E = [[0,1],[0,4],[1,3],[3,8],[4,7],[6,7],[6,9],[5,9],[5,8],[2,5],[2,6],[3,5],[4,6],[1,2],[0,2],[8,10],[10,11],[7,11],[1,10],[0,11],[1,5],[0,6],[20,21],[12,13],[18,19],[14,15],[16,17],[15,16],[14,17],[13,18],[12,19],[2,9],[22,24],[23,24],[22,23],[25,26],[26,27],[25,27]];
+let spin = null;
+function loading(frac, text) {
+    const card = $("loading");
+    if (frac >= 1) { card.classList.remove("show"); spin = null; return; }
+    card.classList.add("show");
+    $("lbar").style.width = `${Math.round(frac * 100)}%`;
+    if (text) $("ltext").textContent = text;
+    if (spin) return;
+    const c = $("cobra"), g = c.getContext("2d"), t0 = performance.now();
+    const draw = (now) => {
+        if (spin !== draw) return;
+        const t = (now - t0) / 1000, a = t * 0.7, b = 0.35 + 0.25 * Math.sin(t * 0.4);
+        const W = c.width, H = c.height, k = W / 330;
+        g.clearRect(0, 0, W, H);
+        const P = COBRA_V.map(([x, y, z]) => {
+            const x1 = x * Math.cos(a) + z * Math.sin(a), z1 = -x * Math.sin(a) + z * Math.cos(a);
+            const y2 = y * Math.cos(b) - z1 * Math.sin(b), z2 = y * Math.sin(b) + z1 * Math.cos(b);
+            const p = 420 / (420 + z2);
+            return [W / 2 + x1 * p * k, H / 2 - y2 * p * k];
+        });
+        g.strokeStyle = "rgb(56,214,232)"; g.lineWidth = 1.5 * k; g.beginPath();
+        for (const [i, j] of COBRA_E) { g.moveTo(...P[i]); g.lineTo(...P[j]); }
+        g.stroke();
+        requestAnimationFrame(draw);
+    };
+    spin = draw; requestAnimationFrame(draw);
 }
 
 function flash(t) { const n = $("status"); n.textContent = t; n.classList.add("show"); setTimeout(() => n.classList.remove("show"), 4000); }

@@ -63,7 +63,6 @@ static void load(void) {
     if (path && *path) read_net(path, &s_nl, s_shape, s_W, s_B);
     const char *rp = getenv("WSPR");
     if (rp && *rp) read_net(rp, &s_rnl, s_rshape, s_RW, s_RB);
-#endif
     const char *n = getenv("WSPN");
     if (n && *n) {
         unsigned long long seed = 1;
@@ -71,6 +70,7 @@ static void load(void) {
         s_rng ^= seed * 0x9E3779B97F4A7C15ULL;
         if (s_hold < 1) s_hold = 1;
     }
+#endif
 }
 
 void wsp_features(const wsp_in_t *in, float f[WSP_NF]) {
@@ -120,7 +120,7 @@ static int jsty_for(double beta) {
 }
 
 static void forward(int nl, const int *shape, const float **Ws, const float **Bs, const float *f, float out[4]) {
-    float a[MAXW], b[MAXW];
+    static float a[MAXW], b[MAXW];      // (static: off the Presto app's 3 KB stack)
     const float *h = f;
     float *o = a;
     for (int l = 0; l < nl; l++) {

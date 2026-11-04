@@ -1,6 +1,6 @@
 name: pages
 # The web page (web/): the C player as WebAssembly beside jsbeeb, built and published to GitHub Pages. Elite itself is
-# not part of it: the page loads Mark Moxon's flicker-free disc from elite.bbcelite.com in the visitor's browser.
+# not part of it: the page loads Mark Moxon's flicker-free disc from his GitHub repository in the visitor's browser.
 on:
   push:
     branches: [main]

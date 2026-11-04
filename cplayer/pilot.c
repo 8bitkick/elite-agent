@@ -20,12 +20,16 @@ static int wsp_app_on(void) {        // (fair mode's default, as the dogfight ne
 static int s_app_up = 1, s_app_final, s_app_commit;
 // (WAPLOG=file: each frame's senses and outputs, a line a frame, for the film's panel)
 static void app_log(const float *f, const wsp_dock_out_t *o) {
+#if APP_LOADED
+    (void) f; (void) o;                 // (the Presto app has no files)
+#else
     static FILE *fp; static int tried;
     if (!tried) { tried = 1; const char *e = getenv("WAPLOG"); if (e) fp = fopen(e, "w"); }
     if (!fp) return;
     fprintf(fp, "%u", now());
     for (int i = 0; i < WSPD_N; i++) fprintf(fp, " %.5g", f[i]);
     fprintf(fp, " | %.2f %.2f %d %d %d %d %d\n", o->alpha, o->beta, o->speed, o->jump, o->up, o->final, o->commit);
+#endif
 }
 // (the threat the network swerves from: pilot's collision_ahead, anything but the station within 452 of our path)
 static int app_threat(const ship_t *sh, int n, double miss[3]) {

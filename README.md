@@ -1,5 +1,9 @@
 # Elite agent
 
+## ▶ [Watch it fly live in your browser](https://8bitkick.cc/elite-agent/)
+
+[![A Deadly-rank fight flown by the AI pilot model, its units lit beside the game: click to watch it live](docs/img/weight-space.gif)](https://8bitkick.cc/elite-agent/)
+
 A player for Acornsoft Elite (BBC Master, Mark Moxon's flicker-free build), written in pure C. It reads
 the machine's RAM and plays only through the keyboard and the analogue joystick (Elite's own joystick
 option). It's self-contained: no OS, no heap, no network, no ML library, about 100 KB of code
@@ -10,11 +14,6 @@ build of the emulator (Pi or Mac) for development.
 It's also released as a plugin for [rp2350-bbc-micro](https://github.com/8bitkick/rp2350-bbc-micro)'s
 plugin slot: `elite-agent.bin` on the [releases page](https://github.com/8bitkick/elite-agent/releases).
 
-| | | |
-|---|---|---|
-| [![A Deadly-rank fight flown by the AI pilot model, its units lit beside the game](docs/img/weight-space.gif)](wsp/README.md) | ![The front laser on a Thargoid](docs/img/shots/thargoid-laser.png) | ![Status: rating Elite](docs/img/elite-rank.png) |
-| [Fair mode's 8 KB AI pilot model](wsp/README.md) in a fight | Lasers on a Thargoid in witchspace | Elite |
-
 Fair mode's dogfights and dockings are flown by two small neural networks whose weights an AI wrote directly, unit
 by unit, then tuned by evolution; a plain C forward pass runs each. The dogfight network (8 KB) scores 97% of the
 C rules' points a fight minute over 450 held-out fights, every fight its own; the docking network (1.5 KB) flies
@@ -23,13 +22,13 @@ with a sixth of its stick reversals. After MIT CSAIL's
 [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/) (2 Nov 2026); how they
 were written and measured: [wsp/README.md](wsp/README.md).
 
-**Watch it live in your browser: [8bitkick.github.io/elite-agent](https://8bitkick.github.io/elite-agent/).** The same
-C player, compiled to WebAssembly, flies Fair mode on [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, from
-Jameson to Elite, beside the film's panel with both networks' units lit as they decide. ▶ 1×, Auto (real time in fights
-and the docking's final, turbo between) or ▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own
-Elite. Elite itself comes from Mark Moxon's site, as his own "Play online" link loads it ([web/README.md](web/README.md)).
-The WebAssembly build, run headless on jsbeeb as a test, reached Elite in 18.2 game hours (seed 13; one death on the
-way, the save reloaded); jsbeeb's timing differs from the native emulator's, so the careers part ways.
+**[The live page](https://8bitkick.cc/elite-agent/)**: the same C player, compiled to WebAssembly, flies Fair mode
+on [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, from Jameson to Elite, beside the film's panel with
+both networks' units lit as they decide. ▶ 1×, Auto (real time in fights and the docking's final, turbo between) or
+▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own Elite. Elite itself is Mark Moxon's
+flicker-free disc, fetched by the browser from his GitHub repository ([web/README.md](web/README.md)). The
+WebAssembly build, run headless on jsbeeb as a test, reached Elite in 18.2 game hours (seed 13; one death on the way,
+the save reloaded); jsbeeb's timing differs from the native emulator's, so the careers part ways.
 
 ## Modes
 
