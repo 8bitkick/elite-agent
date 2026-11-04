@@ -17,16 +17,20 @@ fi
 [ -d node_modules/esbuild ] || npm ci --no-audit --no-fund -s
 rm -rf _site && mkdir -p _site
 cp -r "$J/dist" _site/jsbeeb && rm -rf _site/jsbeeb/discs _site/jsbeeb/benchmarks && mkdir -p _site/jsbeeb/discs
-# (Elite itself is not part of the site: the page loads it from elite.bbcelite.com. LOCAL_DISC=1, for testing where that
+# (Elite itself is not part of the site: the page loads it from Mark Moxon's GitHub. LOCAL_DISC=1, for testing where that
 # site can't be reached: the disc from rp2350-bbc-micro/discs, served at ?disc=elite.ssd)
 [ -n "$LOCAL_DISC" ] && cp ../rp2350-bbc-micro/discs/elite-master-flicker-free-sng47.ssd _site/jsbeeb/discs/elite.ssd
-npx esbuild src/main.js --bundle --format=esm --minify --outfile=_site/app.js --define:JSBEEB_COMMIT="\"$JSBEEB_COMMIT\"" --alias:jsbeeb-src="$(cd "$J" && pwd)/src" \
+# (each file named with its contents' hash in the links to it, so a browser never mixes an old one with a new page)
+AV=$(cat player.wasm panel.json galaxies.json | sha1sum | cut -c1-10)
+npx esbuild src/main.js --bundle --format=esm --minify --outfile=_site/app.js --define:JSBEEB_COMMIT="\"$JSBEEB_COMMIT\"" --define:ASSET_V="\"$AV\"" --alias:jsbeeb-src="$(cd "$J" && pwd)/src" \
   --external:fs --external:path --external:url --external:assert --external:util --external:'node:*' --log-level=warning
 cp index.html style.css player.wasm panel.json galaxies.json gh.png og.png _site/ && cp -r chapters _site/
+V=$(cat _site/app.js _site/style.css | sha1sum | cut -c1-10)
+sed -i "s|href=\"style.css\"|href=\"style.css?v=$V\"|; s|src=\"app.js\"|src=\"app.js?v=$V\"|" _site/index.html
 # jsbeeb is GPL-3.0-or-later: its licence beside its build, and where its source is (the commit this site was built from).
 # The page's own bundle (app.js) includes two of jsbeeb's modules, so the page as a whole is offered under the GPL too
 cp "$J/LICENSE" _site/jsbeeb/LICENSE
 printf 'jsbeeb (c) Matt Godbolt and contributors, GPL-3.0-or-later (LICENSE).\nSource: https://github.com/mattgodbolt/jsbeeb/tree/%s\n' "$JSBEEB_COMMIT" > _site/jsbeeb/SOURCE.txt
-printf 'elite-agent web page. Its source: https://github.com/8bitkick/elite-agent (web/). app.js bundles two GPL-3.0 modules of\njsbeeb (snapshot.js, disc.js; https://github.com/mattgodbolt/jsbeeb/tree/%s), so this page as a whole is offered under the\nGPL-3.0-or-later; elite-agent'"'"'s own code is also MIT licensed. Elite (c) Ian Bell and David Braben is not part of this site:\nthe page loads Mark Moxon'"'"'s flicker-free disc from elite.bbcelite.com.\n' "$JSBEEB_COMMIT" > _site/LICENSES.txt
+printf 'elite-agent web page. Its source: https://github.com/8bitkick/elite-agent (web/). app.js bundles two GPL-3.0 modules of\njsbeeb (snapshot.js, disc.js; https://github.com/mattgodbolt/jsbeeb/tree/%s), so this page as a whole is offered under the\nGPL-3.0-or-later; elite-agent'"'"'s own code is also MIT licensed. Elite (c) Ian Bell and David Braben is not part of this site:\nthe page loads Mark Moxon'"'"'s flicker-free disc from his GitHub repository.\n' "$JSBEEB_COMMIT" > _site/LICENSES.txt
 touch _site/.nojekyll
 du -sh _site

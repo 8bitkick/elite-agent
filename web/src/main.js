@@ -8,6 +8,7 @@ import { commanderSsd, addFile, removeFile, catalogue } from "./save.js";
 import { discFor } from "jsbeeb-src/fdc.js";
 
 const $ = (id) => document.getElementById(id);
+const V = typeof ASSET_V === "string" ? ASSET_V : "dev";      // (the assets' hash: a new build is never served old ones)
 const COMMANDER = "BITKICK";
 // Elite comes from Mark Moxon's source repository on GitHub (his flicker-free Master Elite, the disc his site has, at a
 // pinned commit: GitHub serves it to any page, his site to his own); this site serves none of it.
@@ -130,7 +131,7 @@ async function main() {
     frame.src = `jsbeeb/index.html?embed&model=Master&disc1=${encodeURIComponent(DISC)}${title ? "" : "&autoboot"}`;
     loading(0.02, title ? "Loading the agent…" : "Loading the agent and Elite's disc from Mark Moxon's GitHub…");
     const [panelData, galaxies, wasm, cmdr] = await Promise.all([
-        fetch("panel.json").then((r) => r.json()), fetch("galaxies.json").then((r) => r.json()), fetch("player.wasm").then((r) => r.arrayBuffer()),
+        fetch(`panel.json?v=${V}`).then((r) => r.json()), fetch(`galaxies.json?v=${V}`).then((r) => r.json()), fetch(`player.wasm?v=${V}`).then((r) => r.arrayBuffer()),
         CH ? (CH.data ? CH.data.buffer : fetch(CH.file).then((r) => r.arrayBuffer())) : null,
     ]);
     const gh = new Image(); gh.src = "gh.png";
