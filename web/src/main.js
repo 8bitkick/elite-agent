@@ -25,6 +25,8 @@ const HOLD = 150;                                    // adaptive: frames of real
 const CHAPTERS = {
     deadly: { file: "chapters/deadly.cmdr", frame: 1901411, tally: 2598.05, cash: 18147.3, system: "Orqulela", visit: [2, 77, 242] },
 };
+// (and ?chapter=yours: a commander the visitor loaded, kept for this tab: the machine starts again with it)
+try { const y = JSON.parse(sessionStorage.getItem("elite-agent-commander") || "null"); if (y) CHAPTERS.yours = { data: Uint8Array.from(atob(y.data), (c) => c.charCodeAt(0)), frame: 0, name: y.name }; } catch {}
 const CHAPTER = CHAPTERS[Q.get("chapter")] ? Q.get("chapter") : null, CH = CHAPTER ? CHAPTERS[CHAPTER] : null;
 const OFF = CH ? CH.frame : 0;
 
@@ -32,7 +34,7 @@ const s = {
     frame: 0, tally: 0, cash: 100, system: "Lave", tallyPts: [[0, 0]], log: [], visits: [[0, 20, 173]], view: "docked",
     senses: null, speedLabel: "", turbo: false, lastAction: -1e9, lastDock: 0, lastDepart: -1, started: false,
 };
-if (CH) Object.assign(s, { frame: OFF, tally: CH.tally, cash: CH.cash, system: CH.system, tallyPts: [[OFF, CH.tally]], visits: [CH.visit] });
+if (CH && !CH.data) Object.assign(s, { frame: OFF, tally: CH.tally, cash: CH.cash, system: CH.system, tallyPts: [[OFF, CH.tally]], visits: [CH.visit] });
 window.eliteAgent = s;
 
 // ---- the stage: the film's 1920x1080 frame, scaled to the window; a phone gets its own column
@@ -121,7 +123,7 @@ async function main() {
     loading(0.02, title ? "Loading the agent…" : "Loading the agent and Elite's disc from Mark Moxon's GitHub…");
     const [panelData, galaxies, wasm, cmdr] = await Promise.all([
         fetch("panel.json").then((r) => r.json()), fetch("galaxies.json").then((r) => r.json()), fetch("player.wasm").then((r) => r.arrayBuffer()),
-        CH ? fetch(CH.file).then((r) => r.arrayBuffer()) : null,
+        CH ? (CH.data ? CH.data.buffer : fetch(CH.file).then((r) => r.arrayBuffer())) : null,
     ]);
     const gh = new Image(); gh.src = "gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
@@ -278,23 +280,21 @@ async function main() {
         for (const id of ["pause", "p-pause"]) { $(id).textContent = paused ? (id === "pause" ? "▶ Resume" : "▶") : id === "pause" ? "❚❚ Pause" : "❚❚"; $(id).classList.toggle("on", paused); }
     };
     $("pause").onclick = pause; $("p-pause").onclick = pause;
-    // load a commander: a save on an .ssd of the visitor's (as Save writes, or any Master Elite save), put on the game's
-    // disc under its own name for the agent to load when it next docks
+    // load a commander: a save on an .ssd of the visitor's (as Save writes, or any Master Elite save). The machine starts
+    // again from the start with it on the game's disc, and the agent loads it at once (as the chapters do)
     const pick = $("loadfile");
-    $("load").onclick = $("p-load").onclick = () => { if (!s.started) { flash("Wait for the agent to start, then load a commander."); return; } pick.click(); };
+    $("load").onclick = $("p-load").onclick = () => pick.click();
     pick.onchange = async () => {
         const f = pick.files[0]; pick.value = "";
         if (!f) return;
         let img; try { img = new Uint8Array(await f.arrayBuffer()); } catch { flash("Couldn't read that file."); return; }
         let saves = [];
         try { saves = catalogue(img).filter((x) => x.dir === "E" && x.length === 256); } catch {}
-        if (!saves.length) { flash("No Elite commander on that disc (a 256-byte file in directory E)."); return; }
+        if (!saves.length) { flash("No Elite commander on that disc."); return; }
         const c = saves[0], data = img.slice(c.start * 256, c.start * 256 + 256);
-        let game = toSsdOrDsd(cpu.fdc.drives[0].disc, { force: true });
-        game = addFile(removeFile(game, c.name, "E"), c.name, "E", data);
-        cpu.fdc.loadDisc(0, discFor("elite.ssd", game));
-        agent.load = c.name;
-        flash(`Commander ${c.name} goes in at the next docking.`);
+        try { sessionStorage.setItem("elite-agent-commander", JSON.stringify({ name: c.name, data: btoa(String.fromCharCode(...data)) })); } catch { flash("Couldn't keep the commander."); return; }
+        const q = new URLSearchParams(location.search); q.set("chapter", "yours");
+        location.search = "?" + q.toString();
     };
     // the chapters: from the start (Jameson at Lave) or from a save at Deadly
     for (const id of ["chapter", "p-chapter"]) {
