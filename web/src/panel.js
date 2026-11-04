@@ -161,8 +161,12 @@ export class Panel {
         if (last) {
             const mm = Math.floor(last[0] / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
-            this.text(last[1].length <= 80 ? last[1] : last[1].slice(0, 79) + "…", PX + 50, 282, `14px ${MONO}`, GREEN);
+            this.text(last[1].length <= 54 ? last[1] : last[1].slice(0, 53) + "…", PX + 50, 282, `14px ${MONO}`, GREEN);
         }
+        // which AI model is flying, when one is: the docking model and its phase, or the dogfight model
+        const who = s.view === "dock" && s.senses ? [`DOCKING AI MODEL FLYING  ·  ${s.phase}`, rgb(CYAN)]
+            : s.view === "fight" && s.senses ? ["DOGFIGHT AI MODEL FLYING", rgb(YEL)] : null;
+        if (who) this.text(who[0], PX + PW, 282, `600 13px ${SANS}`, who[1], "right");
         g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 304.5); g.lineTo(PX + PW, 304.5); g.stroke();
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
