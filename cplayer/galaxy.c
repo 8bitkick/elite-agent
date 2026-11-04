@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "ptime.h"
 #include <string.h>
 // The galaxy (systems from the seeds, as the game makes them), markets, trade planning and routes.
@@ -340,6 +341,16 @@ static int floordiv(int a, int b)   // Python //, b > 0
     return q;
 }
 
+double g_trade_margin = 0.05;
+static double trade_margin(void)
+{
+#if !APP_LOADED
+    static int read;
+    if (!read) { read = 1; const char *e = getenv("TRADE_MARGIN"); if (e) g_trade_margin = atof(e); }
+#endif
+    return g_trade_margin;
+}
+
 void best_cargo(int here_economy, int qq26, const uint8_t avl[17], int dest_economy, int cash, int room_t,
                 int illegal_ok, uint8_t buys[17], int *spend, double *profit)
 {
@@ -351,7 +362,9 @@ void best_cargo(int here_economy, int qq26, const uint8_t avl[17], int dest_econ
         if (!illegal_ok && (item == 3 || item == 6 || item == 10)) continue;
         int buy = item_price_tenths(item, here_economy, qq26);
         double gain = exp_price_tenths(item, dest_economy) - buy;
-        if (gain > 1 && buy > 0) {
+        // (a real margin: the price there is rolled on arrival, so an item that only just gains on average loses about
+        // as often as it wins. TRADE_MARGIN, the fraction of the price it must gain on average)
+        if (gain > 1 && buy > 0 && gain >= trade_margin() * buy) {
             c[nc].ratio = gain / buy; c[nc].gain = gain; c[nc].buy = buy; c[nc].item = item;
             nc++;
         }

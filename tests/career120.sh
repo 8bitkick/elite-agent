@@ -13,5 +13,6 @@ if [ "$1" = --update ]; then sha256sum career120.jsonl > "$TOP/tests/career120.s
 if sha256sum -c --quiet "$TOP/tests/career120.sha256"; then
     echo "career120: identical ($(grep -c . career120.jsonl) journal lines)"
 else
-    echo "career120: the journal differs (the player plays differently); kept in $OUT/career120.jsonl"; exit 1
+    echo "career120: the journal differs (the player plays differently); kept in $OUT/career120.jsonl"
+    echo "career120: this machine's hash: $(sha256sum career120.jsonl | cut -c1-64)"; exit 1
 fi

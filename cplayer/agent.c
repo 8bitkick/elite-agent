@@ -225,6 +225,14 @@ PT_THREAD(fly_to(const sys_t *dest, const sys_t *then)) {
     CO_BEGIN(c_fly);
     c_fly.dest = dest;
     c_fly.then = then;
+    {   // what this hop would buy, with the hold's value as cash: that, already held, stays in the hold
+        uint8_t avl[17], keep[17];
+        int spend, worth = 0;
+        double profit;
+        for (int i = 0; i < 17; i++) { avl[i] = R(A_AVL + i) + cargo(i); worth += cargo(i) * item_price_tenths(i, R(A_QQ28), R(A_QQ26)); }
+        best_cargo(R(A_QQ28), R(A_QQ26), avl, c_fly.dest->economy, cash() + worth - 200, cargo_bay() - 2, 0, keep, &spend, &profit);
+        for (int i = 0; i < 17; i++) g_keep[i] = cargo(i) && keep[i];
+    }
     CO_CALL(c_fly, sell_all());
     CO_CALL(c_fly, refuel());
     CO_CALL(c_fly, shop());
@@ -578,9 +586,11 @@ PT_THREAD(trip(void)) {
     }
     {
         // saving for something big (the military laser, a hyperdrive): bounties pay too little,
-        // so trade until it's affordable
+        // so trade until it's affordable. And for anything on the list while short of cash: witchspace pays in
+        // kills, not credits, and a career that kept replacing its energy bomb (900 Cr) sat at ~760 Cr for 16 game
+        // hours, the bomb never affordable, the galactic hyperdrive (the missions) never reached
         int aff = 0, sv = next_purchase(&aff);
-        if (sv < S_N && !aff && SHOP[sv].price >= 50000) {
+        if (sv < S_N && !aff) {
             static int said = -1;
             if (said != sv) status_("Saving up for the %s: trading", SHOP[sv].name), said = sv;
             note("{\"event\": \"trip\", \"why\": \"saving %s\"}", SHOP[sv].name);
@@ -670,6 +680,19 @@ trading:
     // the starting ship (pulse laser) loses fights the fitted one wins: in the first hour of careers, deaths
     // per arrival were 3 of 3 at anarchies, 5 of 31 at government 3, 4 of 65 at 4, none of 69 at 7
     g_risk_mult = laser(0) == 0x8F || laser(0) == 0x97 ? 1 : g_weak_risk;
+    {   // (an item some market in range pays the margin on is kept: the hop's own sale decides once its plan is made)
+        const sys_t *h = here_sys();
+        static const sys_t *nb[64]; static int d[64];
+        int n = h ? in_range(galaxy(), h->x, h->y, 70, nb, d, 64) : 0;
+        extern double g_trade_margin;
+        for (int i = 0; i < 17; i++) {
+            g_keep[i] = 0;
+            if (!cargo(i) || i == 3 || i == 6 || i == 10) continue;
+            int here = item_price_tenths(i, R(A_QQ28), R(A_QQ26));
+            for (int k = 0; k < n && !g_keep[i]; k++)
+                if (nb[k] != h && exp_price_tenths(i, nb[k]->economy) - here >= g_trade_margin * here + 1) g_keep[i] = 1;
+        }
+    }
     CO_CALL(c_trip, sell_all());
     CO_CALL(c_trip, refuel());
     CO_CALL(c_trip, shop());

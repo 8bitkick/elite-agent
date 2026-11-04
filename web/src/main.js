@@ -14,7 +14,7 @@ const COMMANDER = "BITKICK";
 // The title screen's snapshot is made in the visitor's browser on the first visit and kept there.
 const Q = new URLSearchParams(location.search);
 const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
-const CACHE = `elite-agent-title:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
+const CACHE = `elite-agent-start2:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
 // chapters: a later save of the film's career (Fair mode, seed 13), loaded at the first docking; the clock and the chart
@@ -136,24 +136,34 @@ async function main() {
         },
     });
 
-    // before the agent starts: the machine at Elite's title screen. On a first visit it boots there (the player knows
-    // Elite once it's loaded; another 3 s and the spinning Cobra is up), and the moment is kept for the next visit
-    let bootF = 0, seen = -1;
+    // before the agent starts: the machine at Elite's title screen, the same for every visitor. The start is the
+    // machine's state at START_CYCLES of emulated time after it was switched on (Elite loaded, the Cobra turning: it's
+    // up by ~17 M), caught at that frame's end; it's kept in the browser, and every visit, the first too, restores it
+    // and starts the agent at the next frame's end. So every visitor watches the same career, the one tested to Elite
+    // headless (web/run_node.mjs START=, from this snapshot)
+    const START_CYCLES = 30e6;
+    const cycles = () => cpu.cycleSeconds * 2e6 + cpu.currentCycles;
+    let bootF = 0, ready = !!title, pending = false;
     function booting() {
         bootF++;
-        if (seen < 0) {
-            if (!title && bootF % 10 === 0) loading(0.3 + 0.5 * Math.min(1, bootF / 700), "Booting the BBC Master and loading Elite…");
-            if ((title || bootF % 25 === 0) && agent.start(1)) seen = bootF;
+        if (pending) return;
+        if (!ready) {
+            const c = cycles();
+            if (bootF % 10 === 0) loading(0.3 + 0.7 * Math.min(1, c / START_CYCLES), c < 17e6 ? "Booting the BBC Master and loading Elite…" : "Elite is up: the Cobra turning, the agent at the controls…");
+            if (c < START_CYCLES) return;
+            const json = snapshotToJSON(createSnapshot(cpu, cpu.model, {}));
+            try { localStorage.setItem(CACHE, json); } catch (e) { console.warn("no title snapshot kept", e); }
+            pending = true;
+            setTimeout(() => { cpu.restoreState(snapshotFromJSON(json).state); pending = false; ready = true; }, 0);
             return;
         }
-        if (!title && bootF - seen < 150) { if (bootF % 10 === 0) loading(0.8 + 0.2 * (bootF - seen) / 150, "Elite is up: the Cobra turning, the agent at the controls…"); return; }
-        if (!title) setTimeout(() => { try { localStorage.setItem(CACHE, snapshotToJSON(createSnapshot(cpu, cpu.model, {}))); } catch (e) { console.warn("no title snapshot kept", e); } }, 0);
+        if (!agent.start(1)) return;          // (Elite up: always, at START_CYCLES)
         if (CH) {
             // the chapter's save, on the game's disc as E.BITKICK, for the player to load when it first docks (the start)
             const img = addFile(toSsdOrDsd(cpu.fdc.drives[0].disc, { force: true }), COMMANDER, "E", new Uint8Array(cmdr));
             cpu.fdc.loadDisc(0, discFor("elite.ssd", img));
         }
-        agent.start(1);
+        agent.start(1);                       // (again: after the chapter's disc)
         agent.name = COMMANDER;
         if (CH) agent.load = COMMANDER;
         s.started = true;

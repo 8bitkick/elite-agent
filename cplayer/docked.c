@@ -84,6 +84,7 @@ PT_THREAD(buy(const uint8_t want[17])) {
 
 // ---- Sell Cargo (f2): Y for each item held (the game only asks about those)
 static struct { CO; uint8_t asked[17]; uint8_t held[17]; int item; int32_t cash0; } c_sell;
+uint8_t g_keep[17];
 static int is_sell_prompt(void) { return view() != V_SELL || (qq29() < 17 && !c_sell.asked[qq29()]); }
 PT_THREAD(sell_all(void)) {
     CO_BEGIN(c_sell);
@@ -100,7 +101,7 @@ PT_THREAD(sell_all(void)) {
         c_sell.item = qq29();
         if (c_sell.item >= 17 || !c_sell.held[c_sell.item]) break;
         c_sell.asked[c_sell.item] = 1;
-        CO_CALL(c_sell, press(K_Y, 3, 4));
+        CO_CALL(c_sell, press(g_keep[c_sell.item] ? K_N : K_Y, 3, 4));     // (kept: it would be bought straight back)
     }
     CO_CALL(c_sell, wait_for(is_not_sell, 5, "sell done"));
     {
@@ -111,6 +112,7 @@ PT_THREAD(sell_all(void)) {
             if (sold > 0) n += snprintf(line + n, sizeof line - (size_t) n, "%s%s %d%s", n ? ", " : "", ITEM_NAMES[i], sold, UNITS[i]);
         }
         if (n) status_("Sold %s for %.1f Cr (cash %.1f Cr)", line, (cash() - c_sell.cash0) / 10.0, cash() / 10.0);
+        memset(g_keep, 0, sizeof g_keep);
     }
     if (view() != V_STATUS) CO_CALL(c_sell, hold_until(K_F8, is_status, 3, "status"));
     CO_END(c_sell);

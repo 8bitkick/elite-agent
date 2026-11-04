@@ -8,6 +8,7 @@ enum { EQ_FUEL, EQ_MISSILE, EQ_CARGO_BAY, EQ_ECM, EQ_PULSE, EQ_BEAM, EQ_SCOOPS, 
 
 PT_THREAD(buy(const uint8_t want[17]));
 PT_THREAD(sell_all(void));
+extern uint8_t g_keep[17];                   // sell_all leaves these items in the hold (cleared after each sale)
 PT_THREAD(equip(int item, int view));        // sets g_bought
 PT_THREAD(refuel(void));
 PT_THREAD(select_system(const char *name));
