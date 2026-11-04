@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-R78SW19G53"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-R78SW19G53');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>elite-agent</title>
 <meta name="description" content="An AI agent plays Acornsoft Elite on an emulated BBC Master, live in your browser, from Jameson to Elite.">
@@ -25,7 +33,7 @@
 <div id="stage">
   <div id="game"><canvas id="screen" aria-label="Acornsoft Elite, flown by the agent"></canvas></div>
   <div id="bar">
-    <span class="brand">elite-agent</span>
+    <a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub">elite-agent</a>
     <a id="chapter" class="btn"></a>
     <button id="sound" class="btn">Sound</button>
     <button id="save" class="btn" title="An .ssd with the commander's save file, to load in your own Elite">Save commander (.ssd)</button>
@@ -41,7 +49,7 @@
 <!-- portrait: a top bar, the screen, the chart and the network -->
 <div id="phone">
   <header>
-    <div class="row"><span class="brand">elite-agent</span>
+    <div class="row"><a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub">elite-agent</a>
       <div class="seg" role="group" aria-label="Speed"><button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button></div></div>
     <div class="strip">
       <div><span>Time</span><b id="p-time" class="mono">00:00:00</b></div>

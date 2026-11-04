@@ -66,3 +66,5 @@ body.phone #phone { display: block; }
 #ltext { min-height: 1.4em; }
 #loading.show { display: flex; }
 .ff { letter-spacing: -0.25em; margin-right: 0.25em; }
+a.brand { color: inherit; text-decoration: none; }
+a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
