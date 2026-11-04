@@ -79,3 +79,5 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #tip.show { opacity: 1; }
 #tip span { color: var(--dim); font-size: 12px; }
 #tip i { display: block; font-style: normal; color: var(--dim); margin-top: 3px; }
+#phone .brand { white-space: nowrap; } #phone .brand .owner { display: none; }
+#phone .row { gap: 10px; } #phone .seg { flex: 1; width: auto; max-width: 250px; }

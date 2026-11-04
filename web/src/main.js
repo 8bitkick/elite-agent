@@ -321,7 +321,7 @@ function phoneStrip() {
     });
     $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     // the chart and the network, cropped from the panel
-    for (const [id, y0, y1] of [["p-chart", 200, 300], ["p-net", 316, 946]]) {
+    for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
