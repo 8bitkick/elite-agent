@@ -319,7 +319,6 @@ function phoneStrip() {
         const t = { "1x": "▶ 1×", adaptive: "Auto", turbo: "▶▶ Turbo" }[b.dataset.mode];
         if (b.textContent !== t) b.textContent = t;
     });
-    $("p-note").textContent = s.view === "dock" ? s.note || "" : "";
     $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     // the chart and the network, cropped from the panel
     for (const [id, y0, y1] of [["p-chart", 200, 300], ["p-net", 316, 946]]) {

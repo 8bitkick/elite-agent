@@ -33,24 +33,24 @@
 <div id="stage">
   <div id="game"><canvas id="screen" aria-label="Acornsoft Elite, flown by the agent"></canvas></div>
   <div id="bar">
-    <a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub">elite-agent</a>
+    <a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub"><img src="gh.png" alt="" width="18" height="18">8bitkick/elite-agent</a>
     <a id="chapter" class="btn"></a>
     <button id="sound" class="btn">Sound</button>
     <button id="save" class="btn" title="An .ssd with the commander's save file, to load in your own Elite">Save commander (.ssd)</button>
   </div>
-  <div id="credit">Elite © Ian Bell and David Braben · flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon</a> (<a href="https://elite.bbcelite.com/">elite.bbcelite.com</a>) ·
+  <div id="credit"><b>Acornsoft Elite, BBC Master</b> · Elite © Ian Bell and David Braben · flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon</a> ·
     emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>) · <a href="LICENSES.txt">licences</a></div>
   <div id="speed" class="seg" role="group" aria-label="Speed">
     <button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button>
   </div>
   <canvas id="panel"></canvas>
-  <a id="repo" href="https://github.com/8bitkick/elite-agent" title="8bitkick/elite-agent on GitHub" aria-label="8bitkick/elite-agent on GitHub"></a>
+  <div id="netnote">Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB and docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.</div>
 </div>
 
 <!-- portrait: a top bar, the screen, the chart and the network -->
 <div id="phone">
   <header>
-    <div class="row"><a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub">elite-agent</a>
+    <div class="row"><a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub"><img src="gh.png" alt="" width="18" height="18">8bitkick/elite-agent</a>
       <div class="seg" role="group" aria-label="Speed"><button data-mode="1x" title="Real time, with sound">▶ 1×</button><button data-mode="adaptive" title="Turbo, but real time in fights and the final docking">Auto</button><button data-mode="turbo" title="As fast as this computer can go"><span class="ff">▶▶</span> Turbo</button></div></div>
     <div class="strip">
       <div><span>Time</span><b id="p-time" class="mono">00:00:00</b></div>
@@ -63,13 +63,12 @@
   <canvas id="p-screen"></canvas>
   <canvas id="p-net"></canvas>
   <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-sound">Sound</button><button class="btn" id="p-save">Save (.ssd)</button></div>
-  <div id="p-note"></div>
   <canvas id="p-chart"></canvas>
   <pre id="p-log"></pre>
   <footer>
     <b>Acornsoft Elite, BBC Master</b>
     <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
-    <p class="small">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon's source repository</a> (<a href="https://elite.bbcelite.com/">elite.bbcelite.com</a>).
+    <p class="small">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon's source repository</a>.
     Emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>). <a href="LICENSES.txt">Licences</a>.</p>
     <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
   </footer>
