@@ -156,17 +156,17 @@ export class Panel {
         }
         this.text("ELITE", PX + PW, MY + MH + 8, `600 12px ${SANS}`, s.tally >= 6400 ? rgb(YEL) : DIM, "right");
         this.text("6,400", PX + PW, MY + MH + 25, `11px ${MONO}`, "rgb(80,86,98)", "right");
-        // the agent's latest log line
-        const last = s.log[s.log.length - 1];
-        if (last) {
-            const mm = Math.floor(last[0] / 3000), hh = Math.floor(mm / 60);
+        // one status line, from whoever is flying: the docking model (its phase and what it's doing), the dogfight
+        // model (with the fight's latest log line), or else the agent's own latest log line
+        const last = s.log[s.log.length - 1], cut = (t, n) => (t.length <= n ? t : t.slice(0, n - 1) + "…");
+        let at = last ? last[0] : s.frame, text = last ? last[1] : "", tcol = GREEN;
+        if (s.view === "dock" && s.senses) { at = s.frame; text = `Docking AI, ${s.phase.toLowerCase()}: ${s.note || ""}`; tcol = rgb(CYAN); }
+        else if (s.view === "fight" && s.senses) { text = `Dogfight AI: ${text}`; tcol = rgb(YEL); }
+        if (text) {
+            const mm = Math.floor(at / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
-            this.text(last[1].length <= 54 ? last[1] : last[1].slice(0, 53) + "…", PX + 50, 282, `14px ${MONO}`, GREEN);
+            this.text(cut(text, 96), PX + 50, 282, `14px ${MONO}`, tcol);
         }
-        // which AI model is flying, when one is: the docking model and its phase, or the dogfight model
-        const who = s.view === "dock" && s.senses ? [`DOCKING AI MODEL FLYING  ·  ${s.phase}`, rgb(CYAN)]
-            : s.view === "fight" && s.senses ? ["DOGFIGHT AI MODEL FLYING", rgb(YEL)] : null;
-        if (who) this.text(who[0], PX + PW, 282, `600 13px ${SANS}`, who[1], "right");
         g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 304.5); g.lineTo(PX + PW, 304.5); g.stroke();
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
