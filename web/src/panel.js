@@ -159,9 +159,9 @@ export class Panel {
         // one status line, from whoever is flying: the docking model (its phase and what it's doing), the dogfight
         // model (with the fight's latest log line), or else the agent's own latest log line
         const last = s.log[s.log.length - 1], cut = (t, n) => (t.length <= n ? t : t.slice(0, n - 1) + "…");
-        let at = last ? last[0] : s.frame, text = last ? last[1] : "", tcol = GREEN;
-        if (s.view === "dock" && s.senses) { at = s.frame; text = `Docking AI, ${s.phase.toLowerCase()}: ${s.note || ""}`; tcol = rgb(CYAN); }
-        else if (s.view === "fight" && s.senses) { text = `Dogfight AI: ${text}`; tcol = rgb(YEL); }
+        let at = last ? last[0] : s.frame, text = last ? `Agent: ${last[1]}` : "", tcol = GREEN;
+        if (s.view === "dock" && s.senses) { at = s.frame; text = `Docking AI: ${s.note || ""}`; tcol = rgb(CYAN); }
+        else if (s.view === "fight" && s.senses) { text = `Dogfight AI: ${last ? last[1] : ""}`; tcol = rgb(YEL); }
         if (text) {
             const mm = Math.floor(at / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
