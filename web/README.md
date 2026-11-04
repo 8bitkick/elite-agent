@@ -2,7 +2,7 @@
 
 [8bitkick.cc/elite-agent](https://8bitkick.cc/elite-agent/): the agent flying Fair mode live in the browser.
 
-- **The machine** is [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, its own page built unchanged from its
+- **The machine** is the BBC Master of Matt Godbolt's [jsbeeb](https://github.com/mattgodbolt/jsbeeb), the BBC Micro emulator for the browser, its own page built unchanged from its
   repository at a pinned commit and run in a same-origin iframe, out of sight (`?embed&model=Master`). Its sound,
   timing and keyboard are its own.
 - **Elite** is Mark Moxon's flicker-free Master Elite (SNG47), loaded by the browser from his source repository on

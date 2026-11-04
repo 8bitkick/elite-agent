@@ -23,7 +23,7 @@ with a sixth of its stick reversals. After MIT CSAIL's
 were written and measured: [wsp/README.md](wsp/README.md).
 
 **[The live page](https://8bitkick.cc/elite-agent/)**: the same C player, compiled to WebAssembly, flies Fair mode
-on [jsbeeb](https://github.com/mattgodbolt/jsbeeb)'s BBC Master, from Jameson to Elite, beside the film's panel with
+on the BBC Master of [jsbeeb](https://github.com/mattgodbolt/jsbeeb), Matt Godbolt's BBC Micro emulator for the browser (thank you, Matt), from Jameson to Elite, beside the film's panel with
 both networks' units lit as they decide. ▶ 1×, Auto (real time in fights and the docking's final, turbo between) or
 ▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own Elite. Elite itself is Mark Moxon's
 flicker-free disc, fetched by the browser from his GitHub repository ([web/README.md](web/README.md)). The
