@@ -16,7 +16,7 @@ const Q = new URLSearchParams(location.search);
 const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
 // the start: the machine's state START_M million cycles after it's switched on (?start= to try another; the shipped one
 // is the fastest of those tried headless to Elite)
-const START_M = +(Q.get("start") || 30);
+const START_M = +(Q.get("start") || 31);   // (31: flown headless to Elite in 18.9 game hours, the career every visitor watches)
 const CACHE = `elite-agent-start2:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends

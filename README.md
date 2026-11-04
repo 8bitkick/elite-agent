@@ -27,8 +27,9 @@ on the BBC Master of [jsbeeb](https://github.com/mattgodbolt/jsbeeb), Matt Godbo
 both networks' units lit as they decide. ▶ 1×, Auto (real time in fights and the docking's final, turbo between) or
 ▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own Elite. Elite itself is Mark Moxon's
 flicker-free disc, fetched by the browser from his GitHub repository ([web/README.md](web/README.md)). The
-WebAssembly build, run headless on jsbeeb as a test, reached Elite in 18.2 game hours (seed 13; one death on the way,
-the save reloaded); jsbeeb's timing differs from the native emulator's, so the careers part ways.
+page's career, the same for every visitor, was flown headless on the page's own jsbeeb and reached Elite in 18.9 game
+hours (one death on the way, the save reloaded); jsbeeb's timing differs from the native emulator's, so its career is
+its own.
 
 **Trading:** why the agent's earlier "sloppy" trading (thin margins, selling and buying straight back) reached Elite
 sooner than a tidier rewrite, with the money traced through 16 careers, and what would beat both:
