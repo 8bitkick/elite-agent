@@ -171,11 +171,15 @@ export class Panel {
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
         const net = s.view === "dock", fight = s.view === "fight";
-        const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW, cyc = 80, h = 38;   // (cyc: the digits' middle)
+        const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW;
+        let cyc, h;
         const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
         this.text(txt, right, 52, `700 60px ${MONO}`, col, "right");
-        g.font = `700 60px ${MONO}`;
-        const tx = right - g.measureText(txt).width - 18;
+        // the mark centred on the digits as this browser draws them (fonts differ: measured, not assumed)
+        g.font = `700 60px ${MONO}`; g.textBaseline = "top";
+        const m = g.measureText(txt), top = 52 - m.actualBoundingBoxAscent, bot = 52 + m.actualBoundingBoxDescent;
+        cyc = (top + bot) / 2; h = (bot - top) * 0.9;
+        const tx = right - m.width - 18;
         g.fillStyle = col; g.beginPath();
         if (!s.turbo) { g.moveTo(tx - 34, cyc - h / 2); g.lineTo(tx, cyc); g.lineTo(tx - 34, cyc + h / 2); }
         else for (const k of [0, 1]) { g.moveTo(tx - 30 * k - 30, cyc - h / 2); g.lineTo(tx - 30 * k, cyc); g.lineTo(tx - 30 * k - 30, cyc + h / 2); }
