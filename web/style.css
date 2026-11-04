@@ -73,3 +73,9 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
 #repo { position: absolute; left: 1666px; top: 1020px; width: 236px; height: 38px; z-index: 1; border-radius: 6px; }   /* (over the panel's drawn 8bitkick/elite-agent) */
 #repo:hover { background: rgba(255,255,255,.06); }
+.games { display: inline-flex; }
+.games a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
+.games a:last-child { border-right: 0; }
+.games a.on { background: rgb(10, 40, 46); color: var(--cyan); }
+#phone .tools .games { flex: 1; }
+#phone .tools .games a { flex: 1; text-align: center; }

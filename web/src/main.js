@@ -13,10 +13,18 @@ const COMMANDER = "BITKICK";
 // pinned commit: GitHub serves it to any page, his site to his own); this site serves none of it.
 // The title screen's snapshot is made in the visitor's browser on the first visit and kept there.
 const Q = new URLSearchParams(location.search);
-const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
-// the start: the machine's state START_M million cycles after it's switched on (?start= to try another; the shipped one
-// is the fastest of those tried headless to Elite)
-const START_M = +(Q.get("start") || 30);
+// the games (?game=): Mark Moxon's flicker-free Master Elite, the default, and Eben Upton's Solid Elite (filled, sunlit
+// ships; the build the player knows, pinned), each from its author's GitHub. start: the machine's state that many
+// million cycles after it's switched on, every visitor's (?start= to try another; the shipped one reaches Elite headless)
+const GAMES = {
+    flicker: { name: "Flicker-free Elite", start: 30,
+        disc: "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd" },
+    solid: { name: "Solid Elite", start: 45,
+        disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-bbc-master/262bfa61b69c3fb75ce2c004d4944bdc47c1abbd/5-compiled-game-discs/elite-master-sng47.ssd" },
+};
+const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
+const DISC = Q.get("disc") || GAMES[GAME].disc;
+const START_M = +(Q.get("start") || GAMES[GAME].start);
 const CACHE = `elite-agent-start2:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
@@ -242,6 +250,19 @@ async function main() {
     const sound = () => { altT(w); altT(w); for (const id of ["sound", "p-sound"]) { $(id).classList.add("on"); $(id).textContent = "Sound on"; } };
     $("sound").onclick = sound; $("p-sound").onclick = sound;
     $("p-save").onclick = () => $("save").onclick();
+    // the game: buttons that reload the page with ?game= (everything else kept)
+    for (const box of document.querySelectorAll(".games")) {
+        box.innerHTML = "";
+        for (const [k, g] of Object.entries(GAMES)) {
+            const q = new URLSearchParams(location.search);
+            if (k === "flicker") q.delete("game"); else q.set("game", k);
+            q.delete("start");
+            const a = document.createElement("a");
+            a.textContent = g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            box.appendChild(a);
+        }
+    }
+    for (const id of ["credit", "p-credit"]) { const c = $(id); if (c && GAME === "solid") c.innerHTML = c.innerHTML.replace(/flicker-free (Master Elite|disc) from <a[^>]*>([^<]*)<\/a>/, 'Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon\'s source'); }
     // the chapters: from the start (Jameson at Lave) or from a save at Deadly
     for (const id of ["chapter", "p-chapter"]) {
         const a = $(id), q = new URLSearchParams(location.search);
