@@ -367,7 +367,7 @@ function phoneStrip() {
     $("p-kills").textContent = Math.floor(s.tally).toLocaleString("en");
     $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
     $("p-system").textContent = s.system;
-    $("p-log").textContent = s.log.slice(-40).reverse().map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
+    $("p-log").textContent = s.log.slice(-12).reverse().map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
     for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }

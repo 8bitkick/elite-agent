@@ -3,6 +3,7 @@
 // credits and system; the tally chart; then the dogfight network (yellow) in a fight, the docking network (cyan) on the
 // way in, or the galaxy map and the agent's log when docked; the status lines and the credits.
 export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", DIM = "rgb(110,116,128)", FG = "rgb(232,234,238)";
+const IDLE_TEXT = "rgb(150,156,168)", IDLE_EDGE = "rgb(58,64,78)";      // (the network's idle units, readable on a phone)
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
 const PX = 1016, PW = 880, NET_Y = 322, GAP = 62, CW = Math.floor((PW - 5 * GAP) / 6);
@@ -192,7 +193,7 @@ export class Panel {
         this.hits = [];
         cols.forEach(([title, names], c) => {
             const x = colX(c);
-            this.text(title, x, NET_Y, `600 14px ${SANS}`, DIM);
+            this.text(title, x, NET_Y, `600 14px ${SANS}`, IDLE_TEXT);
             names.forEach((name, r) => {
                 const y = rowY(c, r);
                 this.hits.push({ x, y, w: CW, h: rowH(c), c, r, name, title, v: valOf ? valOf(c, r) : null });
@@ -200,8 +201,8 @@ export class Panel {
                 const L = lit(c, r);
                 const g = this.ctx;
                 g.fillStyle = L > 0.02 ? rgb(mix(PANEL, color(c, r), 0.12 + 0.88 * L)) : rgb(PANEL);
-                g.fillRect(x, y, CW, CH); g.strokeStyle = LINE; g.strokeRect(x + 0.5, y + 0.5, CW, CH);
-                this.text(name.slice(0, 12), x + 5, y + CH / 2 + 1, `12px ${MONO}`, L > 0.55 ? "rgb(6,18,22)" : L > 0.02 ? FG : DIM, "left", "middle");
+                g.fillRect(x, y, CW, CH); g.strokeStyle = IDLE_EDGE; g.strokeRect(x + 0.5, y + 0.5, CW, CH);
+                this.text(name.slice(0, 12), x + 5, y + CH / 2 + 1, `12px ${MONO}`, L > 0.55 ? "rgb(6,18,22)" : L > 0.02 ? FG : IDLE_TEXT, "left", "middle");
             });
         });
     }
@@ -231,7 +232,7 @@ export class Panel {
         const F = this.d.fight, f = s.senses;
         fitRows(Math.max(...F.cols.map(([, names], c) => names.length * (c === 5 ? 2 : 1))));
         const vals = f ? acts(F.layers, f) : null;
-        const base = [30, 34, 44];
+        const base = [44, 49, 64];
         const segs = this.fightLinks.map(([i, j, o, w]) => {
             const flow = vals ? (w * vals[i][j]) / (i === F.layers.length - 1 ? F.outscale[o] : F.scale[i + 1][o]) : 0;
             const L = Math.min(1, Math.abs(flow));
@@ -272,7 +273,7 @@ export class Panel {
             return [A[li][cell[0]], c === 5 ? D.outscale[r] : D.scale[li][cell[0]]];
         };
         const lit = (c, r) => { const [v, sc] = V(c, r); return Math.min(1, Math.abs(v) / sc); };
-        const base = [30, 34, 44];
+        const base = [44, 49, 64];
         const segs = D.links.map(([c, a, b]) => {
             const L = lit(c, a) * (0.4 + 0.6 * lit(c + 1, b));
             return [L, rgb(mix(base, CYAN, L * 0.7)), trace(this.dockLanes, c, a, b)];

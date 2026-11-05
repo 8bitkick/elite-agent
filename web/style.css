@@ -105,7 +105,7 @@ body.phone { overflow: visible; height: auto; }      /* (the window scrolls, not
 #phone #p-chart { position: sticky; top: 0; z-index: 3; background: var(--bg); cursor: pointer; }
 #p-screen { position: relative; z-index: 1; }
 #phone .strip { padding: 10px 12px 6px; }
-#phone #p-log { height: auto; max-height: 40vh; overflow-y: auto; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
+#phone #p-log { height: auto; overflow: visible; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
 #phone #p-map { background: rgb(5, 7, 9); }
 #p-nav { position: fixed; left: 0; right: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 6px 8px; padding-top: max(6px, env(safe-area-inset-top));
   background: var(--panel); border-bottom: 1px solid var(--line); transform: translateY(-105%); transition: transform .18s ease-out; }
