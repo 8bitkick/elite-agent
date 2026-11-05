@@ -33,6 +33,10 @@ export class Core {
     /** the sound chip's next 625 samples at 31,250 Hz */
     audio() { const p = this.x.core_audio(); return new Int16Array(this.x.memory.buffer, p, 625); }
     set name(n) { const b = new Uint8Array(this.x.memory.buffer, this.x.wasm_name(), 8); b.fill(0); b.set(new TextEncoder().encode(n.toUpperCase().slice(0, 7))); }
+    /** a commander to load from the disc when next docked (its file E.<name>) */
+    set load(n) { const b = new Uint8Array(this.x.memory.buffer, this.x.wasm_load(), 8); b.fill(0); b.set(new TextEncoder().encode(n.toUpperCase().slice(0, 7))); }
+    /** n bytes of the machine's main RAM, as the player saw it this frame */
+    ram(addr, n) { return new Uint8Array(this.x.memory.buffer, this.x.wasm_ram() + addr, n).slice(); }
     get tally() { return this.x.wasm_tally(); }
     get cash() { return this.x.wasm_cash() / 10; }
     get action() { return this.x.wasm_action(); }

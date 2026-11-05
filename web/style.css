@@ -53,7 +53,7 @@ body.phone #phone { display: block; }
 #p-screen { display: block; width: 100%; aspect-ratio: 512 / 496; image-rendering: pixelated; background: #000; }
 #phone .tools .btn { white-space: nowrap; }
 #phone .tools { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
-#p-chart, #p-net, #p-map { display: block; width: 100%; }
+#p-chart, #p-net { display: block; width: 100%; }
 #p-note { color: var(--cyan); font-size: 13px; line-height: 18px; padding: 4px 12px 0; height: 44px; overflow: hidden; }   /* (two lines, always: no jumps) */
 #p-log { color: var(--green); font: 12px 'JetBrains Mono', ui-monospace, monospace; padding: 4px 12px; margin: 0; white-space: pre-wrap; }
 #phone footer { padding: 12px; color: var(--dim); font-size: 13px; }
@@ -114,7 +114,6 @@ body.phone { overflow: visible; height: auto; }      /* (the window scrolls, not
 .p-stats div { min-width: 0; }
 .p-stats span { display: block; font-size: 11px; color: #9aa1ae; text-transform: uppercase; letter-spacing: .04em; }
 .p-stats b { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#phone #p-map { width: min(100%, 46dvh); align-self: center; border-radius: 8px; background: rgb(5, 7, 9); }
 .p-opts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; align-items: center; }
 .p-opts label { font-size: 13px; color: #9aa1ae; }
 .p-opts .btn { justify-self: start; min-width: 84px; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(255, 255, 255, .08); color: var(--fg); font-size: 13px; font-weight: 600; }
@@ -125,7 +124,7 @@ body.phone { overflow: visible; height: auto; }      /* (the window scrolls, not
 #p-page2 .tools:empty { display: none; }
 #phone #p-page2 footer { padding: 0; margin-top: auto; }
 #p-nav { position: fixed; left: 0; right: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 7px 10px; padding-top: max(7px, env(safe-area-inset-top));
-  background: rgba(16, 19, 25, .8); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transform: translateY(-105%); transition: transform .24s cubic-bezier(.2, .7, .2, 1); }
+  background: rgba(16, 19, 25, .8); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transform: translateY(-105%); transition: transform .55s cubic-bezier(.22, .61, .36, 1); }
 #p-nav.show { transform: none; }
 #p-nav .btn { height: 34px; padding: 0 8px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: 17px; color: var(--fg); font-size: 13px; white-space: nowrap; }
 #p-nav .btn:active { background: rgba(255, 255, 255, .12); }
@@ -142,5 +141,5 @@ body.phone { overflow: visible; height: auto; }      /* (the window scrolls, not
   #p-page1 { display: contents; }
   #phone #p-screen { position: sticky; top: 0; grid-column: 1; grid-row: 1 / 9; width: auto; height: 100dvh; max-width: 100dvh; }
   #phone #p-chart, #phone #p-net, #phone #p-page2 { grid-column: 2; min-width: 0; }
-  #phone #p-chart, #phone #p-net, #phone #p-map { width: 100%; }
+  #phone #p-chart, #phone #p-net { width: 100%; }
 }

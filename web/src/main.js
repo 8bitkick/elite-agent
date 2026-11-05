@@ -3,6 +3,7 @@
 // run_sim fly. No start snapshot: the machine boots from power-on on every visit, in about a second.
 import { Panel, INPUT_NOTE, COL_NOTE } from "./panel.js";
 import { Core } from "../core.js";
+import { addFile } from "./save.js";
 
 const $ = (id) => document.getElementById(id);
 const V = typeof ASSET_V === "string" ? ASSET_V : "dev";
@@ -21,6 +22,14 @@ const GAMES = {
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
 const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "6cb32dd0b7d9c8762bf67d5d2c7a3e6a2179799f0ccf38a0d0fe20946bb375fa" };
 const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
+// the last save, kept in this browser: the commander block (the same for both games, at its own address in each) and the career's
+// counters. A reload or a change of game carries on from it. ?fresh, ?skew or ?check: a fresh career, the save left alone
+const COMMANDER = "BITKICK", SAVE_KEY = "elite-agent-save1", A_TP = { flicker: 0x1234, solid: 0x0C34 };
+const KEEP = !(Q.has("fresh") || Q.has("skew") || Q.has("check"));
+let saved = null;
+try { saved = KEEP ? JSON.parse(localStorage.getItem(SAVE_KEY) || "null") : null; } catch {}
+const OFF = saved ? saved.frame : 0;      // (the clock carries on)
+const RESUMED = !!saved;
 const SKEW = Q.has("skew") ? +Q.get("skew") : GAMES[GAME].skew;
 const CROP = { x: 128, y: 80, w: 512, h: 496 };      // the Elite screen in the core's 768x640 canvas
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
@@ -33,6 +42,7 @@ const s = {
     journal: [], journalHash: null, elite: 0,
     kills: 0, stars: 0, docks: 0, deaths: 0,
 };
+if (saved) Object.assign(s, saved.career, { frame: OFF, tallyPts: [[OFF, saved.career.tally]] });
 window.eliteAgent = s;
 
 function layout() {
@@ -162,7 +172,7 @@ async function main() {
     {
         const nav = $("p-nav"); let timer = 0, y0 = 0, lastY = scrollY;
         const hide = () => nav.classList.remove("show");
-        const show = (ms = 3500) => { nav.classList.add("show"); clearTimeout(timer); timer = setTimeout(hide, ms); };
+        const show = (ms = 4500) => { nav.classList.add("show"); clearTimeout(timer); timer = setTimeout(hide, ms); };
         addEventListener("touchstart", (e) => { y0 = e.touches[0].clientY; }, { passive: true });
         addEventListener("touchmove", (e) => { const d = e.touches[0].clientY - y0; if (d > 14) show(); else if (d < -14) hide(); }, { passive: true });
         addEventListener("scroll", () => { const y = scrollY; if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); lastY = y; }, { passive: true });
@@ -184,11 +194,18 @@ async function main() {
     });
     $("panel").addEventListener("mouseleave", () => tip.classList.remove("show"));
 
-    const core = await Core.create(wasm, roms, disc, {
+    const keepSave = (f, e) => {
+        const block = core.ram(A_TP[GAME], 256);
+        saved = { frame: f + OFF, data: btoa(String.fromCharCode(...block)), game: GAME,
+            career: { tally: e.tally, cash: e.cash, system: s.system, visits: s.visits, kills: s.kills, stars: s.stars, docks: s.docks, deaths: s.deaths } };
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch {}
+    };
+    const startDisc = RESUMED ? addFile(disc, COMMANDER, "E", Uint8Array.from(atob(saved.data), (c) => c.charCodeAt(0))) : disc;
+    const core = await Core.create(wasm, roms, startDisc, {
         log: (level, line) => {
             if (level !== 0) return;
             const f = core.frameNo;
-            s.log.push([f, line]); if (s.log.length > 200) s.log.shift();
+            s.log.push([f + OFF, line]); if (s.log.length > 200) s.log.shift();
             const m = line.match(/^(Docked at|Hyperspace to|Launched from) (.+)$/);
             if (m && m[1] === "Hyperspace to") s.arrive = [f + 600, m[2]];
             else if (m) { s.system = m[2]; s.arrive = null; }
@@ -197,24 +214,26 @@ async function main() {
         },
         note: (json) => {
             const f = core.frameNo;
-            if (f < CHECK_FRAMES) s.journal.push(`{"frame": ${f}, "e": ${json}}\n`);
+            if (f < CHECK_FRAMES && s.journal) s.journal.push(`{"frame": ${f}, "e": ${json}}\n`);
             let e; try { e = JSON.parse(json); } catch { return; }
             if (e.event === "fight_end") s.kills += e.kills || 0;
             else if (e.event === "new_system") s.stars++;
             else if (e.event === "died" || e.event === "escape_pod") s.deaths++;
             if (e.event === "docked") { s.docks++; s.lastDock = f; s.visits.push([e.g - 1, e.x, e.y]); }
             else if (e.event === "depart") s.lastDepart = f;
+            else if (e.event === "save" && KEEP && e.tally >= (saved ? saved.career.tally : 0)) keepSave(f, e);
             else if (e.event === "rank" && e.rank === "Elite" && !s.elite) { s.elite = f; flash(`ELITE after ${(f / 180000).toFixed(2)} game hours`, 0); }
         },
     });
     loading(0.5, "Booting the BBC Master and loading Elite…");
     await new Promise((r) => setTimeout(r, 30));
-    core.name = "BITKICK";
+    core.name = COMMANDER;
     if (!core.start(SKEW)) throw new Error("no Elite the player knows on this disc");
+    if (RESUMED) core.load = COMMANDER;
     s.started = true;
     await new Promise((r) => setTimeout(r, Math.max(0, MIN_CARD_MS - (performance.now() - shown))));
     loading(1);
-    setTimeout(() => showNav(3500), 350);      // (once the card has gone, the controls slide in, so people learn they're there)
+    setTimeout(() => showNav(5000), 400);      // (once the card has gone, the controls slide in, so people learn they're there)
 
     // ---- the screen
     const screen = $("screen"), sctx = screen.getContext("2d");
@@ -279,7 +298,7 @@ async function main() {
         const f = core.frameNo, fw = core.x.wasm_fight_when(), dw = core.x.wasm_dock_when();
         if (fw > 0 && f - fw < 30) { s.lastAction = f; s.actionKind = "fight"; }
         else if (core.action === 2 && dw > 0 && f - dw < 30) { s.lastAction = f; s.actionKind = "dock"; }
-        if (!checked && f >= CHECK_FRAMES) { checked = true; check(); }
+        if (!checked && !RESUMED && f >= CHECK_FRAMES) { checked = true; check(); }
     };
     const check = async () => {
         const h = await sha256(s.journal.join(""));
@@ -313,7 +332,7 @@ async function main() {
         // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
         // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
         showSpeed();
-        s.frame = f; s.tally = core.tally; s.cash = core.cash;
+        s.frame = f + OFF; s.tally = core.tally; s.cash = core.cash;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
         if (s.lastDock > s.lastDepart) { s.view = "docked"; s.senses = null; }
@@ -326,6 +345,13 @@ async function main() {
     };
     requestAnimationFrame(run);
 
+    // start again: the save forgotten, Jameson at Lave
+    const reset = () => {
+        if (!confirm("Start again from Jameson at Lave? This career's save will be lost.")) return;
+        try { localStorage.removeItem(SAVE_KEY); } catch {}
+        location.search = GAME === "flicker" ? "" : `?game=${GAME}`;
+    };
+    for (const id of ["reset", "p-reset"]) { const b = $(id); if (b) b.onclick = reset; }
     const toggleSound = () => {
         if (!sound.ctx) sound.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 31250 });
         sound.ctx.resume();
@@ -345,35 +371,6 @@ async function main() {
 let panelRef = null;
 let showNav = () => {};
 const paused2 = () => s.paused;
-// the phone's galaxy chart, below the network: the stars, the route so far, the current star ringed and named
-let mapKey = "";
-function phoneMap() {
-    if (!panelRef) return;
-    const here = s.visits[s.visits.length - 1], gi = here[0], stars = panelRef.gal[gi], at = stars.find((t) => t[2] === s.system);
-    const key = `${gi}/${s.visits.length}/${s.system}`;
-    if (key === mapKey) return;
-    mapKey = key;
-    const c = $("p-map"), g = c.getContext("2d"), W = 908, TOP = 44, H = W + TOP, M = 14;     // (the map square)
-    if (c.width !== W) { c.width = W; c.height = H; }
-    g.fillStyle = "rgb(9,11,15)"; g.fillRect(0, 0, W, H);
-    g.textBaseline = "middle"; g.textAlign = "left";
-    g.font = "600 22px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(110,116,128)"; g.fillText(`GALAXY ${gi + 1}`, 6, 22);
-    const label = g.measureText(`GALAXY ${gi + 1}`).width;
-    g.font = "600 28px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(242,209,58)"; g.fillText(s.system, 6 + label + 16, 22);
-    g.fillStyle = "rgb(5,7,9)"; g.fillRect(0, TOP, W, H - TOP);
-    const P = (x, y) => [M + (x * (W - 2 * M)) / 256, TOP + M + (y * (H - TOP - 2 * M)) / 256];
-    g.fillStyle = "rgb(60,66,78)";
-    for (const [x, y] of stars) { const [px, py] = P(x, y); g.fillRect(px - 2, py - 2, 4, 4); }
-    const mine = s.visits.filter((v) => v[0] === gi).map((v) => P(v[1], v[2]));
-    g.strokeStyle = "rgb(27,110,80)"; g.lineWidth = 2; g.beginPath(); mine.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
-    g.fillStyle = "rgb(27,175,122)"; for (const [x, y] of mine) { g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); }
-    if (at) {     // (not in witchspace, or a star of another galaxy between jumps)
-        const [hx, hy] = P(at[0], at[1]);
-        g.strokeStyle = "rgb(242,209,58)"; g.lineWidth = 3; g.beginPath(); g.arc(hx, hy, 12, 0, 7); g.stroke();
-        g.font = "24px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(242,209,58)";
-        const right = hx > W - 180; g.textAlign = right ? "right" : "left"; g.fillText(at[2], hx + (right ? -18 : 18), hy);
-    }
-}
 function phoneStrip() {
     if (!document.body.classList.contains("phone")) return;
     const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
@@ -389,7 +386,6 @@ function phoneStrip() {
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
-    phoneMap();
     // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
     const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
     const LINE_TOP = 44, LINE_MID = 67;
