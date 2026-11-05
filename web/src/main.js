@@ -167,7 +167,7 @@ async function main() {
     const gh = new Image(); gh.src = "gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
     panelRef = panel;
-    // the phone's controls: hidden above the rank and the time. A swipe down or a tap on them brings them in, a swipe up or a few
+    // the phone's controls: hidden at the top. A swipe down or a tap on them brings them in, a swipe up or a few
     // seconds without a touch takes them away; they slide in for a moment after loading
     {
         const nav = $("p-nav"); let timer = 0, y0 = 0, lastY = scrollY;
@@ -192,7 +192,7 @@ async function main() {
         function settleSoon() { clearTimeout(settle); settle = setTimeout(snap, 140); }
         function snap() {
             if (touching || innerWidth > innerHeight || !document.body.classList.contains("phone")) return;
-            const pin = $("p-chart").offsetHeight, p2 = $("p-page2").getBoundingClientRect().top + scrollY - pin;
+            const p2 = $("p-page2").getBoundingClientRect().top + scrollY;
             const free = Math.max(0, $("p-page1").getBoundingClientRect().bottom + scrollY - innerHeight), y = pageY();
             if (y <= free || y >= p2 - 1) return;
             const gap = p2 - free, moved = y - startY, down = moved > 0 ? (y - free) / gap > 0.25 : (p2 - y) / gap < 0.25;
