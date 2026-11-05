@@ -250,6 +250,35 @@ async function main() {
 }
 
 let panelRef = null;
+// the phone's galaxy chart, below the network: the stars, the route so far, the current star ringed and named
+let mapKey = "";
+function phoneMap() {
+    if (!panelRef) return;
+    const here = s.visits[s.visits.length - 1], gi = here[0], stars = panelRef.gal[gi], at = stars.find((t) => t[2] === s.system);
+    const key = `${gi}/${s.visits.length}/${s.system}`;
+    if (key === mapKey) return;
+    mapKey = key;
+    const c = $("p-map"), g = c.getContext("2d"), W = 908, H = 600, TOP = 44, M = 14;
+    if (c.width !== W) { c.width = W; c.height = H; }
+    g.fillStyle = "rgb(9,11,15)"; g.fillRect(0, 0, W, H);
+    g.textBaseline = "middle"; g.textAlign = "left";
+    g.font = "600 22px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(110,116,128)"; g.fillText(`GALAXY ${gi + 1}`, 6, 22);
+    const label = g.measureText(`GALAXY ${gi + 1}`).width;
+    g.font = "600 28px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(242,209,58)"; g.fillText(s.system, 6 + label + 16, 22);
+    g.fillStyle = "rgb(5,7,9)"; g.fillRect(0, TOP, W, H - TOP);
+    const P = (x, y) => [M + (x * (W - 2 * M)) / 256, TOP + M + (y * (H - TOP - 2 * M)) / 256];
+    g.fillStyle = "rgb(60,66,78)";
+    for (const [x, y] of stars) { const [px, py] = P(x, y); g.fillRect(px - 2, py - 2, 4, 4); }
+    const mine = s.visits.filter((v) => v[0] === gi).map((v) => P(v[1], v[2]));
+    g.strokeStyle = "rgb(27,110,80)"; g.lineWidth = 2; g.beginPath(); mine.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+    g.fillStyle = "rgb(27,175,122)"; for (const [x, y] of mine) { g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); }
+    if (at) {     // (not in witchspace, or a star of another galaxy between jumps)
+        const [hx, hy] = P(at[0], at[1]);
+        g.strokeStyle = "rgb(242,209,58)"; g.lineWidth = 3; g.beginPath(); g.arc(hx, hy, 12, 0, 7); g.stroke();
+        g.font = "24px Inter, system-ui, sans-serif"; g.fillStyle = "rgb(242,209,58)";
+        const right = hx > W - 180; g.textAlign = right ? "right" : "left"; g.fillText(at[2], hx + (right ? -18 : 18), hy);
+    }
+}
 function phoneStrip() {
     if (!document.body.classList.contains("phone")) return;
     const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
@@ -264,6 +293,7 @@ function phoneStrip() {
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
+    phoneMap();
     // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
     const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
     const LINE_TOP = 44, LINE_MID = 67;

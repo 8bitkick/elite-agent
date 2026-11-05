@@ -50,7 +50,7 @@ body.phone #phone { display: block; }
 #p-screen { display: block; width: 100%; aspect-ratio: 512 / 496; image-rendering: pixelated; background: #000; }
 #phone .tools .btn { white-space: nowrap; }
 #phone .tools { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
-#p-chart, #p-net { display: block; width: 100%; }
+#p-chart, #p-net, #p-map { display: block; width: 100%; }
 #p-note { color: var(--cyan); font-size: 13px; line-height: 18px; padding: 4px 12px 0; height: 44px; overflow: hidden; }   /* (two lines, always: no jumps) */
 #p-log { color: var(--green); font: 12px 'JetBrains Mono', ui-monospace, monospace; padding: 4px 12px; margin: 0; white-space: pre-wrap; }
 #phone footer { padding: 12px; color: var(--dim); font-size: 13px; }
