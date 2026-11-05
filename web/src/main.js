@@ -271,10 +271,11 @@ async function main() {
         s.actionHot = hot ? s.actionKind : null;
         speedButtons();
         for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { const v = hot ? col : ""; if (b.style.background !== v) { b.style.background = v; b.style.borderColor = v; b.style.color = hot ? "#000" : ""; } } }
-        for (const id of ["speedbtn", "p-speedbtn"]) {
-            if (hot) setText($(id), "▶ 1×");
-            else if (speed.sel === Infinity && s.rate) setText($(id), `▶▶ ${Math.round(s.rate)}×`);
-        }
+        // (the speed button is the speed chosen: flat out, the last speed measured there, not the 1× of the action, which its own
+        // button shows. After the action, the measuring starts again, so the 1× doesn't drag the figure down)
+        if (hot) s.rates = [];
+        else if (s.turbo && s.rate && s.rates && s.rates.length > 1 && speed.sel === Infinity) s.maxRate = s.rate;
+        if (speed.sel === Infinity && s.maxRate) for (const id of ["speedbtn", "p-speedbtn"]) setText($(id), `▶▶ ${Math.round(s.maxRate)}×`);
     };
     refreshSpeed = showSpeed;
     const ui = () => {
@@ -286,6 +287,7 @@ async function main() {
         while (s.rates.length > 2 && now - s.rates[0][0] > 2000) s.rates.shift();
         const [t0, f0] = s.rates[0];
         if (now - t0 > 500) s.rate = ((f - f0) / 50) / ((now - t0) / 1000);
+        else if (s.turbo) s.rate = 0;      // (too soon after the action to say)
         s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
         // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
         // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
