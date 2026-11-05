@@ -1,5 +1,5 @@
 // core.wasm from JavaScript: the machine and the player in one object, the same in the browser and in Node.
-import { wasiShim } from "../wasi_shim.js";
+import { wasiShim } from "./wasi_shim.js";
 
 export class Core {
     /** bytes: core.wasm; roms: 8 of 16 KB (the MOS, then slots 9 to 15); disc: an .ssd; hooks: { log(level, line), note(json) } */

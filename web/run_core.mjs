@@ -1,5 +1,5 @@
 // core.wasm headless: a career, to Elite or for MINUTES of game time.
-//   ROMS=dir DISC=file.ssd [SKEW=13] [DRAW=0] [SHOT=frame:file.rgba] node web/dev/run_core.mjs MINUTES [journal.jsonl]
+//   ROMS=dir DISC=file.ssd [SKEW=13] [DRAW=0] [SHOT=frame:file.rgba] node web/run_core.mjs MINUTES [journal.jsonl]
 // DRAW=n draws every nth frame through the renderer (a test that drawing changes nothing). Prints the journal's hash.
 import { createHash } from "node:crypto";
 import { createWriteStream, readFileSync, writeFileSync } from "node:fs";

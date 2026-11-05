@@ -8,7 +8,7 @@
 
 static struct sn76489 s_sn;
 #define MACHINE_SOUND_WRITE(m, byte) sn_write(&s_sn, (byte))
-#include "../../sim/libbeeb.c"
+#include "../sim/libbeeb.c"
 #include "sn76489.c"
 
 #define EXPORT(name) __attribute__((export_name(name)))

@@ -56,8 +56,5 @@ sim/film
 
 # the web page (web/build_site.sh)
 web/_site/
-web/.jsbeeb
 web/node_modules/
-web/agent.dev.wasm
-web/dev/core.dev.wasm
-web/dev/_site/
+web/core.dev.wasm

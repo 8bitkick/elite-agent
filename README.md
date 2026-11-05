@@ -23,14 +23,13 @@ with a sixth of its stick reversals. After MIT CSAIL's
 were written and measured: [wsp/README.md](wsp/README.md).
 
 **[The live page](https://8bitkick.cc/elite-agent/)**: the same C player, compiled to WebAssembly, flies Fair mode
-on the BBC Master of [jsbeeb](https://github.com/mattgodbolt/jsbeeb), Matt Godbolt's BBC Micro emulator for the browser (thank you, Matt), from Jameson to Elite, beside the film's panel with
-both networks' units lit as they decide. ▶ 1×, Auto (real time in fights and the docking's final, turbo between) or
-▶▶ Turbo; jump to Deadly; save the commander as an .ssd to load in your own Elite. Elite itself is Mark Moxon's
-flicker-free disc, fetched by the browser from his GitHub repository ([web/README.md](web/README.md)). The
-page's career is the same for every visitor (its start is taken at an instruction boundary, so it doesn't depend on
-the visitor's computer); `?game=solid` plays Eben Upton's Solid Elite and `?start=N` picks another start. The careers
-from the new starts are being flown headless to Elite (the previous start's reached it in 18.9 game hours).
-[web/STARTS.md](web/STARTS.md) has the results so far, and how to test a start and log it.
+on Kieran Connell's BBC Master core, the emulator on the Presto, with the agent and the emulator together in one WebAssembly file,
+from Jameson to Elite, beside the film's panel with both networks' units lit as they decide. Flat out, or 1× ACTION for real
+time in fights and the docking's final; `?game=solid` plays Eben Upton's Solid Elite. Elite itself is fetched by the browser from its
+authors' GitHub repositories ([web/README.md](web/README.md)). Both games are flown to Elite on the page's own file: flicker-free in
+16.45 game hours, Solid in 18.34, with a whole career in a browser matching one in Node byte for byte. It's built to be the same career
+for every visitor, though so far that's been tested on one Raspberry Pi 5. [web/STARTS.md](web/STARTS.md) has the results, and
+how to fly a career and log it.
 
 **Trading:** why the agent's earlier "sloppy" trading (thin margins, selling and buying straight back) reached Elite
 sooner than a tidier rewrite, with the money traced through 16 careers, and what would beat both:

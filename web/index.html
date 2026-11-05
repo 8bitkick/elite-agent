@@ -26,8 +26,6 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- the machine: jsbeeb's own page, out of sight; the agent and the screen are drawn here from it -->
-<iframe id="beeb" allow="autoplay" title="jsbeeb, a BBC Master emulator" tabindex="-1"></iframe>
 
 <!-- landscape: the film's frame -->
 <div id="stage">
@@ -40,7 +38,7 @@
     <button id="save" class="btn" title="An .ssd with the commander's save file, to load in your own Elite">⤓ Save</button>
   </div>
   <div id="credit"><b>Acornsoft Elite, BBC Master</b> · Elite © Ian Bell and David Braben · flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon</a> ·
-    emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>) · <a href="LICENSES.txt">licences</a></div>
+    emulated by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a> (GPL-3.0) · <a href="LICENSES.txt">licences</a></div>
   <div id="play"><button id="sound" class="btn">🔊 Sound</button><span class="sep"></span><button id="pause" class="btn">❚❚ Pause</button><button id="speedbtn" class="btn" title="Speed: 1×, 2×, 4×, 8× or as fast as this computer can go">▶▶ MAX</button><button id="auto" class="btn on" title="Auto: fights and the final docking at 1×">AUTO ●</button></div>
   <canvas id="panel"></canvas>
   <div id="netnote">Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB and docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.</div>
@@ -70,7 +68,7 @@
     <b>Acornsoft Elite, BBC Master</b>
     <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
     <p class="small" id="p-credit">Elite © Ian Bell and David Braben; flicker-free Master Elite from <a href="https://github.com/markmoxon/elite-source-code-bbc-master/tree/flicker-free">Mark Moxon's source repository</a>.
-    Emulated by <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a> (GPL-3.0, <a href="jsbeeb/SOURCE.txt">source</a>). <a href="LICENSES.txt">Licences</a>.</p>
+    Emulated by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a> (GPL-3.0). <a href="LICENSES.txt">Licences</a>.</p>
     <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
   </footer>
 </div>

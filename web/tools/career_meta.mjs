@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // What produced a career, as JSON beside its journal: enough to fly it again.
-//   career_meta.mjs --game flicker --start 31 --snapshot s.json --disc d.ssd --wasm agent.wasm --jsbeeb dir --minutes 2400 > career.meta.json
+//   career_meta.mjs --game flicker --skew 13 --disc d.ssd --wasm core.wasm --minutes 2400 > career.meta.json
 // Stops if the disc isn't the pinned one for that game.
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -24,18 +24,16 @@ if (!disc) { console.error(`unknown game ${o.game}`); process.exit(2); }
 const discSha = sha(o.disc);
 if (discSha !== disc.sha256) { console.error(`${o.disc} isn't the pinned ${o.game} disc (sha256 ${discSha})`); process.exit(1); }
 
-const snapshot = JSON.parse(readFileSync(o.snapshot, "utf8"));
 console.log(JSON.stringify({
     repo: "github.com/8bitkick/elite-agent",
     commit: git(here, "rev-parse HEAD"),
     uncommitted_changes: git(here, "status --porcelain") !== "",
-    game: o.game, start: +o.start, seed: `start ${o.start}`,
-    start_cycle: snapshot.state.cycleSeconds * 2e6 + snapshot.state.currentCycles,
-    snapshot_sha256: sha(o.snapshot),
+    game: o.game, skew: +o.skew,
     params: { mode: "Fair", commander: "BITKICK", machine: "Master", minutes_allowed: +o.minutes, frames_per_game_minute: 3000 },
-    agent_wasm: { sha256: sha(o.wasm), source: o["wasm-source"] || "web/agent.wasm at the commit above" },
+    core_wasm: { sha256: sha(o.wasm), source: o["wasm-source"] || "web/core.wasm at the commit above" },
     disc,
-    jsbeeb: { repo: "mattgodbolt/jsbeeb", commit: git(o.jsbeeb, "rev-parse HEAD") },
+    emulator: { name: "Kieran Connell's Master core", repo: "8bitkick/rp2350-bbc-micro", commit: "b8232984d0e02350c6f1434374e1d9a0fad09dbf" },
+    roms: { repo: "scarybeasts/beebjit", commit: "db16aaf09df1fa0fd7ea686bc8d09b13f5674a42", path: "roms/mos3.20" },
     host: { platform: `${os.platform()} ${os.arch()}`, cpu: os.cpus()[0]?.model, node: process.version },
     started: new Date().toISOString(),
 }, null, 2));

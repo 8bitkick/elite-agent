@@ -1,0 +1,40 @@
+{
+  "repo": "github.com/8bitkick/elite-agent",
+  "commit": "3741213",
+  "game": "flicker",
+  "skew": 13,
+  "params": {
+    "mode": "Fair",
+    "commander": "BITKICK",
+    "machine": "Master",
+    "minutes_allowed": 2400,
+    "frames_per_game_minute": 3000
+  },
+  "core_wasm": {
+    "sha256": "16783057a9c2583398d8a96e2555f37adbb568351305ed455b340343707a5e8a",
+    "source": "web/core.wasm, pinned"
+  },
+  "disc": {
+    "name": "Flicker-free Elite (SNG47)",
+    "repo": "markmoxon/elite-source-code-bbc-master",
+    "commit": "e6581b586b1c984142a0fee0c8009c7466a38d52",
+    "path": "5-compiled-game-discs/elite-master-flicker-free-sng47.ssd",
+    "sha256": "3c7b7e557d5bce5e7b28f9aed728a79c4b6745b987fdd3d0625cdb64092e9cc9"
+  },
+  "emulator": {
+    "name": "Kieran Connell's Master core",
+    "repo": "8bitkick/rp2350-bbc-micro",
+    "commit": "b8232984d0e02350c6f1434374e1d9a0fad09dbf"
+  },
+  "roms": {
+    "repo": "scarybeasts/beebjit",
+    "commit": "db16aaf09df1fa0fd7ea686bc8d09b13f5674a42",
+    "path": "roms/mos3.20"
+  },
+  "host": {
+    "platform": "linux arm64",
+    "cpu": "Raspberry Pi 5",
+    "node": "v22.22.0"
+  },
+  "started": "2026-11-05"
+}

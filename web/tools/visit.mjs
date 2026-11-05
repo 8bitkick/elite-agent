@@ -1,5 +1,5 @@
 // A visit to the dev page in a real browser, to 10 game minutes: its journal hash against the reference, a screenshot.
-//   SITE=url-or-dir [ROM_DIR= DISC=] CHROMIUM=path node web/dev/visit.mjs [out.png]
+//   SITE=url-or-dir [ROM_DIR= DISC=] CHROMIUM=path node web/tools/visit.mjs [out.png]
 import { createServer } from "node:http";
 import { readFileSync, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
@@ -16,7 +16,7 @@ if (!/^https?:/.test(site)) {
         catch { res.writeHead(404); res.end(); }
     });
     await new Promise((r) => server.listen(0, "127.0.0.1", r));
-    url = `http://127.0.0.1:${server.address().port}/dev/`;
+    url = `http://127.0.0.1:${server.address().port}/`;
 }
 url += process.env.QUERY || "";
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM || undefined });
@@ -33,5 +33,5 @@ if (process.argv[2]) {
 }
 await page.waitForFunction(() => window.eliteAgent?.journalHash, undefined, { timeout: 3 * 3600000, polling: 2000 });
 const r = await page.evaluate(() => ({ hash: window.eliteAgent.journalHash, frame: window.eliteAgent.frame, label: window.eliteAgent.speedLabel, lines: window.eliteAgent.log.length }));
-console.log(`journal ${r.hash}; ${((Date.now() - t0) / 1000).toFixed(0)} s to 10 game minutes; frame ${r.frame}, ${r.label}, ${r.lines} log lines`);
+console.log(`journal ${r.hash}; ${((Date.now() - t0) / 1000).toFixed(0)} s; frame ${r.frame}, ${r.label}, ${r.lines} log lines`);
 await browser.close(); server?.close();

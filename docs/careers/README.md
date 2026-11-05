@@ -17,6 +17,6 @@ build, disc and other parameters weren't recorded.
 
 ## Page careers (`starts/`)
 
-`starts/<game>_<start>.journal.jsonl`, flown by `web/run_node.mjs` from a start the page makes, with
-`starts/<game>_<start>.meta.json` beside it: this repo and commit, the start, the parameters, the disc's repo, commit and
-hash, the `agent.wasm` hash and source, the jsbeeb commit, and the machine. See [web/STARTS.md](../../web/STARTS.md).
+`starts/<game>_<skew>.journal.jsonl`, flown by `web/run_core.mjs` on the page's own `core.wasm`, with
+`starts/<game>_<skew>.meta.json` beside it: this repo and commit, the skew, the parameters, the disc's repo, commit and hash, the
+`core.wasm` hash, the emulator and ROM commits, and the machine. See [web/STARTS.md](../../web/STARTS.md).

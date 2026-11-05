@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A career's row for the results table in web/STARTS.md, from run_node's output and journal:
-//   career_row.mjs --game flicker --start 31 --out career.out --journal career.jsonl --wasm agent.wasm [--by name] [--machine "..."] [--wall-hours 5.2]
+//   career_row.mjs --game flicker --skew 13 --out career.out --journal career.jsonl --wasm core.wasm [--by name] [--machine "..."] [--wall-hours 5.2]
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -29,4 +29,4 @@ let commit = "?"; try { commit = execSync("git rev-parse --short HEAD", { cwd: n
 const time = hours ?? `not Elite at ${(c.frame / 180000).toFixed(1)}`;
 const cr = Math.round(c.credits).toLocaleString("en");
 const today = new Date().toISOString().slice(0, 10);
-console.log(`| ${o.game} | ${o.start} | ${time} | ${c.deaths} | ${c.kills} | ${cr} | ${c.stars} | ${c.galaxy} | ${c.docks} | ${c.witchspace} | yes | ${o.by || "?"} | ${o.machine || "?"}, ${o["wall-hours"] || "?"} h | ${today} | ${commit} | ${wasm} |`);
+console.log(`| ${o.game} | ${o.skew} | ${time} | ${c.deaths} | ${c.kills} | ${cr} | ${c.stars} | ${c.galaxy} | ${c.docks} | ${c.witchspace} | ${o.by || "?"} | ${o.machine || "?"}, ${o["wall-hours"] || "?"} h | ${today} | ${commit} | ${wasm} |`);

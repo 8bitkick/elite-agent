@@ -1,5 +1,5 @@
 name: pages
-# The web page (web/): the C player as WebAssembly beside jsbeeb, built and published to GitHub Pages. Elite itself is
+# The web page (web/): the emulator and the C player in one pinned WebAssembly, published to GitHub Pages. Elite itself is
 # not part of it: the page loads Mark Moxon's flicker-free disc from his GitHub repository in the visitor's browser.
 on:
   push:
@@ -21,15 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: build the site (the pinned agent.wasm, its hash checked; jsbeeb at its pinned commit; the page)
+      - name: build the site (the pinned core.wasm, its hash checked; the page)
         run: web/build_site.sh
-      - name: the dev page, at /dev/, from the kieran-wasm branch (the main page publishes without it if this fails)
-        continue-on-error: true
-        run: |
-          git fetch -q --depth 1 origin kieran-wasm
-          git worktree add -q /tmp/dev FETCH_HEAD
-          ln -s "$PWD/web/node_modules" /tmp/dev/web/node_modules
-          /tmp/dev/web/dev/build_dev.sh "$PWD/web/_site/dev"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/_site

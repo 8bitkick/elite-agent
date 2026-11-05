@@ -2,10 +2,7 @@
   "name": "elite-agent-web",
   "private": true,
   "type": "module",
-  "description": "The elite-agent's C player as WebAssembly on jsbeeb: the page (build_site.sh) and a headless test (run_node.mjs)",
-  "dependencies": {
-    "jsbeeb": "2.18.0"
-  },
+  "description": "The emulator and the elite-agent's C player in one WebAssembly: the page (build_site.sh) and headless careers (run_core.mjs)",
   "devDependencies": {
     "esbuild": "0.24.0",
     "playwright": "1.56.1"

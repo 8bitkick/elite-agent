@@ -1,0 +1,40 @@
+{
+  "repo": "github.com/8bitkick/elite-agent",
+  "commit": "3741213",
+  "game": "solid",
+  "skew": 13,
+  "params": {
+    "mode": "Fair",
+    "commander": "BITKICK",
+    "machine": "Master",
+    "minutes_allowed": 2400,
+    "frames_per_game_minute": 3000
+  },
+  "core_wasm": {
+    "sha256": "16783057a9c2583398d8a96e2555f37adbb568351305ed455b340343707a5e8a",
+    "source": "web/core.wasm, pinned"
+  },
+  "disc": {
+    "name": "Solid Elite",
+    "repo": "ebenupton/solid-elite-bbc-master",
+    "commit": "262bfa61b69c3fb75ce2c004d4944bdc47c1abbd",
+    "path": "5-compiled-game-discs/elite-master-sng47.ssd",
+    "sha256": "0896826fa811c38a0ee1f60a0c9e3eeb1f99c0bd122545a7e9455d09e7c4833e"
+  },
+  "emulator": {
+    "name": "Kieran Connell's Master core",
+    "repo": "8bitkick/rp2350-bbc-micro",
+    "commit": "b8232984d0e02350c6f1434374e1d9a0fad09dbf"
+  },
+  "roms": {
+    "repo": "scarybeasts/beebjit",
+    "commit": "db16aaf09df1fa0fd7ea686bc8d09b13f5674a42",
+    "path": "roms/mos3.20"
+  },
+  "host": {
+    "platform": "linux arm64",
+    "cpu": "Raspberry Pi 5",
+    "node": "v22.22.0"
+  },
+  "started": "2026-11-05"
+}
