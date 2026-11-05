@@ -202,7 +202,8 @@ async function main() {
     // the action worth real time, each frame: the dogfight network deciding, or the docking network flying its final
     const note = () => {
         const f = core.frameNo, fw = core.x.wasm_fight_when(), dw = core.x.wasm_dock_when();
-        if ((fw > 0 && f - fw < 30) || (core.action === 2 && dw > 0 && f - dw < 30)) s.lastAction = f;
+        if (fw > 0 && f - fw < 30) { s.lastAction = f; s.actionKind = "fight"; }
+        else if (core.action === 2 && dw > 0 && f - dw < 30) { s.lastAction = f; s.actionKind = "dock"; }
         if (!checked && f >= CHECK_FRAMES) { checked = true; check(); }
     };
     const check = async () => {
@@ -222,8 +223,17 @@ async function main() {
         const [t0, f0] = s.rates[0];
         if (now - t0 > 500) s.rate = ((f - f0) / 50) / ((now - t0) / 1000);
         s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
-        // (at MAX, how fast MAX is on this machine)
-        if (speed.sel === Infinity) for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `▶▶ MAX${s.turbo && s.rate ? ` ${Math.round(s.rate)}×` : ""}`; }
+        // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
+        // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
+        const hot = speed.auto && speed.sel !== 1 && f - s.lastAction < HOLD, col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";
+        s.actionHot = hot ? s.actionKind : null;
+        for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.style.background = hot ? col : ""; b.style.borderColor = hot ? col : ""; b.style.color = hot ? "#000" : ""; } }
+        speedButtons();
+        for (const id of ["speedbtn", "p-speedbtn"]) {
+            const b = $(id); if (!b) continue;
+            if (hot) b.textContent = "▶ 1×";
+            else if (speed.sel === Infinity && s.turbo && s.rate) b.textContent = `▶▶ MAX ${Math.round(s.rate)}×`;
+        }
         s.frame = f; s.tally = core.tally; s.cash = core.cash;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
