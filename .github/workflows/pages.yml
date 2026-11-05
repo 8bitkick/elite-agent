@@ -4,7 +4,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["web/**", "cplayer/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,9 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: clang's wasm32-wasi target
-        run: sudo apt-get update -q && sudo apt-get install -y -q clang lld wasi-libc libclang-rt-18-dev-wasm32
-      - name: build the site (the player as WebAssembly, jsbeeb at its pinned commit, the page)
+      - name: build the site (the pinned agent.wasm, its hash checked; jsbeeb at its pinned commit; the page)
         run: web/build_site.sh
       - uses: actions/upload-pages-artifact@v3
         with:

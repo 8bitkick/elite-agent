@@ -58,4 +58,4 @@ sim/film
 web/_site/
 web/.jsbeeb
 web/node_modules/
-web/player.wasm
+web/agent.dev.wasm

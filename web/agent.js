@@ -1,4 +1,4 @@
-// The Elite agent on a jsbeeb machine: player.wasm (the C player) reads the machine's main RAM each frame and presses
+// The Elite agent on a jsbeeb machine: agent.wasm (the C player) reads the machine's main RAM each frame and presses
 // its keys and moves its joystick. The same in the browser (index.html) and in Node (run_node.mjs).
 import { wasiShim } from "./wasi_shim.js";
 

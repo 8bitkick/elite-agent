@@ -19,7 +19,7 @@ await s.initialise();
 const cpu = s._machine.processor, kb = s._keyboard;
 let fr = 0, elite = 0;
 const stamp = () => (fr / 3000).toFixed(1).padStart(7);
-const agent = await Agent.create(readFileSync(process.env.WASM || here + "player.wasm"), cpu, kb, {
+const agent = await Agent.create(readFileSync(process.env.WASM || here + "agent.wasm"), cpu, kb, {
     log: (lv, line) => { if (lv === 0) console.log(stamp(), line); if (logf) logf.write(`${stamp()} ${line}\n`); },
     note: (json) => {
         if (journal) journal.write(`{"frame": ${agent.frameNo}, "e": ${json}}\n`);

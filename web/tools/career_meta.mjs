@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // What produced a career, as JSON beside its journal: enough to fly it again.
-//   career_meta.mjs --game flicker --start 31 --snapshot s.json --disc d.ssd --wasm player.wasm --jsbeeb dir --minutes 2400 > career.meta.json
+//   career_meta.mjs --game flicker --start 31 --snapshot s.json --disc d.ssd --wasm agent.wasm --jsbeeb dir --minutes 2400 > career.meta.json
 // Stops if the disc isn't the pinned one for that game.
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -33,7 +33,7 @@ console.log(JSON.stringify({
     start_cycle: snapshot.state.cycleSeconds * 2e6 + snapshot.state.currentCycles,
     snapshot_sha256: sha(o.snapshot),
     params: { mode: "Fair", commander: "BITKICK", machine: "Master", minutes_allowed: +o.minutes, frames_per_game_minute: 3000 },
-    player_wasm: { sha256: sha(o.wasm), source: o["wasm-source"] || "web/build.sh at the commit above" },
+    agent_wasm: { sha256: sha(o.wasm), source: o["wasm-source"] || "web/agent.wasm at the commit above" },
     disc,
     jsbeeb: { repo: "mattgodbolt/jsbeeb", commit: git(o.jsbeeb, "rev-parse HEAD") },
     host: { platform: `${os.platform()} ${os.arch()}`, cpu: os.cpus()[0]?.model, node: process.version },

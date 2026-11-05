@@ -12,7 +12,8 @@
   ship blueprint), takes a jsbeeb snapshot at the title screen with the Cobra turning, and keeps it in the browser;
   later visits restore it.
 - **The agent** is cplayer/, the same C as `run_sim`, compiled to WebAssembly by clang's wasm32-wasi target
-  ([player_wasm.c](player_wasm.c), [build.sh](build.sh)): 680 KB with both networks' weights. [agent.js](agent.js) runs it
+  ([player_wasm.c](player_wasm.c), [build.sh](build.sh)): 680 KB with both networks' weights, pinned as
+  [agent.wasm](agent.wasm), so changes to `cplayer/` don't reach the page until a new one is pinned ([STARTS.md](STARTS.md)). [agent.js](agent.js) runs it
   once a frame from jsbeeb's end-of-frame paint (where the native emulator calls the player): the 32 KB of main RAM in,
   the keys and the joystick out. It costs about 50 µs a frame against jsbeeb's ~5 ms, so it stays on the main thread.
   Fair mode, commander BITKICK.
@@ -38,7 +39,7 @@ Licences: jsbeeb is GPL-3.0-or-later. The site carries its licence and the commi
 as a whole is offered under the GPL too (`LICENSES.txt`); elite-agent's own code stays MIT. Elite © Ian Bell and David
 Braben is not part of the site.
 
-Build: `web/build_site.sh` (clang with the wasm32 target and wasi-libc, Node 22) writes `web/_site`; the `pages`
+Build: `web/build_site.sh` (Node 22) writes `web/_site`; the `pages`
 workflow publishes it. `LOCAL_DISC=1` puts the disc in the site for testing where GitHub can't be reached
 (open it with `?disc=elite.ssd`). `?speed=1x|adaptive|turbo` sets the speed; `?fresh` boots from the disc again.
 

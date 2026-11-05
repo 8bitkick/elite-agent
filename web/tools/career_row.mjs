@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A career's row for the results table in web/STARTS.md, from run_node's output and journal:
-//   career_row.mjs --game flicker --start 31 --out career.out --journal career.jsonl --wasm player.wasm [--by name] [--machine "..."] [--wall-hours 5.2]
+//   career_row.mjs --game flicker --start 31 --out career.out --journal career.jsonl --wasm agent.wasm [--by name] [--machine "..."] [--wall-hours 5.2]
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";

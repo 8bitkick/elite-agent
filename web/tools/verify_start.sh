@@ -29,7 +29,7 @@ SITE=${SITE:-$WEB/_site}
 JSBEEB=$(cd "${JSBEEB:-$WEB/.jsbeeb}" && pwd)
 DISC=$(cd "$(dirname "$DISC")" && pwd)/$(basename "$DISC")
 MINUTES=${MINUTES:-2400}
-WASM=$SITE/player.wasm
+WASM=$SITE/agent.wasm
 mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 T=$OUT/${GAME}_$START
 run_node() { JSBEEB=$JSBEEB WASM=$WASM DISC=$DISC START=$T.json node "$WEB/run_node.mjs" "$@"; }

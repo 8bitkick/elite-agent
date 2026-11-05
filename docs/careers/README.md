@@ -19,4 +19,4 @@ build, disc and other parameters weren't recorded.
 
 `starts/<game>_<start>.journal.jsonl`, flown by `web/run_node.mjs` from a start the page makes, with
 `starts/<game>_<start>.meta.json` beside it: this repo and commit, the start, the parameters, the disc's repo, commit and
-hash, the `player.wasm` hash and source, the jsbeeb commit, and the machine. See [web/STARTS.md](../../web/STARTS.md).
+hash, the `agent.wasm` hash and source, the jsbeeb commit, and the machine. See [web/STARTS.md](../../web/STARTS.md).

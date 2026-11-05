@@ -66,12 +66,8 @@ the results table in web/STARTS.md, and open a pull request adding them, with th
 
 ```bash
 git clone https://github.com/8bitkick/elite-agent && cd elite-agent
-sudo apt install clang lld wasi-libc libclang-rt-19-dev-wasm32   # (clang's wasm32-wasi target; the 19 is your clang's version)
-web/build_site.sh                                             # jsbeeb at its pinned commit, the player, the page
+web/build_site.sh                                       # jsbeeb at its pinned commit, the pinned agent, the page
 (cd web && npm ci && npx playwright install chromium)
-
-# the player everyone must fly, so that results compare: the published page's
-curl -fL -o web/_site/player.wasm https://8bitkick.cc/elite-agent/player.wasm
 
 curl -fL -o flicker.ssd https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd
 curl -fL -o solid.ssd https://raw.githubusercontent.com/ebenupton/solid-elite-bbc-master/262bfa61b69c3fb75ce2c004d4944bdc47c1abbd/5-compiled-game-discs/elite-master-sng47.ssd
@@ -93,7 +89,7 @@ If it's interrupted, run the same command again and it picks up from the last ch
 **To submit:** open a pull request that adds your row to the results table, with the run's final log lines
 (`tail -n 20 runs/<game>_<start>.out`) in its description. Add the career's two files to `docs/careers/starts/`:
 `<game>_<start>.journal.jsonl` and `<game>_<start>.meta.json`. The meta file records what flew it: this repo's commit, the
-start, the parameters, the disc's repo, commit and hash, the `player.wasm` and jsbeeb versions, and the machine.
+start, the parameters, the disc's repo, commit and hash, the `agent.wasm` and jsbeeb versions, and the machine.
 `verify_start.sh` writes it, and refuses a disc that isn't the pinned one.
 
 ## Determinism: what has been tested
@@ -104,7 +100,7 @@ Same start, different conditions, on one Raspberry Pi 5 (arm64):
 |---|---|---|
 | browser vs Node, 10 game minutes | flicker 31, 33, 35 | identical log text |
 | browser vs Node, about 2 game minutes | Solid 45 | identical log text |
-| published wasm vs a local build, Node, 10 game minutes | flicker 31 | byte-identical journals |
+| `agent.wasm` vs a local clang 19 build, Node, 10 game minutes | flicker 31 | byte-identical journals |
 
 **Not tested yet:** a browser throttled 4x, a returning visitor who restores a saved start, a run resumed from a checkpoint,
 other kinds of computer such as x86, and any comparison across a whole career. So this is promising but not proven: if you
@@ -122,7 +118,9 @@ the journals in `docs/careers/starts/`.
 | jsbeeb | [`c6ac7200d284376768458a993285192aa4d477f2`](https://github.com/mattgodbolt/jsbeeb/tree/c6ac7200d284376768458a993285192aa4d477f2) |
 | flicker-free disc | `markmoxon/elite-source-code-bbc-master@e6581b586b1c984142a0fee0c8009c7466a38d52`, sha256 `3c7b7e55...` |
 | Solid disc | `ebenupton/solid-elite-bbc-master@262bfa61b69c3fb75ce2c004d4944bdc47c1abbd`, sha256 `0896826f...` |
-| `player.wasm` | built from `cplayer/` at commit `623a180` by the `pages` workflow, sha256 `40469dd3...` |
+| `web/agent.wasm` | sha256 `40469dd3a338c5776c07365e1e9f8d6a1c8686c5385b2a4431e4fc2280c24b92`, built from `cplayer/` at commit `623a180` by the `pages` workflow (clang 18, Ubuntu 24.04) |
 
-A build on another compiler isn't byte-identical to the published wasm. They flew identical journals in the one 10-minute
-test so far, but use the published one.
+The page, `run_node.mjs` and `verify_start.sh` all fly this one file, and `build_site.sh` stops if its hash doesn't match
+`web/agent.wasm.sha256`. Changes to `cplayer/` don't reach the page until a new one is pinned, and a new pin means the
+careers here must be flown again. `web/build.sh` writes `agent.dev.wasm`, for development: a build on another compiler
+isn't byte-identical, so don't submit results from one.
