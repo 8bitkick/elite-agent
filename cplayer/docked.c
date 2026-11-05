@@ -356,7 +356,10 @@ PT_THREAD(settle_docked(void)) {
             continue;
         }
         if ((is_docked() && view() != V_STATUS) || briefing()) {
-            CO_CALL(c_sd, press(K_SPACE, 3, 4));        // through a mission briefing's pages
+            // through a mission briefing's pages (Solid Elite reads the key there only on its own beat, which a
+            // 3-frame tap once a round can miss every time: on the Thargoid plans' debrief it missed for 10 game
+            // hours. There each try holds it a little longer)
+            CO_CALL(c_sd, press(K_SPACE, g_ev.id == EV_SOLID ? 3 + (c_sd.tries % 4) * 4 : 3, 4));
         } else if (title()) {
             CO_CALL(c_sd, from_title());
         }
