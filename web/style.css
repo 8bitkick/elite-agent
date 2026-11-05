@@ -90,7 +90,6 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .row { gap: 10px; } #phone .seg { flex: 1; width: auto; max-width: 250px; }
 #play { position: absolute; right: 24px; top: 4px; display: flex; gap: 8px; align-items: center; z-index: 1; }
 #play .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
-#auto.on, #p-auto.on { border-color: var(--cyan); color: var(--cyan); background: rgb(10, 40, 46); }
 #speedbtn, #p-speedbtn { min-width: 84px; font-variant-numeric: tabular-nums; }
 #phone .ctl { display: flex; gap: 6px; }
 #phone .ctl .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
@@ -99,3 +98,37 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .row .btn, #phone .row .games { height: 30px; box-sizing: border-box; }
 #phone .row .btn { display: inline-flex; align-items: center; justify-content: center; }
 #phone .row .games a { display: flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; }
+
+/* a phone: nothing scrolls but the section chosen */
+html:has(body.phone), body.phone { overflow: hidden; height: 100dvh; }
+body.phone #phone { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+#phone > canvas { flex: none; }
+#p-panel { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+#p-panel > section { display: none; }
+#p-panel > section.on { display: block; }
+#p-panel > section[data-tab="map"].on { display: flex; justify-content: center; height: 100%; background: rgb(5, 7, 9); }
+#p-map { width: auto; height: 100%; max-width: 100%; }
+#p-panel > section[data-tab="log"] .strip { padding: 10px 12px 6px; }
+#phone #p-log { height: auto; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
+#p-panel > section[data-tab="options"] { padding: 12px; }
+#phone #p-panel .games { margin-top: 10px; }
+#phone #p-panel .games { width: 100%; max-width: none; }
+#phone #p-panel .games a { flex: 1; padding: 12px 0; text-align: center; }
+#phone #p-panel .tools { justify-content: flex-start; padding: 10px 0 0; }
+#phone #p-panel .tools:empty { display: none; }
+#phone footer { padding: 10px 0; }
+#p-ctl { display: flex; gap: 6px; }
+#p-ctl .btn { height: 44px; padding: 0 6px; font-size: 14px; white-space: nowrap; border-radius: 8px; }
+#p-ctl #p-pause { flex: 0 0 48px; }
+#p-ctl #p-speedbtn { flex: 1 1 0; min-width: 0; font-weight: 600; }
+#p-ctl #p-sound { flex: 0 0 62px; }
+#p-tabs { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
+#p-tabs button { height: 46px; background: transparent; border: 0; border-top: 2px solid transparent; color: #9aa1ae; font-size: 14px; font-weight: 600; cursor: pointer; }
+#p-tabs button.on { color: var(--cyan); border-top-color: var(--cyan); }
+/* a phone on its side: the screen on the left, the rest beside it */
+@media (orientation: landscape) {
+  body.phone #phone { display: grid; width: 100vw; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
+  #phone #p-screen { grid-column: 1; grid-row: 1 / 4; width: auto; height: 100dvh; max-width: 100dvh; }
+  #phone #p-chart, #p-panel, #p-tabs { grid-column: 2; min-width: 0; }
+  #phone #p-chart { width: 100%; }
+}

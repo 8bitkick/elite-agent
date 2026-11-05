@@ -24,7 +24,7 @@ were written and measured: [wsp/README.md](wsp/README.md).
 
 **[The live page](https://8bitkick.cc/elite-agent/)**: the same C player, compiled to WebAssembly, flies Fair mode
 on Kieran Connell's BBC Master core, the emulator on the Presto, with the agent and the emulator together in one WebAssembly file,
-from Jameson to Elite, beside the film's panel with both networks' units lit as they decide. Flat out, or 1× ACTION for real
+from Jameson to Elite, beside the film's panel with both networks' units lit as they decide. 1×, 2×, 4×, flat out, or ACTION for real
 time in fights and the docking's final; `?game=solid` plays Eben Upton's Solid Elite. Elite itself is fetched by the browser from its
 authors' GitHub repositories ([web/README.md](web/README.md)). Both games are flown to Elite on the page's own file: flicker-free in
 16.45 game hours, Solid in 18.34, with a whole career in a browser matching one in Node byte for byte. It's built to be the same career

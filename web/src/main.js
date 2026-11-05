@@ -34,7 +34,8 @@ const s = {
 window.eliteAgent = s;
 
 function layout() {
-    const phone = innerWidth < 900 || innerHeight > innerWidth;
+    // (a handset by its screen too: on its side it can be wider than 900, and its page may report wider still)
+    const phone = innerWidth < 900 || innerHeight > innerWidth || Math.min(screen.width, screen.height) < 600;
     document.body.classList.toggle("phone", phone);
     if (!phone) {
         const k = Math.min(innerWidth / 1920, innerHeight / 1080);
@@ -46,10 +47,11 @@ function layout() {
 addEventListener("resize", layout);
 layout();
 
-const SPEEDS = [1, 2, 4, 8, Infinity];
-const QS = Q.get("speed");
-const speed = { sel: QS === "1x" ? 1 : Infinity, auto: QS !== "1x" && QS !== "turbo" };
-const speedName = (n) => (n === Infinity ? "––×" : `${n}×`);      // (flat out: the speed it reaches, once measured)
+// the speed: one button, tapped round. 1×, 2× and 4× hold that speed; ACTION is flat out, but 1× in fights and the docking's final
+// (and for HOLD frames after); MAX is flat out, always
+const MODES = ["1×", "2×", "4×", "ACTION", "MAX"], FIXED = [1, 2, 4], ACTION = 3, MAX = 4;
+const QS = Q.get("speed");     // (?speed=1x, 2x, 4x, action or max; the old ?speed=turbo is max)
+const speed = { mode: QS === "max" || QS === "turbo" ? MAX : Math.max(0, ["1x", "2x", "4x"].indexOf(QS)) || (QS === "1x" ? 0 : ACTION) };
 const setText = (b, t) => { if (b && b.textContent !== t) b.textContent = t; };      // (only when it changes)
 // the buttons act when pressed, not on the click that follows it (a click alone, from a keyboard, still works)
 function press(b, act) {
@@ -58,16 +60,11 @@ function press(b, act) {
     b.addEventListener("pointerdown", (e) => { if (e.button === 0) { pressed = true; act(); } });
     b.addEventListener("click", () => { if (pressed) pressed = false; else act(); });
 }
-function speedButtons() {
-    for (const id of ["speedbtn", "p-speedbtn"]) setText($(id), `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`);
-    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); setText(b, speed.auto ? "1× ACTION ●" : "1× ACTION ○"); b.title = "Real time in fights and docking, full speed between"; } }
+let refreshSpeed = () => {};      // (set once the machine is running)
+for (const id of ["speedbtn", "p-speedbtn"]) {
+    press($(id), () => { speed.mode = (speed.mode + 1) % MODES.length; refreshSpeed(); });
+    setText($(id), MODES[speed.mode]);
 }
-let refreshSpeed = speedButtons;      // (once running: the lit button and the speed shown too)
-for (const id of ["speedbtn", "p-speedbtn"]) press($(id), () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; refreshSpeed(); });
-for (const id of ["auto", "p-auto"]) press($(id), () => { speed.auto = !speed.auto; refreshSpeed(); });
-// (room for three digits, so the button doesn't change width as the speed does)
-for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = id === "p-speedbtn" ? "5.3em" : "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
-speedButtons();
 
 // the loading card: Elite's own Cobra Mk III (its ship blueprint's vertices and edges), turning in lines, and a bar
 const COBRA_V = [[32,0,76],[-32,0,76],[0,26,24],[-120,-3,-8],[120,-3,-8],[-88,16,-40],[88,16,-40],[128,-8,-40],[-128,-8,-40],[0,26,-40],[-32,-24,-40],[32,-24,-40],[-36,8,-40],[-8,12,-40],[8,12,-40],[36,8,-40],[36,-12,-40],[8,-16,-40],[-8,-16,-40],[-36,-12,-40],[0,0,76],[0,0,90],[-80,-6,-40],[-80,6,-40],[-88,0,-40],[80,6,-40],[88,0,-40],[80,-6,-40]];
@@ -138,7 +135,7 @@ async function main() {
             if (k === "flicker") q.delete("game"); else q.set("game", k);
             q.delete("skew");
             const a = document.createElement("a");
-            a.textContent = box.closest("#phone") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            a.textContent = g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
         }
     }
@@ -156,7 +153,13 @@ async function main() {
     const gh = new Image(); gh.src = "gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
     panelRef = panel;
-    { const st = document.querySelector("#phone .strip"); if (st) st.style.display = "none"; }      // (the time is on the line under the rank bar)
+    // the phone's tabs
+    const tabs = [...document.querySelectorAll("#p-tabs button")];
+    for (const t of tabs) press(t, () => {
+        phoneTab = t.dataset.tab;
+        for (const b of tabs) { b.classList.toggle("on", b === t); b.setAttribute("aria-current", b === t ? "page" : "false"); }
+        for (const x of document.querySelectorAll("#p-panel > section")) x.classList.toggle("on", x.dataset.tab === phoneTab);
+    });
     const tip = $("tip");
     $("panel").addEventListener("mousemove", (e) => {
         const c = $("panel"), r = c.getBoundingClientRect();
@@ -221,7 +224,8 @@ async function main() {
     const DRAW_MS = 30;
     let paused = false, last = performance.now(), owe = 0, lastUi = 0, lastDraw = 0, checked = false, drawCost = 4;
     const frame = (draw) => { core.frame(draw); s.frameNo = core.frameNo; };
-    const rate = () => (speed.auto && core.frameNo - s.lastAction < HOLD ? 1 : speed.sel);
+    const inAction = () => speed.mode === ACTION && core.frameNo - s.lastAction < HOLD;
+    const rate = () => (inAction() ? 1 : FIXED[speed.mode] ?? Infinity);
     const run = (now) => {
         requestAnimationFrame(run);
         const dt = Math.min(100, now - last); last = now;
@@ -244,7 +248,9 @@ async function main() {
                 frame(draw && i >= n - 2);
                 if (r === 1) soundFrame(core);
                 note();
-                if (performance.now() - t0 > budget) { owe = 0; break; }
+                // (over budget: stop for this display frame. Real time has first call on the CPU, and what's owed is kept, up to
+                // a little backlog, so a slow frame is made up for, not lost; at higher speeds the backlog is dropped)
+                if (performance.now() - t0 > (r === 1 ? Math.max(budget, FRAME_MS) : budget)) { owe = Math.min(owe + n - i - 1, r === 1 ? 4 : 1); break; }
             }
         }
         if (r !== Infinity) d0 = performance.now();
@@ -267,15 +273,14 @@ async function main() {
         console.log(`journal sha256 at frame ${CHECK_FRAMES}: ${h} (${verdict})`);
     };
     const showSpeed = () => {
-        const hot = speed.auto && speed.sel !== 1 && core.frameNo - s.lastAction < HOLD, col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";
+        const hot = inAction(), col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";     // (lit: ACTION in force, in the colour of the AI flying)
         s.actionHot = hot ? s.actionKind : null;
-        speedButtons();
-        for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { const v = hot ? col : ""; if (b.style.background !== v) { b.style.background = v; b.style.borderColor = v; b.style.color = hot ? "#000" : ""; } } }
-        // (the speed button is the speed chosen: flat out, the last speed measured there, not the 1× of the action, which its own
-        // button shows. After the action, the measuring starts again, so the 1× doesn't drag the figure down)
-        if (hot) s.rates = [];
-        else if (s.turbo && s.rate && s.rates && s.rates.length > 1 && speed.sel === Infinity) s.maxRate = s.rate;
-        if (speed.sel === Infinity && s.maxRate) for (const id of ["speedbtn", "p-speedbtn"]) setText($(id), `▶▶ ${Math.round(s.maxRate)}×`);
+        for (const id of ["speedbtn", "p-speedbtn"]) {
+            const b = $(id); if (!b) continue;
+            setText(b, MODES[speed.mode]);
+            const v = hot ? col : "";
+            if (b.style.background !== v) { b.style.background = v; b.style.borderColor = v; b.style.color = hot ? "#000" : ""; }
+        }
     };
     refreshSpeed = showSpeed;
     const ui = () => {
@@ -288,7 +293,7 @@ async function main() {
         const [t0, f0] = s.rates[0];
         if (now - t0 > 500) s.rate = ((f - f0) / 50) / ((now - t0) / 1000);
         else if (s.turbo) s.rate = 0;      // (too soon after the action to say)
-        s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
+        s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : `▶ ${s.rate && s.rate < 0.95 ? s.rate.toFixed(1) : 1}×`;      // (never claims a 1× it isn't reaching)
         // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
         // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
         showSpeed();
@@ -307,9 +312,10 @@ async function main() {
         if (!sound.ctx) sound.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 31250 });
         sound.ctx.resume();
         sound.on = !sound.on;
-        for (const id of ["sound", "p-sound"]) { $(id).classList.toggle("on", sound.on); $(id).textContent = sound.on ? "Sound on" : "🔊 Sound"; }
+        $("sound").textContent = sound.on ? "Sound on" : "🔊 Sound";
+        for (const id of ["sound", "p-sound"]) $(id).classList.toggle("on", sound.on);
     };
-    $("sound").onclick = toggleSound; $("p-sound").onclick = toggleSound;
+    press($("sound"), toggleSound); press($("p-sound"), toggleSound);
     const pause = () => {
         paused = !paused;
         for (const id of ["pause", "p-pause"]) { $(id).textContent = paused ? (id === "pause" ? "▶ Resume" : "▶") : id === "pause" ? "❚❚ Pause" : "❚❚"; $(id).classList.toggle("on", paused); }
@@ -318,6 +324,8 @@ async function main() {
 }
 
 let panelRef = null;
+let phoneTab = "ai";
+const paused2 = () => s.paused;
 // the phone's galaxy chart, below the network: the stars, the route so far, the current star ringed and named
 let mapKey = "";
 function phoneMap() {
@@ -350,25 +358,30 @@ function phoneMap() {
 function phoneStrip() {
     if (!document.body.classList.contains("phone")) return;
     const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
-    $("p-time").textContent = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
-    $("p-rank").textContent = RANKS.filter(([k]) => s.tally >= k).pop()[1];
+        $("p-rank").textContent = RANKS.filter(([k]) => s.tally >= k).pop()[1];
     $("p-kills").textContent = Math.floor(s.tally).toLocaleString("en");
     $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
     $("p-system").textContent = s.system;
-    $("p-log").textContent = s.log.slice(-3).map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
-    for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
+    $("p-log").textContent = s.log.slice(-40).reverse().map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
+    for (const [id, y0, y1] of phoneTab === "ai" ? [["p-chart", 214, 300], ["p-net", 316, 972]] : [["p-chart", 214, 300]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
-    phoneMap();
+    if (phoneTab === "map") phoneMap();
     // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
     const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
     const LINE_TOP = 44, LINE_MID = 67;
     g.fillStyle = "rgb(9,11,15)"; g.fillRect(0, LINE_TOP, 908, $("p-chart").height - LINE_TOP);
     g.textBaseline = "middle"; g.textAlign = "left";
     g.font = `600 30px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "#fff"; g.fillText(time, 6, LINE_MID);
-    const x = 6 + g.measureText(time).width + 18;
+    g.font = `600 30px ui-monospace, Menlo, Consolas, monospace`;
+    // the speed, beside it: lit in the colour of the AI flying while 1× ACTION is in force
+    const spd = s.rate ? `${s.rate < 9.95 ? s.rate.toFixed(1) : Math.round(s.rate)}×` : "";      // (measured: what it's really doing)
+    const tx = 6 + g.measureText(time).width + 14;
+    g.font = `600 24px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = s.actionHot === "fight" ? "rgb(242,209,58)" : s.actionHot ? "rgb(56,214,232)" : "rgb(154,161,174)";
+    g.fillText(paused2() ? "❚❚" : spd, tx, LINE_MID);
+    const x = tx + Math.max(g.measureText("100×").width, g.measureText(spd).width) + 14;
     if (panelRef && panelRef.line) {
         g.font = `22px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = panelRef.line.col;
         const room = Math.floor((908 - x - 6) / g.measureText("0").width), t = panelRef.line.text;
