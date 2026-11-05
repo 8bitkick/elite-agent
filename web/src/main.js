@@ -173,9 +173,32 @@ async function main() {
         const nav = $("p-nav"); let timer = 0, y0 = 0, lastY = scrollY;
         const hide = () => nav.classList.remove("show");
         const show = (ms = 4500) => { nav.classList.add("show"); clearTimeout(timer); timer = setTimeout(hide, ms); };
-        addEventListener("touchstart", (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+        let touching = false, touched = false, startY = 0, settle = 0;
+        addEventListener("touchstart", (e) => { y0 = e.touches[0].clientY; touching = touched = true; startY = pageY(); clearTimeout(settle); }, { passive: true });
         addEventListener("touchmove", (e) => { const d = e.touches[0].clientY - y0; if (d > 14) show(); else if (d < -14) hide(); }, { passive: true });
-        addEventListener("scroll", () => { const y = scrollY; if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); lastY = y; }, { passive: true });
+        addEventListener("touchend", () => { touching = false; settleSoon(); }, { passive: true });
+        addEventListener("touchcancel", () => { touching = false; settleSoon(); }, { passive: true });
+        // scrolling itself moves the controls only without a touch (a mouse wheel, a keyboard): an iPhone's bounce and momentum aren't
+        // the finger's doing, so on a touch screen only the finger's swipe counts
+        addEventListener("scroll", () => {
+            const y = pageY();
+            if (!touched) { if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); }
+            lastY = y;
+            if (touched && !touching) settleSoon();
+        }, { passive: true });
+        // the two pages: when the finger has lifted and the page has stopped, between the pages it goes on to the one the swipe was heading
+        // for, if it went a quarter of the way, or back. A page taller than the screen scrolls freely; a pull at the top moves nothing
+        function pageY() { return Math.max(0, Math.min(scrollY, document.documentElement.scrollHeight - innerHeight)); }
+        function settleSoon() { clearTimeout(settle); settle = setTimeout(snap, 140); }
+        function snap() {
+            if (touching || innerWidth > innerHeight || !document.body.classList.contains("phone")) return;
+            const pin = $("p-chart").offsetHeight, p2 = $("p-page2").getBoundingClientRect().top + scrollY - pin;
+            const free = Math.max(0, $("p-page1").getBoundingClientRect().bottom + scrollY - innerHeight), y = pageY();
+            if (y <= free || y >= p2 - 1) return;
+            const gap = p2 - free, moved = y - startY, down = moved > 0 ? (y - free) / gap > 0.25 : (p2 - y) / gap < 0.25;
+            scrollTo({ top: down ? p2 : free, behavior: "smooth" });
+            startY = down ? p2 : free;
+        }
         nav.addEventListener("pointerdown", () => show(), { passive: true });
         $("p-chart").addEventListener("click", () => (nav.classList.contains("show") ? hide() : show()));
         showNav = show;

@@ -100,16 +100,15 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .row .games a { display: flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; }
 
 /* a phone: the page scrolls, the rank and the time pinned, the controls hidden above them */
-html:has(body.phone) { overflow: auto; height: auto; }
-body.phone { overflow: visible; height: auto; }      /* (the window scrolls, not the body: the pinning needs it, and so do the browser's bars) */
+html:has(body.phone) { overflow: auto; height: auto; overscroll-behavior-y: none; }      /* (a pull at the top is ours, not the browser's refresh) */
+body.phone { overflow: visible; height: auto; overscroll-behavior-y: none; }      /* (the window scrolls, not the body: the pinning needs it, and so do the browser's bars) */
 #phone #p-chart { position: sticky; top: 0; z-index: 3; background: var(--bg); cursor: pointer; }
 #p-screen { position: relative; z-index: 1; }
 /* two pages that snap: the game and the AI, then the stats and options */
 @media (orientation: portrait) {
-  html:has(body.phone) { scroll-snap-type: y mandatory; scroll-padding-top: 9.5vw; }
-  #p-page1 { scroll-snap-align: start; min-height: calc(100dvh - 9.5vw); }
+  #p-page1 { min-height: calc(100dvh - 9.5vw); }
 }
-#p-page2 { scroll-snap-align: start; min-height: calc(100dvh - 9.5vw); box-sizing: border-box; padding: 14px 12px 20px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); }
+#p-page2 { min-height: calc(100dvh - 9.5vw); box-sizing: border-box; padding: 14px 12px 20px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); }
 .p-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
 .p-stats div { min-width: 0; }
 .p-stats span { display: block; font-size: 11px; color: #9aa1ae; text-transform: uppercase; letter-spacing: .04em; }
