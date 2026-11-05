@@ -134,5 +134,14 @@ void elite_zp_frame(const uint8_t *ram)
     int bank = ram[0xF4];
     g_zp_held = bank == 5 || bank == 6 || bank == 0x85 || (bank == 7 && q == 0);
     if (!g_zp_held) memcpy(g_zp_keep, ram + 0x06, 34), memcpy(g_zp_keep + 34, ram + 0xD2, 16);
+    // (F_FRAME, the frame layer's once-an-iteration render, saves Elite's zero page on the stack as it starts,
+    // &06-&27 then &D2-&E1, one PHA each, from S = &F5 on this build: seen by its return addresses above, at &1F6-&1F9.
+    // There the copy is Elite's, whatever the frame has done to the zero page since. Without it, a quiet space view
+    // (the regeneration between witchspace fights: the game waits out each frame in F_FRAME) froze our energy and
+    // shields for minutes, and the chain of mis-jumps broke after one wave every time)
+    else if (bank == 6 && ram[0x1F6] == 32 && ram[0x1F7] == 37 && ram[0x1F8] == 105 && ram[0x1F9] == 38) {
+        for (int z = 0; z < 34; z++) g_zp_keep[z] = ram[0x1F5 - z];
+        for (int k = 0; k < 16; k++) g_zp_keep[34 + k] = ram[0x1F5 - 34 - k];
+    }
 }
 void elite_assume_master(void) { g_ev = MASTER; }
