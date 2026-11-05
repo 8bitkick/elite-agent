@@ -44,34 +44,32 @@
   <div id="netnote">Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB and docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.</div>
 </div>
 
-<!-- a phone: the rank and the time, the screen, the section chosen, the controls and the tabs -->
+<!-- a phone: one page that scrolls (so the browser's own bars can slide away); the rank and the time stay pinned; the controls are in
+     a nav above them, hidden until a swipe down or a tap on the rank and time -->
 <div id="phone">
-  <canvas id="p-chart" role="img" aria-label="Rank progress, the game's time and the latest log line"></canvas>
+  <nav id="p-nav" aria-label="Controls">
+    <button class="btn" id="p-pause" aria-label="Pause">❚❚</button>
+    <button class="btn" id="p-speedbtn" title="Speed: 1×, 2×, 4×, ACTION (flat out, 1× in fights and docking) or MAX (flat out). Tap to change">ACTION</button>
+    <button class="btn" id="p-sound">Sound</button>
+    <div class="games seg" role="group" aria-label="Game"></div>
+  </nav>
+  <canvas id="p-chart" role="button" tabindex="0" aria-label="Rank progress, the game's time and the latest log line. Tap for the controls"></canvas>
   <canvas id="p-screen" aria-label="Acornsoft Elite, flown by the agent"></canvas>
-  <div id="p-panel">
-    <section data-tab="ai" class="on"><canvas id="p-net" aria-label="The network flying now, its units lit as it decides"></canvas></section>
-    <section data-tab="map"><canvas id="p-map" aria-label="The galaxy chart: the stars visited and the current star"></canvas></section>
-    <section data-tab="log">
-      <div class="strip">
-        <div><span>Rank</span><b id="p-rank">Harmless</b></div>
-        <div><span>Kills</span><b id="p-kills">0</b></div>
-        <div><span>Credits</span><b id="p-cash">100 Cr</b></div>
-        <div><span>System</span><b id="p-system">Lave</b></div>
-      </div>
-      <pre id="p-log"></pre>
-    </section>
-    <section data-tab="options">
-      <div id="p-ctl"><button class="btn" id="p-pause" aria-label="Pause">❚❚</button><button class="btn" id="p-speedbtn" title="Speed: 1×, 2×, 4×, ACTION (flat out, 1× in fights and docking) or MAX (flat out). Tap to change">ACTION</button><button class="btn" id="p-sound">Sound</button></div>
-      <div class="games seg" role="group" aria-label="Game"></div>
-      <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-load">⤒ Load</button><button class="btn" id="p-save">⤓ Save</button></div>
-      <footer>
-        <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
-        <p class="small" id="p-credit"></p>
-        <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
-      </footer>
-    </section>
+  <canvas id="p-net" aria-label="The network flying now, its units lit as it decides"></canvas>
+  <canvas id="p-map" aria-label="The galaxy chart: the stars visited and the current star"></canvas>
+  <div class="strip">
+    <div><span>Rank</span><b id="p-rank">Harmless</b></div>
+    <div><span>Kills</span><b id="p-kills">0</b></div>
+    <div><span>Credits</span><b id="p-cash">100 Cr</b></div>
+    <div><span>System</span><b id="p-system">Lave</b></div>
   </div>
-  <nav id="p-tabs" aria-label="Sections"><button data-tab="ai" class="on">AI</button><button data-tab="map">Galaxy</button><button data-tab="log">Log</button><button data-tab="options">Options</button></nav>
+  <pre id="p-log"></pre>
+  <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-load">⤒ Load</button><button class="btn" id="p-save">⤓ Save</button></div>
+  <footer>
+    <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
+    <p class="small" id="p-credit"></p>
+    <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
+  </footer>
 </div>
 <div id="tip" role="tooltip"></div>
 <input type="file" id="loadfile" accept=".ssd,.dsd" hidden>

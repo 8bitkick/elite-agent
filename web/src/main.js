@@ -135,7 +135,7 @@ async function main() {
             if (k === "flicker") q.delete("game"); else q.set("game", k);
             q.delete("skew");
             const a = document.createElement("a");
-            a.textContent = g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            a.textContent = box.closest("#phone") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
         }
     }
@@ -153,13 +153,19 @@ async function main() {
     const gh = new Image(); gh.src = "gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
     panelRef = panel;
-    // the phone's tabs
-    const tabs = [...document.querySelectorAll("#p-tabs button")];
-    for (const t of tabs) press(t, () => {
-        phoneTab = t.dataset.tab;
-        for (const b of tabs) { b.classList.toggle("on", b === t); b.setAttribute("aria-current", b === t ? "page" : "false"); }
-        for (const x of document.querySelectorAll("#p-panel > section")) x.classList.toggle("on", x.dataset.tab === phoneTab);
-    });
+    // the phone's controls: hidden above the rank and the time. A swipe down or a tap on them brings them in, a swipe up or a few
+    // seconds without a touch takes them away; they show for a moment on arrival, so people learn they're there
+    {
+        const nav = $("p-nav"); let timer = 0, y0 = 0, lastY = scrollY;
+        const hide = () => nav.classList.remove("show");
+        const show = (ms = 3500) => { nav.classList.add("show"); clearTimeout(timer); timer = setTimeout(hide, ms); };
+        addEventListener("touchstart", (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+        addEventListener("touchmove", (e) => { const d = e.touches[0].clientY - y0; if (d > 14) show(); else if (d < -14) hide(); }, { passive: true });
+        addEventListener("scroll", () => { const y = scrollY; if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); lastY = y; }, { passive: true });
+        nav.addEventListener("pointerdown", () => show(), { passive: true });
+        $("p-chart").addEventListener("click", () => (nav.classList.contains("show") ? hide() : show()));
+        show(4000);
+    }
     const tip = $("tip");
     $("panel").addEventListener("mousemove", (e) => {
         const c = $("panel"), r = c.getBoundingClientRect();
@@ -324,7 +330,6 @@ async function main() {
 }
 
 let panelRef = null;
-let phoneTab = "ai";
 const paused2 = () => s.paused;
 // the phone's galaxy chart, below the network: the stars, the route so far, the current star ringed and named
 let mapKey = "";
@@ -363,12 +368,13 @@ function phoneStrip() {
     $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
     $("p-system").textContent = s.system;
     $("p-log").textContent = s.log.slice(-40).reverse().map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
-    for (const [id, y0, y1] of phoneTab === "ai" ? [["p-chart", 214, 300], ["p-net", 316, 972]] : [["p-chart", 214, 300]]) {
+    for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
-    if (phoneTab === "map") phoneMap();
+    $("p-map").style.display = s.view === "docked" ? "none" : "";      // (docked, the panel's own chart is in the network's place)
+    phoneMap();
     // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
     const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
     const LINE_TOP = 44, LINE_MID = 67;
