@@ -21,7 +21,7 @@ const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
 const SKEW = Q.has("skew") ? +Q.get("skew") : GAMES[GAME].skew;
 const CROP = { x: 128, y: 80, w: 512, h: 496 };      // the Elite screen in the core's 768x640 canvas
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
-const CHECK_FRAMES = 30000;                          // 10 game minutes
+const CHECK_FRAMES = +(Q.get("check") || 30000);     // the journal hashed up to here: 10 game minutes (?check=frames for further)
 
 const s = {
     frame: 0, tally: 0, cash: 100, system: "Lave", tallyPts: [[0, 0]], log: [], visits: [[0, 20, 173]], view: "docked",
@@ -206,9 +206,9 @@ async function main() {
     const check = async () => {
         const h = await sha256(s.journal.join(""));
         s.journalHash = h; s.journal = null;
-        const ref = REFERENCE[`${GAME}_${SKEW}`];
+        const ref = CHECK_FRAMES === 30000 ? REFERENCE[`${GAME}_${SKEW}`] : null;
         const verdict = !ref ? "no reference for this game and skew" : h === ref ? "matches the reference: this machine flies the same career" : "DOESN'T MATCH the reference: please report it";
-        console.log(`journal sha256 at 10 game minutes: ${h} (${verdict})`);
+        console.log(`journal sha256 at frame ${CHECK_FRAMES}: ${h} (${verdict})`);
     };
     const ui = () => {
         const f = core.frameNo;
