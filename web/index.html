@@ -50,6 +50,7 @@
 <div id="phone">
   <header>
     <div class="row"><a class="brand" href="https://github.com/8bitkick/elite-agent#readme" title="How it works: the README on GitHub"><img src="gh.png" alt="" width="18" height="18"><span><span class="owner">8bitkick/</span>elite-agent</span></a>
+      <div class="games seg" role="group" aria-label="Game"></div>
       <div class="ctl"><button class="btn" id="p-pause">❚❚</button><button class="btn" id="p-speedbtn" title="Speed: 1×, 2×, 4×, 8× or as fast as this computer can go">▶▶ MAX</button><button class="btn on" id="p-auto" title="Auto: fights and the final docking at 1×">AUTO ●</button></div></div>
     <div class="strip">
       <div><span>Time</span><b id="p-time" class="mono">00:00:00</b></div>
@@ -59,11 +60,11 @@
       <div><span>System</span><b id="p-system">Lave</b></div>
     </div>
   </header>
+  <canvas id="p-chart"></canvas>
   <canvas id="p-screen"></canvas>
   <canvas id="p-net"></canvas>
-  <div class="tools"><div class="games seg" role="group" aria-label="Game"></div></div>
+  <canvas id="p-map" aria-label="The galaxy chart: the stars visited and the current star"></canvas>
   <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-sound">Sound</button><button class="btn" id="p-load">⤒ Load</button><button class="btn" id="p-save">⤓ Save</button></div>
-  <canvas id="p-chart"></canvas>
   <pre id="p-log"></pre>
   <footer>
     <b>Acornsoft Elite, BBC Master</b>

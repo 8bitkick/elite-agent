@@ -42,6 +42,9 @@ body.phone #phone { display: block; }
 #phone .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 #phone .brand { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; }
 #phone .seg { width: 250px; }
+#phone .row .games { width: auto; flex: 0 0 auto; max-width: none; font-size: 12px; }
+#phone .row .games a { padding: 6px 5px; text-align: center; white-space: nowrap; }
+#phone .row .brand > span { display: none; }
 #phone .strip { display: flex; justify-content: space-between; gap: 8px; }
 #phone .strip div { display: flex; flex-direction: column; min-width: 0; }
 #phone .strip span { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -50,7 +53,7 @@ body.phone #phone { display: block; }
 #p-screen { display: block; width: 100%; aspect-ratio: 512 / 496; image-rendering: pixelated; background: #000; }
 #phone .tools .btn { white-space: nowrap; }
 #phone .tools { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
-#p-chart, #p-net { display: block; width: 100%; }
+#p-chart, #p-net, #p-map { display: block; width: 100%; }
 #p-note { color: var(--cyan); font-size: 13px; line-height: 18px; padding: 4px 12px 0; height: 44px; overflow: hidden; }   /* (two lines, always: no jumps) */
 #p-log { color: var(--green); font: 12px 'JetBrains Mono', ui-monospace, monospace; padding: 4px 12px; margin: 0; white-space: pre-wrap; }
 #phone footer { padding: 12px; color: var(--dim); font-size: 13px; }
@@ -92,3 +95,7 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .ctl { display: flex; gap: 6px; }
 #phone .ctl .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
 #phone .ctl #p-speedbtn { min-width: 66px; }
+#phone .row { gap: 5px; } #phone .row .ctl { gap: 4px; flex: 0 1 auto; min-width: 0; } #phone .row .ctl .btn { padding-left: 5px; padding-right: 5px; }
+#phone .row .btn, #phone .row .games { height: 30px; box-sizing: border-box; }
+#phone .row .btn { display: inline-flex; align-items: center; justify-content: center; }
+#phone .row .games a { display: flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; }

@@ -166,6 +166,7 @@ export class Panel {
             const mm = Math.floor(at / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
             this.text(cut(text, 96), PX + 50, 282, `14px ${MONO}`, tcol);
+            this.line = { text, col: tcol };      // (the phone's top line draws it again, larger)
         }
         g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(PX, 304.5); g.lineTo(PX + PW, 304.5); g.stroke();
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
