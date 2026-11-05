@@ -351,10 +351,72 @@ static double trade_margin(void)
     return g_trade_margin;
 }
 
+// TRADE_RULE (experiment; 0, the live rule: by gain/price ratio). 1: the fill with the most expected profit within
+// both the hold and the cash. Each fill is greedy in the order of gain - lambda * price, for lambdas from 0 (the most
+// gain per unit, best when the hold binds) up to large (the ratio, best when the cash binds); the best of them is
+// near the optimum of the two-limit knapsack (its LP optimum is one of these orders, bar the last items)
+int g_trade_rule = 0;
+int trade_rule(void)
+{
+#if !APP_LOADED
+    static int read;
+    if (!read) { read = 1; const char *e = getenv("TRADE_RULE"); if (e) g_trade_rule = atoi(e); }
+#endif
+    return g_trade_rule;
+}
+typedef struct { double ratio, gain; int buy, item; } cand_t;
+static double fill_in_order(const cand_t *c, const int *ord, int nc, const uint8_t avl[17], int cash, int room_t,
+                            uint8_t buys[17], int *spend)
+{
+    int sp = 0;
+    double pr = 0.0;
+    for (int item = 0; item < 17; item++) buys[item] = 0;
+    for (int k = 0; k < nc; k++) {
+        const cand_t *e = &c[ord[k]];
+        int n = floordiv(cash - sp, e->buy);
+        if (avl[e->item] < n) n = avl[e->item];
+        if (e->item <= 12) { if (room_t < n) n = room_t; }
+        else if (n > 199) n = 199;
+        if (n <= 0) continue;
+        buys[e->item] = (uint8_t)n;
+        sp += n * e->buy;
+        pr += n * e->gain;
+        if (e->item <= 12) room_t -= n;
+    }
+    *spend = sp;
+    return pr;
+}
+static void best_fill(const cand_t *c, int nc, const uint8_t avl[17], int cash, int room_t,
+                      uint8_t buys[17], int *spend, double *profit)
+{
+    static const double LAMBDA[] = {0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 5, 10, 1e9};
+    uint8_t b[17];
+    int sp, ord[17];
+    double best = -1;
+    for (unsigned li = 0; li < sizeof LAMBDA / sizeof LAMBDA[0]; li++) {
+        double lam = LAMBDA[li];
+        for (int i = 0; i < nc; i++) ord[i] = i;
+        for (int i = 1; i < nc; i++) {        // descending by gain - lam * buy (ties: the order given, the ratio's)
+            int t = ord[i], j = i;
+            double v = lam > 1e8 ? c[t].ratio : c[t].gain - lam * c[t].buy;
+            while (j > 0) {
+                double u = lam > 1e8 ? c[ord[j - 1]].ratio : c[ord[j - 1]].gain - lam * c[ord[j - 1]].buy;
+                if (!(v > u)) break;
+                ord[j] = ord[j - 1];
+                j--;
+            }
+            ord[j] = t;
+        }
+        double pr = fill_in_order(c, ord, nc, avl, cash, room_t, b, &sp);
+        if (pr > best + 1e-9) { best = pr; memcpy(buys, b, 17); *spend = sp; *profit = pr; }
+    }
+    if (best < 0) { memset(buys, 0, 17); *spend = 0; *profit = 0; }
+}
+
 void best_cargo(int here_economy, int qq26, const uint8_t avl[17], int dest_economy, int cash, int room_t,
                 int illegal_ok, uint8_t buys[17], int *spend, double *profit)
 {
-    struct { double ratio, gain; int buy, item; } c[17], t;
+    cand_t c[17], t;
     int nc = 0;
     for (int item = 0; item < 17; item++) {
         buys[item] = 0;
@@ -388,6 +450,10 @@ void best_cargo(int here_economy, int qq26, const uint8_t avl[17], int dest_econ
     int sp = 0;
     double pr = 0.0;
     int budget = cash;   // reserve = 0
+    if (trade_rule() & 1) {      // (experiment) the most expected profit within the hold and the cash
+        best_fill(c, nc, avl, cash, room_t, buys, spend, profit);
+        return;
+    }
     for (int i = 0; i < nc; i++) {
         int item = c[i].item, buy = c[i].buy;
         int n = floordiv(budget - sp, buy);

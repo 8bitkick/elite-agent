@@ -685,7 +685,18 @@ trading:
         static const sys_t *nb[64]; static int d[64];
         int n = h ? in_range(galaxy(), h->x, h->y, 70, nb, d, 64) : 0;
         extern double g_trade_margin;
-        for (int i = 0; i < 17; i++) {
+        extern int trade_rule(void);
+        // (experiment, TRADE_RULE & 2: cargo counts as cash. When the hold sold here completes the purchase being
+        // saved for, nothing is kept: it all goes, and shop() buys the item)
+        int sell_out = 0;
+        memset(g_keep, 0, 17);
+        if (trade_rule() & 2) {
+            int a = 0, sv = next_purchase(&a);
+            long worth = cash();
+            for (int i = 0; i < 17; i++) if (cargo(i)) worth += (long) cargo(i) * item_price_tenths(i, R(A_QQ28), R(A_QQ26));
+            sell_out = sv < S_N && !a && worth >= SHOP[sv].price + SHOP[sv].keep;
+        }
+        for (int i = 0; i < 17 && !sell_out; i++) {
             g_keep[i] = 0;
             if (!cargo(i) || i == 3 || i == 6 || i == 10) continue;
             int here = item_price_tenths(i, R(A_QQ28), R(A_QQ26));
