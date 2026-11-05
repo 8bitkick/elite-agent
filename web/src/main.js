@@ -26,7 +26,7 @@ const GAMES = {
 const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
 const DISC = Q.get("disc") || GAMES[GAME].disc;
 const START_M = +(Q.get("start") || GAMES[GAME].start);
-const CACHE = `elite-agent-start2:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
+const CACHE = `elite-agent-start3:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
 // chapters: a later save of the film's career (Fair mode, seed 13), loaded at the first docking; the clock and the chart
@@ -186,7 +186,11 @@ async function main() {
     // headless (web/run_node.mjs START=, from this snapshot)
     const START_CYCLES = START_M * 1e6;
     const cycles = () => cpu.cycleSeconds * 2e6 + cpu.currentCycles;
-    let bootF = 0, ready = !!title, pending = false;
+    let bootF = 0, ready = !!title, pending = false, atBoundary = null;
+    {   // (whichever loop runs the machine, jsbeeb's or the page's: after each execute(), at an instruction boundary)
+        const exec = cpu.execute.bind(cpu);
+        cpu.execute = (n) => { const r = exec(n); if (atBoundary) { const f = atBoundary; atBoundary = null; f(); return true; } return r; };
+    }
     function booting() {
         bootF++;
         if (pending) return;
@@ -194,10 +198,19 @@ async function main() {
             const c = cycles();
             if (bootF % 10 === 0) loading(0.3 + 0.7 * Math.min(1, c / START_CYCLES), c < 17e6 ? "Booting the BBC Master and loading Elite…" : "Elite is up: the Cobra turning, the agent at the controls…");
             if (c < START_CYCLES) return;
-            const json = snapshotToJSON(createSnapshot(cpu, cpu.model, {}));
-            try { localStorage.setItem(CACHE, json); } catch (e) { console.warn("no title snapshot kept", e); }
+            // (not here: this is the video's paint, in the middle of an instruction. Stopped, the CPU ends this one and
+            // execute() returns between instructions, where the snapshot is taken: the state at an instruction boundary,
+            // the same for every browser and for run_node, however the emulation was sliced)
             pending = true;
-            setTimeout(() => { cpu.restoreState(snapshotFromJSON(json).state); pending = false; ready = true; }, 0);
+            cpu.stop();
+            atBoundary = () => {
+                const snap = createSnapshot(cpu, cpu.model, {});
+                Object.assign(snap.state, { halted: false, targetCycles: snap.state.currentCycles });
+                const json = snapshotToJSON(snap);
+                try { localStorage.setItem(CACHE, json); } catch (e) { console.warn("no title snapshot kept", e); }
+                cpu.restoreState(snapshotFromJSON(json).state);
+                pending = false; ready = true;
+            };
             return;
         }
         if (!agent.start(1)) return;          // (Elite up: always, at START_CYCLES)
