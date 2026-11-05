@@ -154,7 +154,7 @@ async function main() {
     const panel = new Panel($("panel"), panelData, galaxies, gh);
     panelRef = panel;
     // the phone's controls: hidden above the rank and the time. A swipe down or a tap on them brings them in, a swipe up or a few
-    // seconds without a touch takes them away; they show for a moment on arrival, so people learn they're there
+    // seconds without a touch takes them away; they slide in for a moment after loading
     {
         const nav = $("p-nav"); let timer = 0, y0 = 0, lastY = scrollY;
         const hide = () => nav.classList.remove("show");
@@ -164,7 +164,7 @@ async function main() {
         addEventListener("scroll", () => { const y = scrollY; if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); lastY = y; }, { passive: true });
         nav.addEventListener("pointerdown", () => show(), { passive: true });
         $("p-chart").addEventListener("click", () => (nav.classList.contains("show") ? hide() : show()));
-        show(4000);
+        showNav = show;
     }
     const tip = $("tip");
     $("panel").addEventListener("mousemove", (e) => {
@@ -207,6 +207,7 @@ async function main() {
     s.started = true;
     await new Promise((r) => setTimeout(r, Math.max(0, MIN_CARD_MS - (performance.now() - shown))));
     loading(1);
+    setTimeout(() => showNav(3500), 350);      // (once the card has gone, the controls slide in, so people learn they're there)
 
     // ---- the screen
     const screen = $("screen"), sctx = screen.getContext("2d");
@@ -330,6 +331,7 @@ async function main() {
 }
 
 let panelRef = null;
+let showNav = () => {};
 const paused2 = () => s.paused;
 // the phone's galaxy chart, below the network: the stars, the route so far, the current star ringed and named
 let mapKey = "";
