@@ -14,11 +14,19 @@ const COMMANDER = "BITKICK";
 // pinned commit: GitHub serves it to any page, his site to his own); this site serves none of it.
 // The title screen's snapshot is made in the visitor's browser on the first visit and kept there.
 const Q = new URLSearchParams(location.search);
-const DISC = Q.get("disc") || "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd";
-// the start: the machine's state START_M million cycles after it's switched on (?start= to try another; the shipped one
-// is the fastest of those tried headless to Elite)
-const START_M = +(Q.get("start") || 31);   // (31: flown headless to Elite in 18.9 game hours, the career every visitor watches)
-const CACHE = `elite-agent-start2:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
+// the games (?game=): Mark Moxon's flicker-free Master Elite, the default, and Eben Upton's Solid Elite (filled, sunlit
+// ships; the build the player knows, pinned), each from its author's GitHub. start: the machine's state that many
+// million cycles after it's switched on, every visitor's (?start= to try another; the shipped one reaches Elite headless)
+const GAMES = {
+    flicker: { name: "Flicker-free Elite", start: 31,     // (flown headless to Elite in 18.9 game hours)
+        disc: "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd" },
+    solid: { name: "Solid Elite", start: 45,
+        disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-bbc-master/262bfa61b69c3fb75ce2c004d4944bdc47c1abbd/5-compiled-game-discs/elite-master-sng47.ssd" },
+};
+const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
+const DISC = Q.get("disc") || GAMES[GAME].disc;
+const START_M = +(Q.get("start") || GAMES[GAME].start);
+const CACHE = `elite-agent-start3:${START_M}:${typeof JSBEEB_COMMIT === "string" ? JSBEEB_COMMIT : "dev"}:${DISC}`;
 const CROP = { x: 264, y: 80, w: 512, h: 496 };      // the Elite screen in jsbeeb's 1024x625 frame
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
 // chapters: a later save of the film's career (Fair mode, seed 13), loaded at the first docking; the clock and the chart
@@ -178,7 +186,11 @@ async function main() {
     // headless (web/run_node.mjs START=, from this snapshot)
     const START_CYCLES = START_M * 1e6;
     const cycles = () => cpu.cycleSeconds * 2e6 + cpu.currentCycles;
-    let bootF = 0, ready = !!title, pending = false;
+    let bootF = 0, ready = !!title, pending = false, atBoundary = null;
+    {   // (whichever loop runs the machine, jsbeeb's or the page's: after each execute(), at an instruction boundary)
+        const exec = cpu.execute.bind(cpu);
+        cpu.execute = (n) => { const r = exec(n); if (atBoundary) { const f = atBoundary; atBoundary = null; f(); return true; } return r; };
+    }
     function booting() {
         bootF++;
         if (pending) return;
@@ -186,10 +198,19 @@ async function main() {
             const c = cycles();
             if (bootF % 10 === 0) loading(0.3 + 0.7 * Math.min(1, c / START_CYCLES), c < 17e6 ? "Booting the BBC Master and loading Elite…" : "Elite is up: the Cobra turning, the agent at the controls…");
             if (c < START_CYCLES) return;
-            const json = snapshotToJSON(createSnapshot(cpu, cpu.model, {}));
-            try { localStorage.setItem(CACHE, json); } catch (e) { console.warn("no title snapshot kept", e); }
+            // (not here: this is the video's paint, in the middle of an instruction. Stopped, the CPU ends this one and
+            // execute() returns between instructions, where the snapshot is taken: the state at an instruction boundary,
+            // the same for every browser and for run_node, however the emulation was sliced)
             pending = true;
-            setTimeout(() => { cpu.restoreState(snapshotFromJSON(json).state); pending = false; ready = true; }, 0);
+            cpu.stop();
+            atBoundary = () => {
+                const snap = createSnapshot(cpu, cpu.model, {});
+                Object.assign(snap.state, { halted: false, targetCycles: snap.state.currentCycles });
+                const json = snapshotToJSON(snap);
+                try { localStorage.setItem(CACHE, json); } catch (e) { console.warn("no title snapshot kept", e); }
+                cpu.restoreState(snapshotFromJSON(json).state);
+                pending = false; ready = true;
+            };
             return;
         }
         if (!agent.start(1)) return;          // (Elite up: always, at START_CYCLES)
@@ -276,6 +297,19 @@ async function main() {
     const sound = () => { altT(w); altT(w); for (const id of ["sound", "p-sound"]) { $(id).classList.add("on"); $(id).textContent = "Sound on"; } };
     $("sound").onclick = sound; $("p-sound").onclick = sound;
     $("p-save").onclick = () => $("save").onclick();
+    // the game: buttons that reload the page with ?game= (everything else kept)
+    for (const box of document.querySelectorAll(".games")) {
+        box.innerHTML = "";
+        for (const [k, g] of Object.entries(GAMES)) {
+            const q = new URLSearchParams(location.search);
+            if (k === "flicker") q.delete("game"); else q.set("game", k);
+            q.delete("start");
+            const a = document.createElement("a");
+            a.textContent = g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            box.appendChild(a);
+        }
+    }
+    for (const id of ["credit", "p-credit"]) { const c = $(id); if (c && GAME === "solid") c.innerHTML = c.innerHTML.replace(/flicker-free (Master Elite|disc) from <a[^>]*>([^<]*)<\/a>/, 'Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon\'s source'); }
     // pause: jsbeeb's loop and the page's turbo both stopped, and started again as the speed has them
     const pause = () => {
         paused = !paused;

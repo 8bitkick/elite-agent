@@ -72,6 +72,12 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
 #phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
+.games { display: inline-flex; }
+.games a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
+.games a:last-child { border-right: 0; }
+.games a.on { background: rgb(10, 40, 46); color: var(--cyan); }
+#phone .tools .games { flex: 1; }
+#phone .tools .games a { flex: 1; text-align: center; }
 #tip { position: fixed; z-index: 6; max-width: 290px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   padding: 7px 10px; font-size: 13px; color: var(--fg); pointer-events: none; opacity: 0; transition: opacity .1s; }
 #tip.show { opacity: 1; }

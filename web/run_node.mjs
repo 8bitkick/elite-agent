@@ -14,7 +14,7 @@ const minutes = +(process.argv[2] || 10), jpath = process.argv[3], lpath = proce
 const EVERY = +(process.env.CKPT_EVERY || 30000);
 const CKPT = process.env.CKPT, resume = CKPT && existsSync(CKPT) ? JSON.parse(readFileSync(CKPT, "utf8")) : null;
 const journal = jpath ? createWriteStream(jpath, { flags: resume ? "a" : "w" }) : null, logf = lpath ? createWriteStream(lpath, { flags: resume ? "a" : "w" }) : null;
-const s = new MachineSession("Master", { discImage: here + "../rp2350-bbc-micro/discs/elite-master-flicker-free-sng47.ssd" });
+const s = new MachineSession("Master", { discImage: process.env.DISC || here + "../rp2350-bbc-micro/discs/elite-master-flicker-free-sng47.ssd" });
 await s.initialise();
 const cpu = s._machine.processor, kb = s._keyboard;
 let fr = 0, elite = 0;
