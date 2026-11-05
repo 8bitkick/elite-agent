@@ -184,19 +184,34 @@ async function main() {
             const y = pageY();
             if (!touched) { if (y < lastY - 6) show(); else if (y > lastY + 6) hide(); }
             lastY = y;
-            if (touched && !touching) settleSoon();
+            if (touched && !touching && !isGliding()) settleSoon();
         }, { passive: true });
         // the two pages: when the finger has lifted and the page has stopped, between the pages it goes on to the one the swipe was heading
         // for, if it went a quarter of the way, or back. A page taller than the screen scrolls freely; a pull at the top moves nothing
+        // (our own, at our own speed: the browser's smooth scrolling takes as long as it likes. A touch stops it)
+        let gliding = 0;
+        let glideEnd = 0;
+        const isGliding = () => performance.now() < glideEnd;
+        function glide(from, to) {
+            glideEnd = performance.now() + 240;
+            const id = ++gliding, t0 = performance.now(), MS = 200;
+            const step = (now) => {
+                if (id !== gliding || touching) return;
+                const k = Math.min(1, (now - t0) / MS), e = 1 - (1 - k) * (1 - k) * (1 - k);
+                scrollTo(0, from + (to - from) * e);
+                if (k < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+        }
         function pageY() { return Math.max(0, Math.min(scrollY, document.documentElement.scrollHeight - innerHeight)); }
-        function settleSoon() { clearTimeout(settle); settle = setTimeout(snap, 140); }
+        function settleSoon() { clearTimeout(settle); settle = setTimeout(snap, 70); }
         function snap() {
             if (touching || innerWidth > innerHeight || !document.body.classList.contains("phone")) return;
             const p2 = $("p-page2").getBoundingClientRect().top + scrollY;
             const free = Math.max(0, $("p-page1").getBoundingClientRect().bottom + scrollY - innerHeight), y = pageY();
             if (y <= free || y >= p2 - 1) return;
             const gap = p2 - free, moved = y - startY, down = moved > 0 ? (y - free) / gap > 0.25 : (p2 - y) / gap < 0.25;
-            scrollTo({ top: down ? p2 : free, behavior: "smooth" });
+            glide(y, down ? p2 : free);
             startY = down ? p2 : free;
         }
         nav.addEventListener("pointerdown", () => show(), { passive: true });
