@@ -193,7 +193,7 @@ async function main() {
             if (m && m[1] === "Hyperspace to") s.arrive = [f + 600, m[2]];
             else if (m) { s.system = m[2]; s.arrive = null; }
             else if (line.startsWith("Mis-jump: trapped in witchspace")) { s.system = "Witchspace"; s.arrive = null; }
-            if (m && m[1] === "Launched from") { s.lastDepart = f; s.lastLaunch = f; }
+            if (m && m[1] === "Launched from") s.lastDepart = f;
         },
         note: (json) => {
             const f = core.frameNo;
@@ -239,8 +239,8 @@ async function main() {
     let paused = false, last = performance.now(), owe = 0, lastUi = 0, lastDraw = 0, checked = false, drawCost = 4;
     const frame = (draw) => { core.frame(draw); s.frameNo = core.frameNo; };
     const inAction = () => speed.mode === ACTION && core.frameNo - s.lastAction < HOLD;
-    // (ACTION, docked: 4×, so the shopping and the charts can be seen; docked from the first dock to the launch)
-    const isDocked = () => s.lastDock >= (s.lastLaunch ?? -1);
+    // (ACTION, docked: 4×, so the shopping can be seen; docked as the AI window has it, from the dock until it sets off)
+    const isDocked = () => s.lastDock > s.lastDepart;
     const rate = () => (inAction() ? 1 : speed.mode === ACTION && isDocked() ? DOCKED_RATE : FIXED[speed.mode] ?? Infinity);
     const run = (now) => {
         requestAnimationFrame(run);
