@@ -10,9 +10,9 @@ const Q = new URLSearchParams(location.search);
 const ROM_BASE = "https://raw.githubusercontent.com/scarybeasts/beebjit/db16aaf09df1fa0fd7ea686bc8d09b13f5674a42/roms/mos3.20/";
 const ROMS = ["mos", "dfs", "viewsht", "edit", "basic4", "adfs", "view", "terminal"];
 const GAMES = {
-    flicker: { name: "Flicker-free Elite", skew: 13,
+    flicker: { name: "Wireframe", credit: "Flicker-free Elite by Mark Moxon, after Ian Bell and David Braben", skew: 13,
         disc: "https://raw.githubusercontent.com/markmoxon/elite-source-code-bbc-master/e6581b586b1c984142a0fee0c8009c7466a38d52/5-compiled-game-discs/elite-master-flicker-free-sng47.ssd" },
-    solid: { name: "Solid Elite", skew: 13,
+    solid: { name: "Solid", credit: "Solid Elite by Eben Upton, after Mark Moxon's source and Ian Bell and David Braben", skew: 13,
         disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-bbc-master/262bfa61b69c3fb75ce2c004d4944bdc47c1abbd/5-compiled-game-discs/elite-master-sng47.ssd" },
 };
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
@@ -57,13 +57,37 @@ for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () =>
 for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
 speedButtons();
 
+// the loading card: Elite's own Cobra Mk III (its ship blueprint's vertices and edges), turning in lines, and a bar
+const COBRA_V = [[32,0,76],[-32,0,76],[0,26,24],[-120,-3,-8],[120,-3,-8],[-88,16,-40],[88,16,-40],[128,-8,-40],[-128,-8,-40],[0,26,-40],[-32,-24,-40],[32,-24,-40],[-36,8,-40],[-8,12,-40],[8,12,-40],[36,8,-40],[36,-12,-40],[8,-16,-40],[-8,-16,-40],[-36,-12,-40],[0,0,76],[0,0,90],[-80,-6,-40],[-80,6,-40],[-88,0,-40],[80,6,-40],[88,0,-40],[80,-6,-40]];
+const COBRA_E = [[0,1],[0,4],[1,3],[3,8],[4,7],[6,7],[6,9],[5,9],[5,8],[2,5],[2,6],[3,5],[4,6],[1,2],[0,2],[8,10],[10,11],[7,11],[1,10],[0,11],[1,5],[0,6],[20,21],[12,13],[18,19],[14,15],[16,17],[15,16],[14,17],[13,18],[12,19],[2,9],[22,24],[23,24],[22,23],[25,26],[26,27],[25,27]];
+let spin = null;
 function loading(frac, text) {
     const card = $("loading");
-    if (frac >= 1) { card.classList.remove("show"); return; }
+    if (frac >= 1) { card.classList.remove("show"); spin = null; return; }
     card.classList.add("show");
     $("lbar").style.width = `${Math.round(frac * 100)}%`;
     if (text) $("ltext").textContent = text;
+    if (spin) return;
+    const c = $("cobra"), g = c.getContext("2d"), t0 = performance.now();
+    const draw = (now) => {
+        if (spin !== draw) return;
+        const t = (now - t0) / 1000, a = t * 0.7, b = 0.35 + 0.25 * Math.sin(t * 0.4);
+        const W = c.width, H = c.height, k = W / 330;
+        g.clearRect(0, 0, W, H);
+        const P = COBRA_V.map(([x, y, z]) => {
+            const x1 = x * Math.cos(a) + z * Math.sin(a), z1 = -x * Math.sin(a) + z * Math.cos(a);
+            const y2 = y * Math.cos(b) - z1 * Math.sin(b), z2 = y * Math.sin(b) + z1 * Math.cos(b);
+            const p = 420 / (420 + z2);
+            return [W / 2 + x1 * p * k, H / 2 - y2 * p * k];
+        });
+        g.strokeStyle = "rgb(56,214,232)"; g.lineWidth = 1.5 * k; g.beginPath();
+        for (const [i, j] of COBRA_E) { g.moveTo(...P[i]); g.lineTo(...P[j]); }
+        g.stroke();
+        requestAnimationFrame(draw);
+    };
+    spin = draw; requestAnimationFrame(draw);
 }
+
 function flash(t, ms = 4000) { const n = $("status"); n.textContent = t; n.classList.add("show"); if (ms) setTimeout(() => n.classList.remove("show"), ms); }
 
 // ---- sound: the chip's samples, a frame at a time, only at real speed
@@ -106,6 +130,11 @@ async function main() {
             box.appendChild(a);
         }
     }
+    const shown = performance.now(), MIN_CARD_MS = 1000;      // (the card, and who made the game, for at least a second)
+    const card = document.querySelector("#loading .card"), who = document.createElement("div");
+    who.textContent = GAMES[GAME].credit;
+    who.style.cssText = "color:var(--dim);font-size:14px;text-align:center;line-height:1.4";
+    card.appendChild(who);
     loading(0.05, "Loading the machine, its ROMs and Elite's disc…");
     const [panelData, galaxies, wasm, disc, ...roms] = await Promise.all([
         fetch(`../panel.json?v=${V}`).then((r) => r.json()), fetch(`../galaxies.json?v=${V}`).then((r) => r.json()),
@@ -155,6 +184,7 @@ async function main() {
     core.name = "BITKICK";
     if (!core.start(SKEW)) throw new Error("no Elite the player knows on this disc");
     s.started = true;
+    await new Promise((r) => setTimeout(r, Math.max(0, MIN_CARD_MS - (performance.now() - shown))));
     loading(1);
 
     // ---- the screen
