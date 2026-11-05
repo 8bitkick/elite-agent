@@ -61,7 +61,7 @@ const code = await (async () => {
     const page = await context.newPage();
     page.on("pageerror", (e) => console.error("page error:", e.message));
     if (disc) {
-        await context.route(/\.ssd(\?|$)/, (route) => route.fulfill({ status: 200, contentType: "application/octet-stream",
+        await context.route(/\.ssd(\?|$)/, (route) => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ status: 200, contentType: "application/octet-stream",
             headers: { "access-control-allow-origin": "*" }, body: disc }));
     }
     const cdp = await context.newCDPSession(page);

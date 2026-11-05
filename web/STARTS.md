@@ -101,9 +101,13 @@ Same start, different conditions, on one Raspberry Pi 5 (arm64):
 | browser vs Node, 10 game minutes | flicker 31, 33, 35 | identical log text |
 | browser vs Node, about 2 game minutes | Solid 45 | identical log text |
 | `agent.wasm` vs a local clang 19 build, Node, 10 game minutes | flicker 31 | byte-identical journals |
+| browser vs browser, to frame 12,000 | flicker 31 | identical log text and frames, identical snapshot |
+| local page vs the live site, to frame 6,000 | Solid 45 | identical log text and frames, identical snapshot |
+| first visit vs a returning visit, to frame 6,000 | flicker 31 | identical log text and frames (7 lines), identical snapshot |
 
-**Not tested yet:** a browser throttled 4x, a returning visitor who restores a saved start, a run resumed from a checkpoint,
-other kinds of computer such as x86, and any comparison across a whole career. So this is promising but not proven: if you
+**Not tested yet:** a run resumed from a checkpoint, other kinds of computer such as x86, and any comparison across a whole
+career. A browser throttled 4x hasn't produced a result either: on a Raspberry Pi 5 the page stops responding at that
+setting, so there was nothing to compare. So this is promising but not proven: if you
 compare a same-seed run and it differs, please open an issue.
 
 **Different starts can fly the same career.** Starts 41.24 and 287 wrote byte-identical journals for their first 10 game
