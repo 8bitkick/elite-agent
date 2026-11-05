@@ -10,8 +10,8 @@ const o = {};
 const lines = readFileSync(o.out, "utf8").split("\n").filter(Boolean);
 const result = lines.filter((l) => /^(ELITE|not Elite) after /.test(l)).pop() || "";
 const hours = result.match(/^ELITE after ([\d.]+)/)?.[1];
-// a death is any log line saying "died" or "escape pod"
-const deaths = lines.filter((l) => /died|escape pod/.test(l)).length;
+// a death is a log line saying "died" or using the escape pod (buying one, "Fitted escape pod", isn't)
+const deaths = lines.filter((l) => /died|escape pod/.test(l) && !/Fitted escape pod/.test(l)).length;
 
 const c = { kills: 0, fights: 0, stars: 0, galaxy: 1, docks: 0, credits: 0, witchspace: 0, frame: 0 };
 for (const l of readFileSync(o.journal, "utf8").split("\n")) {

@@ -33,7 +33,7 @@ Hours are game hours from Jameson at Lave to the rank of Elite. **Bold** starts 
 
 *No careers have finished yet. Solid 45 is flying now.*
 
-A death is a log line containing `died` or `escape pod`. Credits are the last figure in the journal. Stars are systems
+A death is a log line containing `died` or `escape pod`, not counting buying a pod (`Fitted escape pod`). Credits are the last figure in the journal. Stars are systems
 visited for the first time. Witchspace counts farming sessions. Missions aren't listed, because the web player's journal
 doesn't record them. Compare rows only when their `wasm` column matches.
 
