@@ -50,12 +50,21 @@ const SPEEDS = [1, 2, 4, 8, Infinity];
 const QS = Q.get("speed");
 const speed = { sel: QS === "1x" ? 1 : Infinity, auto: QS !== "1x" && QS !== "turbo" };
 const speedName = (n) => (n === Infinity ? "––×" : `${n}×`);      // (flat out: the speed it reaches, once measured)
-function speedButtons() {
-    for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`; }
-    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); b.textContent = speed.auto ? "1× ACTION ●" : "1× ACTION ○"; b.title = "Real time in fights and docking, full speed between"; } }
+const setText = (b, t) => { if (b && b.textContent !== t) b.textContent = t; };      // (only when it changes)
+// the buttons act when pressed, not on the click that follows it (a click alone, from a keyboard, still works)
+function press(b, act) {
+    if (!b) return;
+    let pressed = false;
+    b.addEventListener("pointerdown", (e) => { if (e.button === 0) { pressed = true; act(); } });
+    b.addEventListener("click", () => { if (pressed) pressed = false; else act(); });
 }
-for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.onclick = () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; speedButtons(); }; }
-for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () => { speed.auto = !speed.auto; speedButtons(); }; }
+function speedButtons() {
+    for (const id of ["speedbtn", "p-speedbtn"]) setText($(id), `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`);
+    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); setText(b, speed.auto ? "1× ACTION ●" : "1× ACTION ○"); b.title = "Real time in fights and docking, full speed between"; } }
+}
+let refreshSpeed = speedButtons;      // (once running: the lit button and the speed shown too)
+for (const id of ["speedbtn", "p-speedbtn"]) press($(id), () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; refreshSpeed(); });
+for (const id of ["auto", "p-auto"]) press($(id), () => { speed.auto = !speed.auto; refreshSpeed(); });
 // (room for three digits, so the button doesn't change width as the speed does)
 for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = id === "p-speedbtn" ? "5.3em" : "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
 speedButtons();
@@ -206,33 +215,42 @@ async function main() {
 
     // ---- the machine, from the page's animation frames: as many frames as this speed owes, at most TURBO_SHARE of the
     // time. The picture is drawn on the last two of them: the renderer needs one to find the beam after a gap
-    const TURBO_SHARE = 0.8;
-    let paused = false, last = performance.now(), owe = 0, lastUi = 0, checked = false;
+    // TURBO_SHARE of each display frame, the drawing included (it's measured, and taken off the machine's time), never more
+    // than a 60 Hz frame's: the rest is the browser's, for taps and scrolling. How it's sliced doesn't change the career
+    const TURBO_SHARE = 0.8, FRAME_MS = 1000 / 60;
+    const DRAW_MS = 30;
+    let paused = false, last = performance.now(), owe = 0, lastUi = 0, lastDraw = 0, checked = false, drawCost = 4;
     const frame = (draw) => { core.frame(draw); s.frameNo = core.frameNo; };
     const rate = () => (speed.auto && core.frameNo - s.lastAction < HOLD ? 1 : speed.sel);
     const run = (now) => {
         requestAnimationFrame(run);
         const dt = Math.min(100, now - last); last = now;
         if (paused) return;
-        const r = rate(), t0 = performance.now(), budget = Math.min(40, Math.max(4, dt * TURBO_SHARE));
+        // (at speed, the picture about 30 times a second is plenty: the other display frames are all the machine's)
+        const r = rate(), t0 = performance.now(), draw = r <= 2 || now - lastDraw >= DRAW_MS, budget = Math.max(1, Math.min(dt, FRAME_MS) * TURBO_SHARE - (draw ? drawCost : 0));
+        if (draw) lastDraw = now;
         s.turbo = r !== 1;
+        let d0 = t0;
         if (r === Infinity) {
             let n = 0;
-            do { for (let i = 0; i < 8; i++) frame(false); n += 8; note(); } while (performance.now() - t0 < budget - 2 && rate() === Infinity);
-            frame(true); frame(true); note();
+            do { for (let i = 0; i < 4; i++) frame(false); n += 4; note(); } while (performance.now() - t0 < budget && rate() === Infinity);
+            d0 = performance.now();
+            if (draw) { frame(true); frame(true); note(); }
         } else {
             owe = Math.min(owe + (dt / 20) * r, 200);
             const n = Math.floor(owe);
             owe -= n;
             for (let i = 0; i < n; i++) {
-                frame(i >= n - 2);
+                frame(draw && i >= n - 2);
                 if (r === 1) soundFrame(core);
                 note();
                 if (performance.now() - t0 > budget) { owe = 0; break; }
             }
         }
-        show();
-        if (now - lastUi > 50) { lastUi = now; ui(); }
+        if (r !== Infinity) d0 = performance.now();
+        if (draw) show();
+        if (now - lastUi > 100) { lastUi = now; ui(); }
+        if (draw) drawCost += (performance.now() - d0 - drawCost) * 0.1;      // (smoothed: the panel is redrawn only every few frames)
     };
     // the action worth real time, each frame: the dogfight network deciding, or the docking network flying its final
     const note = () => {
@@ -248,6 +266,17 @@ async function main() {
         const verdict = !ref ? "no reference for this game and skew" : h === ref ? "matches the reference: this machine flies the same career" : "DOESN'T MATCH the reference: please report it";
         console.log(`journal sha256 at frame ${CHECK_FRAMES}: ${h} (${verdict})`);
     };
+    const showSpeed = () => {
+        const hot = speed.auto && speed.sel !== 1 && core.frameNo - s.lastAction < HOLD, col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";
+        s.actionHot = hot ? s.actionKind : null;
+        speedButtons();
+        for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { const v = hot ? col : ""; if (b.style.background !== v) { b.style.background = v; b.style.borderColor = v; b.style.color = hot ? "#000" : ""; } } }
+        for (const id of ["speedbtn", "p-speedbtn"]) {
+            if (hot) setText($(id), "▶ 1×");
+            else if (speed.sel === Infinity && s.rate) setText($(id), `▶▶ ${Math.round(s.rate)}×`);
+        }
+    };
+    refreshSpeed = showSpeed;
     const ui = () => {
         const f = core.frameNo;
         if (s.arrive && f >= s.arrive[0]) { s.system = s.arrive[1]; s.arrive = null; }
@@ -260,15 +289,7 @@ async function main() {
         s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
         // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
         // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
-        const hot = speed.auto && speed.sel !== 1 && f - s.lastAction < HOLD, col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";
-        s.actionHot = hot ? s.actionKind : null;
-        for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.style.background = hot ? col : ""; b.style.borderColor = hot ? col : ""; b.style.color = hot ? "#000" : ""; } }
-        speedButtons();
-        for (const id of ["speedbtn", "p-speedbtn"]) {
-            const b = $(id); if (!b) continue;
-            if (hot) b.textContent = "▶ 1×";
-            else if (speed.sel === Infinity && s.turbo && s.rate) b.textContent = `▶▶ ${Math.round(s.rate)}×`;
-        }
+        showSpeed();
         s.frame = f; s.tally = core.tally; s.cash = core.cash;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
@@ -291,7 +312,7 @@ async function main() {
         paused = !paused;
         for (const id of ["pause", "p-pause"]) { $(id).textContent = paused ? (id === "pause" ? "▶ Resume" : "▶") : id === "pause" ? "❚❚ Pause" : "❚❚"; $(id).classList.toggle("on", paused); }
     };
-    $("pause").onclick = pause; $("p-pause").onclick = pause;
+    press($("pause"), pause); press($("p-pause"), pause);
 }
 
 let panelRef = null;
