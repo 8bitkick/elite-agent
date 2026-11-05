@@ -222,6 +222,8 @@ async function main() {
         const [t0, f0] = s.rates[0];
         if (now - t0 > 500) s.rate = ((f - f0) / 50) / ((now - t0) / 1000);
         s.speedLabel = s.turbo ? `▶▶ ${(s.rate || 1).toFixed(1)}×` : "▶ 1×";
+        // (at MAX, how fast MAX is on this machine)
+        if (speed.sel === Infinity) for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `▶▶ MAX${s.turbo && s.rate ? ` ${Math.round(s.rate)}×` : ""}`; }
         s.frame = f; s.tally = core.tally; s.cash = core.cash;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
