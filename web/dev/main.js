@@ -46,13 +46,15 @@ layout();
 const SPEEDS = [1, 2, 4, 8, Infinity];
 const QS = Q.get("speed");
 const speed = { sel: QS === "1x" ? 1 : Infinity, auto: QS !== "1x" && QS !== "turbo" };
-const speedName = (n) => (n === Infinity ? "MAX" : `${n}×`);
+const speedName = (n) => (n === Infinity ? "––×" : `${n}×`);      // (flat out: the speed it reaches, once measured)
 function speedButtons() {
     for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`; }
     for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); b.textContent = speed.auto ? "1× ACTION ●" : "1× ACTION ○"; b.title = "Real time in fights and docking, full speed between"; } }
 }
 for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.onclick = () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; speedButtons(); }; }
 for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () => { speed.auto = !speed.auto; speedButtons(); }; }
+// (room for three digits, so the button doesn't change width as the speed does)
+for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
 speedButtons();
 
 function loading(frac, text) {
@@ -232,7 +234,7 @@ async function main() {
         for (const id of ["speedbtn", "p-speedbtn"]) {
             const b = $(id); if (!b) continue;
             if (hot) b.textContent = "▶ 1×";
-            else if (speed.sel === Infinity && s.turbo && s.rate) b.textContent = `▶▶ MAX ${Math.round(s.rate)}×`;
+            else if (speed.sel === Infinity && s.turbo && s.rate) b.textContent = `▶▶ ${Math.round(s.rate)}×`;
         }
         s.frame = f; s.tally = core.tally; s.cash = core.cash;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
