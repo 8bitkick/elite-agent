@@ -120,8 +120,9 @@ body.phone { overflow: visible; height: auto; overscroll-behavior-y: none; }    
 .p-opts .games { justify-self: start; width: auto; max-width: none; height: 34px; padding: 2px; border: 0; border-radius: 17px; background: rgba(255, 255, 255, .08); font-size: 13px; }
 .p-opts .games a { display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 15px; color: rgb(170, 176, 188); white-space: nowrap; text-decoration: none; }
 .p-opts .games a.on { background: rgba(56, 214, 232, .2); color: var(--cyan); font-weight: 600; }
-#p-page2 .tools:empty { display: none; }
-#phone #p-page2 footer { padding: 0; margin-top: auto; }
+#p-page2 .tools { display: none; }      /* (Load and Save: not on this page yet) */
+#phone #p-page2 footer { padding: 0; }
+#p-page2 footer p:first-child { margin-top: 0; }
 #p-nav { position: fixed; left: 0; right: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 7px 10px; padding-top: max(7px, env(safe-area-inset-top));
   background: rgba(16, 19, 25, .8); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transform: translateY(-105%); transition: transform .55s cubic-bezier(.22, .61, .36, 1); }
 #p-nav.show { transform: none; }
