@@ -54,7 +54,7 @@ function speedButtons() {
 for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.onclick = () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; speedButtons(); }; }
 for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () => { speed.auto = !speed.auto; speedButtons(); }; }
 // (room for three digits, so the button doesn't change width as the speed does)
-for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
+for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) { b.style.minWidth = id === "p-speedbtn" ? "5.3em" : "6.2em"; b.style.textAlign = "center"; b.style.fontVariantNumeric = "tabular-nums"; b.style.whiteSpace = "nowrap"; b.style.boxSizing = "border-box"; } }
 speedButtons();
 
 // the loading card: Elite's own Cobra Mk III (its ship blueprint's vertices and edges), turning in lines, and a bar
@@ -126,7 +126,7 @@ async function main() {
             if (k === "flicker") q.delete("game"); else q.set("game", k);
             q.delete("skew");
             const a = document.createElement("a");
-            a.textContent = g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            a.textContent = box.closest("#phone") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
         }
     }

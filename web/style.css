@@ -42,6 +42,9 @@ body.phone #phone { display: block; }
 #phone .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 #phone .brand { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; }
 #phone .seg { width: 250px; }
+#phone .row .games { width: auto; flex: 0 0 auto; max-width: none; font-size: 12px; }
+#phone .row .games a { padding: 6px 5px; text-align: center; white-space: nowrap; }
+#phone .row .brand > span { display: none; }
 #phone .strip { display: flex; justify-content: space-between; gap: 8px; }
 #phone .strip div { display: flex; flex-direction: column; min-width: 0; }
 #phone .strip span { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -92,3 +95,4 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .ctl { display: flex; gap: 6px; }
 #phone .ctl .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
 #phone .ctl #p-speedbtn { min-width: 66px; }
+#phone .row { gap: 5px; } #phone .row .ctl { gap: 4px; flex: 0 1 auto; min-width: 0; } #phone .row .ctl .btn { padding-left: 5px; padding-right: 5px; }
