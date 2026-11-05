@@ -56,20 +56,31 @@
   <canvas id="p-chart" role="button" tabindex="0" aria-label="Rank progress, the game's time and the latest log line. Tap for the controls"></canvas>
   <canvas id="p-screen" aria-label="Acornsoft Elite, flown by the agent"></canvas>
   <canvas id="p-net" aria-label="The network flying now, its units lit as it decides"></canvas>
-  <canvas id="p-map" aria-label="The galaxy chart: the stars visited and the current star"></canvas>
-  <div class="strip">
-    <div><span>Rank</span><b id="p-rank">Harmless</b></div>
-    <div><span>Kills</span><b id="p-kills">0</b></div>
-    <div><span>Credits</span><b id="p-cash">100 Cr</b></div>
-    <div><span>System</span><b id="p-system">Lave</b></div>
-  </div>
-  <pre id="p-log"></pre>
-  <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-load">⤒ Load</button><button class="btn" id="p-save">⤓ Save</button></div>
-  <footer>
-    <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
-    <p class="small" id="p-credit"></p>
-    <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
-  </footer>
+  <section id="p-page2" aria-label="Stats and options">
+    <div class="p-stats">
+      <div><span>Rank</span><b id="p-rank">Harmless</b></div>
+      <div><span>Kill tally</span><b id="p-tally">0</b></div>
+      <div><span>Credits</span><b id="p-cash">100 Cr</b></div>
+      <div><span>Star</span><b id="p-system">Lave</b></div>
+      <div><span>Galaxy</span><b id="p-galaxy">1</b></div>
+      <div><span>Stars seen</span><b id="p-stars">0</b></div>
+      <div><span>Kills</span><b id="p-kills">0</b></div>
+      <div><span>Docks</span><b id="p-docks">0</b></div>
+      <div><span>Deaths</span><b id="p-deaths">0</b></div>
+    </div>
+    <canvas id="p-map" aria-label="The galaxy chart: the stars visited and the current star"></canvas>
+    <div class="p-opts">
+      <label>Speed</label><button class="btn" id="p-speedbtn2">ACTION</button>
+      <label>Sound</label><button class="btn" id="p-sound2">Off</button>
+      <label>Game</label><div class="games seg" role="group" aria-label="Game"></div>
+    </div>
+    <div class="tools"><a class="btn" id="p-chapter"></a><button class="btn" id="p-load">⤒ Load</button><button class="btn" id="p-save">⤓ Save</button></div>
+    <footer>
+      <p>Fair mode: only what a player can see on the screen. Flown by two AI models: dogfights 8 KB, docking 1.5 KB.</p>
+      <p class="small" id="p-credit"></p>
+      <a class="gh" href="https://github.com/8bitkick/elite-agent"><img src="gh.png" alt="" width="20" height="20"> 8bitkick/elite-agent</a>
+    </footer>
+  </section>
 </div>
 <div id="tip" role="tooltip"></div>
 <input type="file" id="loadfile" accept=".ssd,.dsd" hidden>

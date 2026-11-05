@@ -14,8 +14,8 @@
 - **The panel** is the film's, drawn on a canvas in the film's own 1920x1080 frame ([src/panel.js](src/panel.js)): the clock,
   rank, tally, credits, system and the tally chart; the dogfight network (yellow) in a fight, the docking network (cyan) on the
   way in; the galaxy map when docked. A phone gets the rank bar and time above the screen, and tabs: AI, Galaxy, Log and Options.
-- **Speed:** one button, tapped round: **1×, 2×, 4×** hold that speed; **ACTION** (the default) is flat out, but 1× in fights and the
-  docking's final and for 3 s after, the button lit in the colour of the AI flying; **MAX** is flat out, always. Flat out takes 80% of
+- **Speed:** one button, tapped round: **1×, 2×, 4×** hold that speed; **ACTION** (the default) is flat out, but 4× while docked, and 1× in fights and
+  the docking's final and for 3 s after, the button lit in the colour of the AI flying; **MAX** is flat out, always. Flat out takes 80% of
   each display frame, the drawing included. The page shows the speed it measures. None of it changes the career.
 - **Not on this page yet:** saving and loading a commander and "Jump to Deadly", which the jsbeeb page had. `src/save.js` and
   `chapters/` are kept for them. Sound is wired from the core's SN76489 a frame at a time, but untested by ear.

@@ -130,6 +130,7 @@ export class Panel {
         g.fillStyle = BG; g.fillRect(X0, 0, 1920 - X0, H);
         this.drawTop(s);
         if (s.view === "docked") this.drawDocked(s);
+        else if (s.view === "log") this.drawLog(s);
         else if (s.view === "fight") this.drawFight(s);
         else this.drawDock(s);
     }
@@ -305,6 +306,19 @@ export class Panel {
         g.strokeStyle = rgb(YEL); g.lineWidth = 2; g.beginPath(); g.arc(hx, hy, 7, 0, 7); g.stroke(); g.lineWidth = 1;
         const nm = (this.gal[gi].find(([x, y]) => x === here[1] && y === here[2]) || [0, 0, ""])[2];
         this.text(nm, hx + 11, hy - 7, `14px ${SANS}`, rgb(YEL));
+        this.hits = []; this.net = null;
+    }
+
+    // the AI not flying: the agent's log in the network's place, the latest at the bottom
+    drawLog(s) {
+        const LH = 34, N = Math.floor((BOT - NET_Y - 24) / LH), p2 = (n) => String(n).padStart(2, "0");
+        this.text("AGENT LOG", PX, NET_Y, `600 14px ${SANS}`, IDLE_TEXT);
+        const lines = s.log.slice(-N), font = `24px ${MONO}`;
+        lines.forEach(([f, t], i) => {
+            const mm = Math.floor(f / 3000), y = NET_Y + 24 + i * LH;
+            this.text(`${Math.floor(mm / 60)}:${p2(mm % 60)}`, PX, y, font, IDLE_TEXT);
+            this.text(t.length <= 54 ? t : t.slice(0, 53) + "…", PX + 92, y, font, i === lines.length - 1 ? "rgb(52,204,148)" : GREEN);
+        });
         this.hits = []; this.net = null;
     }
 

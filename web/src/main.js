@@ -24,12 +24,14 @@ const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
 const SKEW = Q.has("skew") ? +Q.get("skew") : GAMES[GAME].skew;
 const CROP = { x: 128, y: 80, w: 512, h: 496 };      // the Elite screen in the core's 768x640 canvas
 const HOLD = 150;                                    // adaptive: frames of real time after the action ends
+const AI_HOLD = 150;                                 // frames the network stays up after the AI last decided
 const CHECK_FRAMES = +(Q.get("check") || 30000);     // the journal hashed up to here: 10 game minutes (?check=frames for further)
 
 const s = {
     frame: 0, tally: 0, cash: 100, system: "Lave", tallyPts: [[0, 0]], log: [], visits: [[0, 20, 173]], view: "docked",
     senses: null, speedLabel: "", turbo: false, lastAction: -1e9, lastDock: 0, lastDepart: -1, started: false,
     journal: [], journalHash: null, elite: 0,
+    kills: 0, stars: 0, docks: 0, deaths: 0,
 };
 window.eliteAgent = s;
 
@@ -48,7 +50,9 @@ addEventListener("resize", layout);
 layout();
 
 // the speed: one button, tapped round. 1×, 2× and 4× hold that speed; ACTION is flat out, but 1× in fights and the docking's final
-// (and for HOLD frames after); MAX is flat out, always
+// (and for HOLD frames after) and 4× while docked; MAX is flat out, always
+const DOCKED_RATE = 4;
+const SPEED_BTNS = ["speedbtn", "p-speedbtn", "p-speedbtn2"];
 const MODES = ["1×", "2×", "4×", "ACTION", "MAX"], FIXED = [1, 2, 4], ACTION = 3, MAX = 4;
 const QS = Q.get("speed");     // (?speed=1x, 2x, 4x, action or max; the old ?speed=turbo is max)
 const speed = { mode: QS === "max" || QS === "turbo" ? MAX : Math.max(0, ["1x", "2x", "4x"].indexOf(QS)) || (QS === "1x" ? 0 : ACTION) };
@@ -61,7 +65,7 @@ function press(b, act) {
     b.addEventListener("click", () => { if (pressed) pressed = false; else act(); });
 }
 let refreshSpeed = () => {};      // (set once the machine is running)
-for (const id of ["speedbtn", "p-speedbtn"]) {
+for (const id of SPEED_BTNS) {
     press($(id), () => { speed.mode = (speed.mode + 1) % MODES.length; refreshSpeed(); });
     setText($(id), MODES[speed.mode]);
 }
@@ -135,7 +139,7 @@ async function main() {
             if (k === "flicker") q.delete("game"); else q.set("game", k);
             q.delete("skew");
             const a = document.createElement("a");
-            a.textContent = box.closest("#phone") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
+            a.textContent = box.closest("#p-nav") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
         }
     }
@@ -189,13 +193,16 @@ async function main() {
             if (m && m[1] === "Hyperspace to") s.arrive = [f + 600, m[2]];
             else if (m) { s.system = m[2]; s.arrive = null; }
             else if (line.startsWith("Mis-jump: trapped in witchspace")) { s.system = "Witchspace"; s.arrive = null; }
-            if (m && m[1] === "Launched from") s.lastDepart = f;
+            if (m && m[1] === "Launched from") { s.lastDepart = f; s.lastLaunch = f; }
         },
         note: (json) => {
             const f = core.frameNo;
             if (f < CHECK_FRAMES) s.journal.push(`{"frame": ${f}, "e": ${json}}\n`);
             let e; try { e = JSON.parse(json); } catch { return; }
-            if (e.event === "docked") { s.lastDock = f; s.visits.push([e.g - 1, e.x, e.y]); }
+            if (e.event === "fight_end") s.kills += e.kills || 0;
+            else if (e.event === "new_system") s.stars++;
+            else if (e.event === "died" || e.event === "escape_pod") s.deaths++;
+            if (e.event === "docked") { s.docks++; s.lastDock = f; s.visits.push([e.g - 1, e.x, e.y]); }
             else if (e.event === "depart") s.lastDepart = f;
             else if (e.event === "rank" && e.rank === "Elite" && !s.elite) { s.elite = f; flash(`ELITE after ${(f / 180000).toFixed(2)} game hours`, 0); }
         },
@@ -232,7 +239,9 @@ async function main() {
     let paused = false, last = performance.now(), owe = 0, lastUi = 0, lastDraw = 0, checked = false, drawCost = 4;
     const frame = (draw) => { core.frame(draw); s.frameNo = core.frameNo; };
     const inAction = () => speed.mode === ACTION && core.frameNo - s.lastAction < HOLD;
-    const rate = () => (inAction() ? 1 : FIXED[speed.mode] ?? Infinity);
+    // (ACTION, docked: 4×, so the shopping and the charts can be seen; docked from the first dock to the launch)
+    const isDocked = () => s.lastDock >= (s.lastLaunch ?? -1);
+    const rate = () => (inAction() ? 1 : speed.mode === ACTION && isDocked() ? DOCKED_RATE : FIXED[speed.mode] ?? Infinity);
     const run = (now) => {
         requestAnimationFrame(run);
         const dt = Math.min(100, now - last); last = now;
@@ -282,7 +291,7 @@ async function main() {
     const showSpeed = () => {
         const hot = inAction(), col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";     // (lit: ACTION in force, in the colour of the AI flying)
         s.actionHot = hot ? s.actionKind : null;
-        for (const id of ["speedbtn", "p-speedbtn"]) {
+        for (const id of SPEED_BTNS) {
             const b = $(id); if (!b) continue;
             setText(b, MODES[speed.mode]);
             const v = hot ? col : "";
@@ -308,8 +317,10 @@ async function main() {
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
         if (s.lastDock > s.lastDepart) { s.view = "docked"; s.senses = null; }
-        else if (fight.when > 0 && f - fight.when < 30) { s.view = "fight"; s.senses = fight.f; }
-        else { s.view = "dock"; s.senses = dock.when > 0 && f - dock.when < 30 ? dock.f : null; }
+        else if (fight.when > 0 && f - fight.when < 30) { s.view = "fight"; s.senses = fight.f; s.lastAi = f; }
+        else if (dock.when > 0 && f - dock.when < 30) { s.view = "dock"; s.senses = dock.f; s.lastAi = f; }
+        else if (f - (s.lastAi ?? -1e9) < AI_HOLD) { s.view = "dock"; s.senses = null; }     // (a moment's gap in the AI: the network stays)
+        else { s.view = "log"; s.senses = null; }
         panel.draw(s);
         phoneStrip();
     };
@@ -320,9 +331,10 @@ async function main() {
         sound.ctx.resume();
         sound.on = !sound.on;
         $("sound").textContent = sound.on ? "Sound on" : "🔊 Sound";
-        for (const id of ["sound", "p-sound"]) $(id).classList.toggle("on", sound.on);
+        setText($("p-sound2"), sound.on ? "On" : "Off");
+        for (const id of ["sound", "p-sound", "p-sound2"]) $(id).classList.toggle("on", sound.on);
     };
-    press($("sound"), toggleSound); press($("p-sound"), toggleSound);
+    press($("sound"), toggleSound); press($("p-sound"), toggleSound); press($("p-sound2"), toggleSound);
     const pause = () => {
         paused = !paused;
         for (const id of ["pause", "p-pause"]) { $(id).textContent = paused ? (id === "pause" ? "▶ Resume" : "▶") : id === "pause" ? "❚❚ Pause" : "❚❚"; $(id).classList.toggle("on", paused); }
@@ -365,17 +377,18 @@ function phoneMap() {
 function phoneStrip() {
     if (!document.body.classList.contains("phone")) return;
     const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
-        $("p-rank").textContent = RANKS.filter(([k]) => s.tally >= k).pop()[1];
-    $("p-kills").textContent = Math.floor(s.tally).toLocaleString("en");
-    $("p-cash").textContent = `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`;
-    $("p-system").textContent = s.system;
-    $("p-log").textContent = s.log.slice(-12).reverse().map(([f, t]) => { const mm = Math.floor(f / 3000); return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, "0")}  ${t}`; }).join("\n");
+        const set = (id, v) => setText($(id), String(v));
+    set("p-rank", RANKS.filter(([k]) => s.tally >= k).pop()[1]);
+    set("p-tally", Math.floor(s.tally).toLocaleString("en"));
+    set("p-cash", `${s.cash.toLocaleString("en", { maximumFractionDigits: 0 })} Cr`);
+    set("p-system", s.system);
+    set("p-galaxy", s.visits[s.visits.length - 1][0] + 1);
+    set("p-stars", s.stars); set("p-kills", s.kills.toLocaleString("en")); set("p-docks", s.docks); set("p-deaths", s.deaths);
     for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
     }
-    $("p-map").style.display = s.view === "docked" ? "none" : "";      // (docked, the panel's own chart is in the network's place)
     phoneMap();
     // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
     const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
