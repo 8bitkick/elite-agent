@@ -258,7 +258,7 @@ function phoneMap() {
     const key = `${gi}/${s.visits.length}/${s.system}`;
     if (key === mapKey) return;
     mapKey = key;
-    const c = $("p-map"), g = c.getContext("2d"), W = 908, H = 600, TOP = 44, M = 14;
+    const c = $("p-map"), g = c.getContext("2d"), W = 908, TOP = 44, H = W + TOP, M = 14;     // (the map square)
     if (c.width !== W) { c.width = W; c.height = H; }
     g.fillStyle = "rgb(9,11,15)"; g.fillRect(0, 0, W, H);
     g.textBaseline = "middle"; g.textAlign = "left";
