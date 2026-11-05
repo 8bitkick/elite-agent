@@ -49,7 +49,7 @@ const speed = { sel: QS === "1x" ? 1 : Infinity, auto: QS !== "1x" && QS !== "tu
 const speedName = (n) => (n === Infinity ? "MAX" : `${n}×`);
 function speedButtons() {
     for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.textContent = `${speed.sel === 1 ? "▶" : "▶▶"} ${speedName(speed.sel)}`; }
-    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); b.textContent = speed.auto ? "AUTO ●" : "AUTO ○"; } }
+    for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) { b.classList.toggle("on", speed.auto); b.textContent = speed.auto ? "1× ACTION ●" : "1× ACTION ○"; b.title = "Real time in fights and docking, full speed between"; } }
 }
 for (const id of ["speedbtn", "p-speedbtn"]) { const b = $(id); if (b) b.onclick = () => { speed.sel = SPEEDS[(SPEEDS.indexOf(speed.sel) + 1) % SPEEDS.length]; speedButtons(); }; }
 for (const id of ["auto", "p-auto"]) { const b = $(id); if (b) b.onclick = () => { speed.auto = !speed.auto; speedButtons(); }; }
