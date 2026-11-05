@@ -59,3 +59,5 @@ web/_site/
 web/.jsbeeb
 web/node_modules/
 web/agent.dev.wasm
+web/dev/core.dev.wasm
+web/dev/_site/
