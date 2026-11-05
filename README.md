@@ -30,6 +30,7 @@ flicker-free disc, fetched by the browser from his GitHub repository ([web/READM
 page's career is the same for every visitor (its start is taken at an instruction boundary, so it doesn't depend on
 the visitor's computer); `?game=solid` plays Eben Upton's Solid Elite and `?start=N` picks another start. The careers
 from the new starts are being flown headless to Elite (the previous start's reached it in 18.9 game hours).
+[web/STARTS.md](web/STARTS.md) has the results so far, and how to test a start and log it.
 
 **Trading:** why the agent's earlier "sloppy" trading (thin margins, selling and buying straight back) reached Elite
 sooner than a tidier rewrite, with the money traced through 16 careers, and what would beat both:
