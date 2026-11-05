@@ -96,3 +96,6 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .ctl .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
 #phone .ctl #p-speedbtn { min-width: 66px; }
 #phone .row { gap: 5px; } #phone .row .ctl { gap: 4px; flex: 0 1 auto; min-width: 0; } #phone .row .ctl .btn { padding-left: 5px; padding-right: 5px; }
+#phone .row .btn, #phone .row .games { height: 30px; box-sizing: border-box; }
+#phone .row .btn { display: inline-flex; align-items: center; justify-content: center; }
+#phone .row .games a { display: flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; }
