@@ -209,8 +209,6 @@ async function main() {
         const ref = REFERENCE[`${GAME}_${SKEW}`];
         const verdict = !ref ? "no reference for this game and skew" : h === ref ? "matches the reference: this machine flies the same career" : "DOESN'T MATCH the reference: please report it";
         console.log(`journal sha256 at 10 game minutes: ${h} (${verdict})`);
-        flash(`10 game minutes: journal ${h.slice(0, 12)}… ${verdict}`, 15000);
-        for (const id of ["netnote"]) { const n = $(id); if (n) n.textContent = `Dev page. Journal hash at 10 game minutes: ${h.slice(0, 16)}… ${verdict}.`; }
     };
     const ui = () => {
         const f = core.frameNo;
