@@ -4,6 +4,11 @@
 reached Elite, and how to test more of them and add your results. If you use Claude Code, the
 [prompt below](#testing-starts-with-claude-code) does the work for you.
 
+> **Coming:** a [dev page](https://8bitkick.cc/elite-agent/dev/) with the emulator (Kieran Connell's Master core) and the agent
+> in one pinned wasm, about 10 times faster headless than this page's jsbeeb. On it, flicker-free reached Elite in 16.45 game
+> hours, and a whole career in a real browser matched Node's journal byte for byte (Chromium and Node on one Raspberry Pi 5).
+> Careers logged on this page won't carry over to it, because a different emulator flies different careers.
+
 ## What a start is
 
 A start `N` is the machine's state `N` million emulated cycles after power-on, with Elite on its title screen. The page
