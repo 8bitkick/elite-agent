@@ -112,6 +112,8 @@ async function main() {
     ]);
     const gh = new Image(); gh.src = "../gh.png";
     const panel = new Panel($("panel"), panelData, galaxies, gh);
+    panelRef = panel;
+    { const st = document.querySelector("#phone .strip"); if (st) st.style.display = "none"; }      // (the time is on the line under the rank bar)
     const tip = $("tip");
     $("panel").addEventListener("mousemove", (e) => {
         const c = $("panel"), r = c.getBoundingClientRect();
@@ -247,6 +249,7 @@ async function main() {
     $("pause").onclick = pause; $("p-pause").onclick = pause;
 }
 
+let panelRef = null;
 function phoneStrip() {
     if (!document.body.classList.contains("phone")) return;
     const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
@@ -260,6 +263,18 @@ function phoneStrip() {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
+    }
+    // the line under the rank bar: the game's time in white, then the latest log line, larger than the panel's
+    const g = $("p-chart").getContext("2d"), time = `${p2(Math.floor(secs / 3600))}:${p2(Math.floor(secs / 60) % 60)}:${p2(secs % 60)}`;
+    const LINE_TOP = 44, LINE_MID = 67;
+    g.fillStyle = "rgb(9,11,15)"; g.fillRect(0, LINE_TOP, 908, $("p-chart").height - LINE_TOP);
+    g.textBaseline = "middle"; g.textAlign = "left";
+    g.font = `600 30px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "#fff"; g.fillText(time, 6, LINE_MID);
+    const x = 6 + g.measureText(time).width + 18;
+    if (panelRef && panelRef.line) {
+        g.font = `22px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = panelRef.line.col;
+        const room = Math.floor((908 - x - 6) / g.measureText("0").width), t = panelRef.line.text;
+        g.fillText(t.length <= room ? t : t.slice(0, room - 1) + "…", x, LINE_MID);
     }
 }
 const RANKS = [[0, "Harmless"], [8, "Mostly Harmless"], [16, "Poor"], [32, "Average"], [64, "Above Average"], [128, "Competent"],

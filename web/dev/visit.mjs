@@ -31,7 +31,7 @@ if (process.argv[2]) {
     await page.screenshot({ path: process.argv[2] });
     console.log("screenshot at", ((Date.now() - t0) / 1000).toFixed(0), "s, frame", await page.evaluate(() => window.eliteAgent.frame));
 }
-await page.waitForFunction(() => window.eliteAgent?.journalHash, undefined, { timeout: 1800000, polling: 500 });
+await page.waitForFunction(() => window.eliteAgent?.journalHash, undefined, { timeout: 3 * 3600000, polling: 2000 });
 const r = await page.evaluate(() => ({ hash: window.eliteAgent.journalHash, frame: window.eliteAgent.frame, label: window.eliteAgent.speedLabel, lines: window.eliteAgent.log.length }));
 console.log(`journal ${r.hash}; ${((Date.now() - t0) / 1000).toFixed(0)} s to 10 game minutes; frame ${r.frame}, ${r.label}, ${r.lines} log lines`);
 await browser.close(); server?.close();
