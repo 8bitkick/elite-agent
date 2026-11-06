@@ -129,7 +129,7 @@ footer a { color: var(--soft); }
 <form class="beat" action="./" method="get">
   <div><b>Best so far: 15.5 game hours to Elite.</b> Each seed is a different career, and we've tried two on this build. Can you find a faster one?</div>
   <div class="ctl"><label>Mode <select name="mode"><option value="optimal">Optimal</option><option value="fair">Fair</option><option value="curious">Curious</option></select></label>
-  <label>Seed <input name="skew" type="number" min="0" max="100000" value="7" required></label>
+  <label>Seed <input name="skew" type="number" min="0" max="100000" value="13" required></label>
   <button type="submit">Fly this seed</button></div>
 </form>
 <div class="specs">
@@ -267,7 +267,7 @@ footer a { color: var(--soft); }
 
 <h2>Find a faster seed</h2>
 <p>Use the box at the top, or fly one headless:</p>
-<pre>MODE=optimal web/tools/fly.sh --game flicker --skew 7</pre>
+<pre>MODE=optimal web/tools/fly.sh --game flicker --skew 13</pre>
 <p>Post yours in <a href="https://github.com/8bitkick/elite-agent/issues">the issues</a>. Anyone can replay it, and only results from the same build compare. Weights, labs and failures are all in <a href="https://github.com/8bitkick/elite-agent">the repository</a>.</p>
 <p class="cite">The technique: Takehi, Teoh, Zhang and Khattab, <a href="https://rikiyat.github.io/blog/weight-space-programming/">“Sparks of Weight-Space Programming”</a>, November 2026.</p>
 <footer>Elite © Ian Bell and David Braben. BBC Master emulation by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a>; flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master">Mark Moxon's source project</a>. Independent, not affiliated with MIT, Acornsoft or the post's authors.</footer>

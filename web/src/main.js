@@ -149,7 +149,7 @@ async function main() {
     const NOTE = {
         optimal: "Optimal mode: the agent reads the game's RAM. Its fights are flown by the interceptor, a network written for points a minute; the docking by the docking network.",
         fair: "Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB, docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.",
-        curious: "Curious mode: the agent explores every galaxy. While it's on top, the camera network flies the fights for the viewer: close, drifting, a pass, the kill seen big; otherwise the interceptor.",
+        curious: "Curious mode: the agent explores every galaxy. The camera network flies the fights for the viewer: close, drifting, the kill seen big; in danger, the interceptor.",
     };
     for (const id of ["netnote"]) { const n = $(id); if (n) n.textContent = NOTE[MODE]; }
     { const f = document.querySelector("#phone footer p"); if (f) f.textContent = NOTE[MODE]; }

@@ -23,7 +23,7 @@ a.btn { text-decoration: none; }
 #credit { position: absolute; left: 24px; top: 979px; width: 963px; font-size: 13px; color: var(--dim); }
 #credit a, #phone .small a, #netnote a { color: var(--dim); }
 #credit b { color: var(--fg); font-weight: 600; }
-#netnote { position: absolute; left: 1016px; top: 979px; width: 880px; font-size: 13px; color: var(--dim); }
+#netnote { position: absolute; left: 24px; top: 1024px; width: 963px; font-size: 13px; color: var(--dim); }
 #phone .small { font-size: 12px; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .seg button { flex: 1; background: var(--panel); color: var(--dim); border: 0; border-right: 1px solid var(--line); font-size: 11px; padding: 4px 0; cursor: pointer; }
