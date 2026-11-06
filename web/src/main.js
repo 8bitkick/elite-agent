@@ -426,7 +426,7 @@ function phoneStrip() {
     set("p-system", s.system);
     set("p-galaxy", s.visits[s.visits.length - 1][0] + 1);
     set("p-stars", s.stars); set("p-kills", s.kills.toLocaleString("en")); set("p-docks", s.docks); set("p-deaths", s.deaths);
-    for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 972]]) {
+    for (const [id, y0, y1] of [["p-chart", 214, 300], ["p-net", 316, 1080]]) {
         const c = $(id), g = c.getContext("2d");
         if (c.width !== 908) { c.width = 908; c.height = y1 - y0; }
         g.drawImage($("panel"), 0, y0, 908, y1 - y0, 0, 0, 908, y1 - y0);
