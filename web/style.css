@@ -75,9 +75,9 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 #phone .seg button { white-space: nowrap; overflow: hidden; text-overflow: clip; height: 30px; line-height: 20px; font-variant-numeric: tabular-nums; }   /* (the live speed in it must not resize the bar) */
 #phone .strip b, #phone .strip span { line-height: 18px; height: 18px; }
 #p-log { line-height: 17px; height: 59px; overflow: hidden; white-space: pre; }
-.games { display: inline-flex; }
-.games a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
-.games a:last-child { border-right: 0; }
+.games, .modes { display: inline-flex; }
+.games a, .modes a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
+.games a:last-child, .modes a:last-child { border-right: 0; }
 .games a.on { background: rgb(10, 40, 46); color: var(--cyan); }
 #phone .tools .games { flex: 1; }
 #phone .tools .games a { flex: 1; text-align: center; }
@@ -120,9 +120,9 @@ body.phone { overflow: visible; height: auto; overscroll-behavior-y: none; }    
 .p-opts label { font-size: 13px; color: #9aa1ae; }
 .p-opts .btn { justify-self: start; min-width: 84px; height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: rgba(255, 255, 255, .08); color: var(--fg); font-size: 13px; font-weight: 600; }
 .p-opts .btn.on { color: var(--cyan); }
-.p-opts .games { justify-self: start; width: auto; max-width: none; height: 34px; padding: 2px; border: 0; border-radius: 17px; background: rgba(255, 255, 255, .08); font-size: 13px; }
-.p-opts .games a { display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 15px; color: rgb(170, 176, 188); white-space: nowrap; text-decoration: none; }
-.p-opts .games a.on { background: rgba(56, 214, 232, .2); color: var(--cyan); font-weight: 600; }
+.p-opts .games, .p-opts .modes { justify-self: start; width: auto; max-width: none; height: 34px; padding: 2px; border: 0; border-radius: 17px; background: rgba(255, 255, 255, .08); font-size: 13px; }
+.p-opts .games a, .p-opts .modes a { display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 15px; color: rgb(170, 176, 188); white-space: nowrap; text-decoration: none; }
+.p-opts .games a.on, .p-opts .modes a.on { background: rgba(56, 214, 232, .2); color: var(--cyan); font-weight: 600; }
 #p-page2 .tools { display: none; }      /* (Load and Save: not on this page yet) */
 #phone #p-page2 footer { padding: 0; }
 #p-page2 footer p:first-child { margin-top: 0; }

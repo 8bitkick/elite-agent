@@ -267,6 +267,7 @@ int main(int argc, char **argv) {
         }
     }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
+    { extern int g_pilots; if (getenv("PILOTS")) g_pilots = atoi(getenv("PILOTS")); }      // (each mode's own AI pilots)
     { extern void curious_env(void); curious_env(); }      // (curious steering numbers: CROLLDB, CRC*, PSW...)
     { extern int g_fight_reach; if (getenv("FIGHTR")) g_fight_reach = atoi(getenv("FIGHTR")); }
     { extern int g_ws_noregen; if (getenv("WSNOREGEN")) g_ws_noregen = atoi(getenv("WSNOREGEN")); }

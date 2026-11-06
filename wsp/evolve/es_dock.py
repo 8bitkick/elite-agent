@@ -35,9 +35,12 @@ SPACE = dict(
     cen_deg=(0.25, "log"), lvl_deg=(0.25, "log"), off8=(0.25, "log"), commit_r=(0.25, "log"),
 )
 # the line-up's ugliness, added to the seconds: each stick reversal, each second crawling far out, each swing of the aim
-W_REV, W_CRAWL, W_SWING = 0.5, 1.0, 3.0
+W_REV, W_CRAWL, W_SWING = [float(x) for x in os.environ.get("ES_WEIGHTS", "0.5 1.0 3.0").split()]
+W_SEC = float(os.environ.get("ES_WSEC", "1"))       # (a mode's own goal: Efficient plain time; Curious, the look counts for more)
+MODE_ENV = dict(kv.split("=") for kv in os.environ.get("ES_MODE", "FAIR=1").split())
 NAMES = list(SPACE)
 BASE = dict(A.PARAMS)
+if os.environ.get("ES_BASE"): BASE.update(json.load(open(os.environ["ES_BASE"])))
 
 
 def decode(x, base=BASE):
@@ -60,7 +63,7 @@ def run(paths, wfile, procs=1):
     def one(chunk):
         fd, lst = tempfile.mkstemp(suffix=".lst"); os.close(fd)
         open(lst, "w").write("\n".join(chunk) + "\n")
-        env = dict(os.environ, FAIR="1", LABDOCK="1", WSPAPP="1", WSPAPPW=wfile, LABWIN=str(WINDOW), LOG="3")
+        env = dict(os.environ, **MODE_ENV, LABDOCK="1", WSPAPP="1", WSPAPPW=wfile, LABWIN=str(WINDOW), LOG="3")
         p = subprocess.run([LAB, lst], env=env, capture_output=True, text=True)
         os.unlink(lst)
         ug = ugliness(p.stderr)
@@ -99,7 +102,7 @@ def ugliness(err):
 
 
 def cost(rows):
-    c = [(s if r == "docked" else WINDOW + (60 if r == "timeout" else 120)) + W_REV * u[0] + W_CRAWL * u[1] + W_SWING * u[2] for _, r, s, u in rows]
+    c = [W_SEC * (s if r == "docked" else WINDOW + (60 if r == "timeout" else 120)) + W_REV * u[0] + W_CRAWL * u[1] + W_SWING * u[2] for _, r, s, u in rows]
     secs = [s for _, r, s, u in rows if r == "docked"]
     return (float(np.mean(c)), sum(r == "docked" for _, r, _, _ in rows), len(rows), round(float(np.median(secs)), 1) if secs else None,
             round(float(np.median([u[0] for _, _, _, u in rows])), 1), round(float(np.mean([u[1] for _, _, _, u in rows])), 1), round(float(np.mean([u[2] for _, _, _, u in rows])), 2))

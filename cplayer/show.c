@@ -49,6 +49,7 @@ show_params_t g_sp = {
     // knife-edge on any close pass; followed into the side and rear views for 4 s, after 1.5 s straight on
     .fb_odds = 0.25f, .fb_side = 500, .fb_start = 4000, .fb_speed = 10, .novel_look = 1, .knife_d = 900, .pass_knife = 1, .pass_cpa = 600,
     .follow_s = 4, .extend_s = 1.5f, .glance = 1, .glance_d = 1200, .glance_max = 2.0f, .glance_gap = 6.0f, .glance_px = 20,
+    .pulse_e = 230,      // (the camera pilot: the handover to the interceptor on a pulse laser, energy under this; CAMPULSE= in run_sim)
     // SHOWPIECES. A missile in 30% of fights, the bomb in half of those with a pack in close (rare by design)
     .msl_odds = 0.3f, .msl_near = 1200, .msl_far = 6000, .bomb_odds = 0.5f, .bomb_n = 3, .bomb_dist = 3000, .bomb_ws = 1,
     // WITCHSPACE. The nearest group (side views 25 -> 31% of fights); the Thargons first (cleared fast, then
@@ -112,6 +113,8 @@ static int in_view(const ship_t *s, int view) {
     else if (view == 3) { double t = x; x = -z, z = t; }
     return z > 0 && fabs(x) < z / 2 && fabs((double) s->y) < z * 0.375;
 }
+int show_in_view(const ship_t *s, int view) { return in_view(s, view); }      // (the lab's per-frame log: is it in the picture)
+double show_px_in_view(const ship_t *s, int view) { return in_view(s, view) ? size_px(s, dist_of(s)) : 0; }      // (... and how big it's drawn there)
 static int seen_in(const ship_t *s, int view) { return in_view(s, view) && size_px(s, dist_of(s)) >= 4; }
 // where it'll be k game loops on: its own motion, and ours along z
 static ship_t ahead(const ship_t *s, double k) {
@@ -260,6 +263,22 @@ void show_frame(const ship_t *sh, int n) {
 }
 int show_on(void) { return S.on; }
 
+// The camera pilot (wsp/MODES.md) flies every Curious fight: the mode is the show, from the first fight on a pulse
+// laser. Not the margin above, nor the laser or the purse: the one thing that hands a fight to the interceptor is
+// real danger, the energy under 128 or a missile homing on us with no ECM, the same "urgent" test as the margin's
+// (in witchspace the agent jumps out under bail_energy, 180: the handover comes above that, so the interceptor gets
+// its turn before the bail-out, as the margin's own switch-off used to give it)
+// (and on a pulse laser, sooner: a show fight on one is slow to kill and a pack kills us first. Seed 13's career died
+// 54 times in its first five hours at the 128 handover, the tally stuck under 20)
+int show_danger(const ship_t *sh, int n) {
+    int pulse = !(laser(0) & 0x80);
+    if (energy() < (witchspace() ? 200 : pulse ? g_sp.pulse_e : 128)) return 1;
+    if (has_ecm()) return 0;
+    for (int i = 0; i < n; i++)
+        if (sh[i].type == 1 && (sh[i].ai & 0x40) && ship_in_space(&sh[i]) && !ship_dead(&sh[i])) return 1;
+    return 0;
+}
+
 // ==== WITCHSPACE and CLOSING IN: the target's worth
 // witchspace: the target by its group: nearness times the enemies within group_d of it, so we fly at the swarm, not
 // at the best-value ship on its own out at 10,000. While a Thargoid lives, the Thargons within thg_d first (its
@@ -281,8 +300,9 @@ static double thg_value(const ship_t *s, double v, const ship_t *const *th, int 
     return v / 10;
 }
 double show_value(const ship_t *s, double v, const ship_t *const *th, int nt) {
-    v = thg_value(s, v, th, nt);
     if (tally() != s_kill_tally) s_kill_tally = tally(), s_last_kill = now();      // (a kill: for stall_s)
+    { extern int g_pilots; if (g_pilots) return v; }      // (the modes' own pilots: Curious ranks its targets as Optimal does; the show is in how the camera flies them)
+    v = thg_value(s, v, th, nt);
     if (g_sp.near_pref && show_on() && !witchspace() && s->type != 1) v *= 3000.0 / (dist_of(s) + 1000);
     if (g_sp.run_value && show_on() && s->type != 1 && dist_of(s) > 2000 && range_rate(s) > 0) v *= g_sp.run_value;
     if (!g_sp.ws_group || !show_on() || !witchspace() || s->type == 1) return v;
@@ -556,10 +576,42 @@ int show_key(const ship_t *sh, int n, const ship_t *const *th, int nt, const shi
 // a glance left or right as a ship goes past close (where it'll be a game loop and a half on: the view key takes ~6
 // frames), back as soon as it's gone; after a flyby, follow it in whichever view has it. Our controls act on the ship
 // whatever the view, so the steering flies on through it; but only the view's own laser fires
+// (the glance is the show's whether show.c's margin or the camera pilot (wsp/MODES.md) is flying the fight: a side
+// camera on a pass is presentation, not the stick, and the network's senses don't depend on the view)
 int show_view(int view, const ship_t *sh, int n, const ship_t *t) {
-    if (!show_on() || !g_sp.glance) { G.view = 0; return view; }
+    extern int g_wsp_net;
+    if (!(show_on() || (g_curious && g_wsp_net == 1)) || !g_sp.glance) { G.view = 0; return view; }
     for (int i = 0; i < n; i++)         // (an incoming missile: eyes front)
         if (sh[i].type == 1 && (sh[i].ai & 0x40) && !ship_dead(&sh[i])) { G.view = 0; return view; }
+    if (g_curious && g_wsp_net == 1) {
+        // the camera pilot: the picture follows the fight. The target's own view while it's drawn big enough to read; off
+        // every picture, the biggest hostile (who's shooting us), unless the target is ahead (the laser fires from the
+        // view shown: a look away from a target in the sights is a shot wasted); between the views' narrow cones, the
+        // last view a moment, then the front
+        const double see_px = 10, other_px = 16;
+        int v = -1;
+        if (t && !ship_dead(t) && size_px(t, dist_of(t)) >= see_px)
+            for (int i = 0; i < 4 && v < 0; i++) if (in_view(t, i)) v = i;
+        if (v < 0 && !(t && in_view(t, 0))) {
+            double best = other_px;
+            for (int i = 0; i < n; i++) {
+                const ship_t *s = &sh[i];
+                if (!ship_is_ship(s) || !ship_in_space(s) || ship_dead(s) || !(s->newb & NEWB_HOSTILE)) continue;
+                double px = size_px(s, dist_of(s));
+                if (px < best) continue;
+                for (int w = 1; w <= 3; w++) if (in_view(s, w)) best = px, v = w;
+            }
+        }
+        if (v == 0) { G.view = 0; return 0; }
+        if (v > 0) {
+            if (v != G.view) status_("A look %s", v == 1 ? "back" : v == 2 ? "left" : "right");
+            G.view = v, G.until = now() + 30;
+            return v;
+        }
+        if (G.view && now() < G.until && !(t && in_view(t, 0))) return G.view;
+        G.view = 0;
+        return view;
+    }
     if (G.view) {
         int still = 0;
         for (int i = 0; i < n; i++)
@@ -577,12 +629,12 @@ int show_view(int view, const ship_t *sh, int n, const ship_t *t) {
         if (!ship_is_ship(s) || !ship_in_space(s) || ship_dead(s) || !(s->newb & NEWB_HOSTILE) || s->type == 1) continue;
         double d = dist_of(s);
         if (d > g_sp.glance_d) continue;
-        int side = s->x < 0 ? 2 : 3;
-        if (s->z < -d / 2 || now() < G.next || view != 0 || size_px(s, d) < g_sp.glance_px) continue;
+        int side = s->z < -d / 2 ? 1 : s->x < 0 ? 2 : 3;
+        if (side == 1 || now() < G.next || view != 0 || size_px(s, d) < g_sp.glance_px) continue;
         ship_t q = ahead(s, 1.5);
         if (!in_view(s, side) && !in_view(&q, side)) continue;
         G.view = side, G.until = now() + (uint32_t) (g_sp.glance_max * 50), G.next = now() + (uint32_t) (g_sp.glance_gap * 50);
-        status_("A look %s", side == 2 ? "left" : "right");
+        status_("A look %s", side == 1 ? "back" : side == 2 ? "left" : "right");
         return side;
     }
     return view;

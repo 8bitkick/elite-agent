@@ -15,7 +15,8 @@
 static int wsp_app_on(void) {        // (fair mode's default, as the dogfight network's: WSPAPP=0 the C laws, WSPAPP=1 in Optimal mode too)
     static int v = -1;
     if (v < 0) { const char *e = getenv("WSPAPP"); v = e ? *e != '0' : -2; }
-    return v == -2 ? g_fair != 0 : v;
+    extern int g_pilots;
+    return v == -2 ? (g_fair != 0 || g_pilots) : v;
 }
 static int s_app_up = 1, s_app_final, s_app_commit;
 // (WAPLOG=file: each frame's senses and outputs, a line a frame, for the film's panel)

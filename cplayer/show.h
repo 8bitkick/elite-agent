@@ -58,6 +58,7 @@ typedef struct {
     float follow_s, extend_s;   // after it: follow it in whichever view has it; fly straight on first
     int glance, glance_d;       // a look left or right at an enemy going past within glance_d...
     float glance_max, glance_gap, glance_px;   // ... for up to glance_max s, glance_gap s apart, at glance_px or more
+    int pulse_e;                // the camera pilot hands over to the interceptor under this energy on a pulse laser
 
     // SHOWPIECES: the missile, the energy bomb
     float msl_odds; int msl_near, msl_far;     // the share of fights with a missile, at one between msl_near and msl_far

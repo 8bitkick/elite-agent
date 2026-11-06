@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "state.h"           // (g_fair: a constant 0 in a build without fair mode, the Presto's)
 #include "wsp_dock.h"
 #include "dock_weights.h"
+#include "dock_opt_weights.h"      // Optimal mode's set (wsp/MODES.md: the jump asked for sooner); Curious flies fair mode's
 
 #define MAXL 8
 #define MAXW 256
@@ -21,15 +23,19 @@ static void load(void) {
     if (done) return;
     done = 1;
     net_t *n = &s_net;
-    n->nl = DOCK_LAYERS;
+    // the mode's own set: Optimal's (the same network with its own numbers), else fair mode's (Curious flies it too)
+    extern int g_curious;
+    const int *SHAPE = DOCK_SHAPE, *const *I = DOCK_I, *N = DOCK_N; const float *const *V = DOCK_V, *const *B = DOCK_B; const double *S = DOCK_SENSES; int NL = DOCK_LAYERS;
+    if (!g_fair && !g_curious) { SHAPE = DOCKO_SHAPE, I = DOCKO_I, N = DOCKO_N, V = DOCKO_V, B = DOCKO_B, S = DOCKO_SENSES, NL = DOCKO_LAYERS; }
+    n->nl = NL;
     for (int i = 0; i <= n->nl; i++) {
-        n->shape[i] = DOCK_SHAPE[i];
+        n->shape[i] = SHAPE[i];
 #if !APP_LOADED     // (the Presto app has no exit: its compiled-in weights fit, as this build's do)
         if (n->shape[i] > MAXW) { fprintf(stderr, "docking network: layer %d has %d units, MAXW %d\n", i, n->shape[i], MAXW); exit(1); }
 #endif
     }
-    for (int i = 0; i < n->nl; i++) n->I[i] = DOCK_I[i], n->V[i] = DOCK_V[i], n->B[i] = DOCK_B[i], n->N[i] = DOCK_N[i];
-    for (int i = 0; i < 5; i++) s_G[i] = DOCK_SENSES[i];
+    for (int i = 0; i < n->nl; i++) n->I[i] = I[i], n->V[i] = V[i], n->B[i] = B[i], n->N[i] = N[i];
+    for (int i = 0; i < 5; i++) s_G[i] = S[i];
 #if !APP_LOADED
     const char *path = getenv("WSPAPPW");
     if (path && *path) {
