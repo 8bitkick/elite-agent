@@ -569,8 +569,11 @@ int show_key(const ship_t *sh, int n, const ship_t *const *th, int nt, const shi
 // a glance left or right as a ship goes past close (where it'll be a game loop and a half on: the view key takes ~6
 // frames), back as soon as it's gone; after a flyby, follow it in whichever view has it. Our controls act on the ship
 // whatever the view, so the steering flies on through it; but only the view's own laser fires
+// (the glance is the show's whether show.c's margin or the camera pilot (wsp/MODES.md) is flying the fight: a side
+// camera on a pass is presentation, not the stick, and the network's senses don't depend on the view)
 int show_view(int view, const ship_t *sh, int n, const ship_t *t) {
-    if (!show_on() || !g_sp.glance) { G.view = 0; return view; }
+    extern int g_wsp_net;
+    if (!(show_on() || (g_curious && g_wsp_net == 1)) || !g_sp.glance) { G.view = 0; return view; }
     for (int i = 0; i < n; i++)         // (an incoming missile: eyes front)
         if (sh[i].type == 1 && (sh[i].ai & 0x40) && !ship_dead(&sh[i])) { G.view = 0; return view; }
     if (G.view) {
