@@ -32,3 +32,4 @@ Headless: [run_core.mjs](run_core.mjs), or [tools/fly.sh](tools/fly.sh) for a ca
 
 The dev page, [/dev/](https://8bitkick.cc/elite-agent/dev/), is built by the same workflow from the `wsp-modes` branch (its [wsp/MODES.md](https://github.com/8bitkick/elite-agent/blob/wsp-modes/wsp/MODES.md)): each mode flying its own AI pilots, `?mode=optimal|fair|curious`, and a Deadly button that jumps to a Deadly-rank save. Its fight networks are drawn by pilot, the camera purple and the interceptor red, and ACTION runs them all at 1x. The camera keeps the fight in the picture. The dev page also carries the paper, `paper.html`. A push to that branch doesn't run the workflow: a push under `web/` on main does, or "Run workflow" on it.
 
+
