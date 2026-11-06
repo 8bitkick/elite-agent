@@ -50,6 +50,8 @@ struct app_api {
 #include "galaxy.h"
 #include "docked.h"
 #include "fair.h"
+#include "wsp_pilot.h"
+#include "wsp_dock.h"
 
 #ifndef ELITE_AUTOSTART
 #define ELITE_AUTOSTART 2500        // frames: at most this (50 s) after boot or a reset, if the game never looked ready
@@ -217,6 +219,7 @@ static bool elite_init(const struct app_api *api)
             MACHINE_HOOK_VERSION, (unsigned long) io->version, (unsigned long) io->model, (unsigned long) io->mos);
         return false;
     }
+    { extern int g_pilots; g_pilots = 1; }       // (every mode flies its own AI pilot models, as on the web page; "agent pilots off": the C rules)
     s_hook = io;
     memset(&s_tot, 0, sizeof s_tot);
     strcpy(s_tot.name, "JAMESON");      // (Elite's own: a new game is already it, so nothing to keep)
@@ -370,6 +373,25 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
     } else if (!strcmp(a, "save")) {
         save_totals();
         snprintf(reply, reply_size, "AGENT totals saved");
+    } else if (!strcmp(a, "net")) {     // the network flying now, for the web panel's diagram: read only, each sense an int16 of 1/256ths in hex (a reply's at most 256 bytes)
+        extern float g_wsp_last_f[], g_dock_last_f[];
+        extern uint32_t g_wsp_last_frame, g_dock_last_frame;
+        extern int g_wsp_last_net;
+        uint32_t f = s_io.frame;
+        int fight = g_wsp_last_frame > 0 && f - g_wsp_last_frame < 30, dock = !fight && g_dock_last_frame > 0 && f - g_dock_last_frame < 30;
+        const float *v = fight ? g_wsp_last_f : dock ? g_dock_last_f : NULL;
+        int nv = fight ? WSP_NF : dock ? WSPD_N : 0;
+        int o = snprintf(reply, reply_size, "{\"n\":%d,\"s\":\"", fight ? g_wsp_last_net : dock ? 3 : -1);
+        for (int i = 0; i < nv && o + 7 < (int) reply_size; i++) {
+            int q = (int) (v[i] * 256.0f + (v[i] < 0 ? -0.5f : 0.5f));
+            q = q > 32767 ? 32767 : q < -32768 ? -32768 : q;
+            o += snprintf(reply + o, reply_size - o, "%04x", (unsigned) (q & 0xFFFF));
+        }
+        snprintf(reply + o, reply_size - o, "\"}");
+    } else if (!strncmp(a, "pilots ", 7)) {       // the modes' own AI pilots on or off (off: the C rules), to compare them on the board
+        extern int g_pilots;
+        g_pilots = !strcmp(a + 7, "on");
+        snprintf(reply, reply_size, "AGENT pilots %s", g_pilots ? "on" : "off");
     } else if (!strcmp(a, "status")) {
         char t[16];
         hms(t, sizeof t, s_tot.car.frames);

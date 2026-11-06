@@ -141,6 +141,15 @@ export class Panel {
         else this.drawDock(s);
     }
 
+    /** the network alone, as the Presto's web panel shows it: s.view "fight" or "dock", s.fightNet, s.senses; top: the canvas's top in the film's coordinates */
+    drawNet(s, top) {
+        const g = this.ctx;
+        if (s.view === "dock") this.dockActs = s.senses ? acts(this.d.dock.layers, s.senses) : null;
+        g.setTransform(1, 0, 0, 1, -X0, -top);
+        g.fillStyle = BG; g.fillRect(X0, top, 1920 - X0, H);
+        if (s.view === "fight") this.drawFight(s); else this.drawDock(s);
+    }
+
     drawTop(s) {
         const secs = Math.floor(s.frame / 50), p2 = (n) => String(n).padStart(2, "0");
         this.text("GAME TIME", PX, 36, `600 14px ${SANS}`, DIM);
