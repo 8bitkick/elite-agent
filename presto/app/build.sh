@@ -35,7 +35,7 @@ CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wal
   -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DNO_FAIR=$NOFAIR -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
   -DELITE_DISC=\"$(basename "${DISC:-}")\" -include $HERE/app_libc.h -I$TOP/cplayer -I$API_DIR"
 OBJS=
-for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
+for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/viewer.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
          "$TOP"/cplayer/{keyq,agent,cfly,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show,wsp_pilot,wsp_dock}.c; do
     o="$OUT/$(basename "${f%.c}").o"
     [ "$o" -nt "$f" ] && [ -f "${o%.o}.ci" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"

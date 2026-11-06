@@ -25,6 +25,7 @@ POINTERS = {
     'bfs': [CONDS], 'wait_for': [CONDS], 'hold_until': [CONDS], 'settle': [CONDS],
     'elite_frame': [FIRMWARE], 'key': [FIRMWARE], 'p_analogue': [FIRMWARE], 'say': [FIRMWARE],
     'p_hold': [FIRMWARE], 'p_tap': [FIRMWARE], 'elite_init': [FIRMWARE], 'elite_command': [FIRMWARE],
+    'viewer_init': [FIRMWARE], 'viewer_due': [FIRMWARE], 'viewer_draw': [FIRMWARE, 'view_log'], 'viewer_status': [FIRMWARE], 'viewer_set': [FIRMWARE], 'map_view': [FIRMWARE],
 }
 
 

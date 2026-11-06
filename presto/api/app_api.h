@@ -59,6 +59,22 @@ struct app_api {
     bool (*turbo_get)(void);            // the machine running as fast as it can
     void (*turbo_set)(bool on);
     void *ram; uint32_t ram_size;       // the app's RAM (its ram_base, up to APP_RAM_TOP; 0: none)
+    // Added later: check size before use (an older firmware hasn't them). The app's own screen, in
+    // place of the machine's picture: a tap anywhere on the panel swaps between the two, and the
+    // machine runs on underneath either way. view_open says how many rows of the board's display
+    // format (board.h) it wants, and is told their length: false if the board has no such thing.
+    // The RAM is taken only while the screen is shown, so the machine's picture costs none: view_buffer
+    // is the rows (each ends with BOARD_DISPLAY_ROW_END, set here), row_words words apart, NULL while
+    // hidden, or if the RAM wasn't there; all blank, showing row 0, each time it's shown. view_map says
+    // which row a display row shows. The app draws whenever it likes: the panel just scans what's there.
+    bool (*view_open)(int rows, int *row_words, int *display_rows);
+    uint32_t *(*view_buffer)(void);
+    void (*view_map)(int display_row, int row);
+    bool (*view_shown)(void);
+    void (*view_set)(bool shown);
+    uint32_t (*view_taps)(void);        // taps since boot, each a swap
+    uint32_t (*view_edges)(void);       // the touch line's falling edges since boot: finger or not
+    uint32_t (*view_errors)(void);      // and the times the touch panel didn't answer
 };
 
 // What the app gives the firmware: at the start of the slot (or compiled in).

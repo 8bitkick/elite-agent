@@ -205,11 +205,14 @@ static uint32_t stack_low(void)
     return (uint32_t) p;
 }
 
+#if !ELITE_HOOKS
+#include "viewer.h"
+#endif
 static bool elite_init(const struct app_api *api)
 {
     s_api = api;
 #if !ELITE_HOOKS
-    if (api->version < 1 || api->size < sizeof (struct app_api)) return false;     // (no log to say it with)
+    if (api->version < 1 || api->size < offsetof(struct app_api, ram) + sizeof api->ram + sizeof api->ram_size) return false;     // (no log to say it with)
 #endif
     // (the Master only for now: the player plays the Model B's disc Elite too, cplayer/elite_ver.c,
     // but the Model B's firmware has no RAM for an app)
@@ -227,9 +230,17 @@ static bool elite_init(const struct app_api *api)
     s_tot.boots = 1;
     s_resets_seen = io->resets;
     stack_paint();
+#if !ELITE_HOOKS
+    if (!viewer_init(api)) say("PLAYER no AI viewer on the panel: an older firmware, or no RAM for it");
+#endif
     return true;
 }
 
+#if !ELITE_HOOKS
+// (the log's i-th line kept, oldest first)
+static const char *view_log(int i) { int base = s_logn > LOGN ? s_logn - LOGN : 0; return s_log[(base + i) % LOGN]; }
+static void hms(char *out, size_t n, uint32_t frames);
+#endif
 static void elite_frame(const struct machine_hook_io *io)
 {
     if (io->resets != s_resets_seen) {
@@ -255,6 +266,16 @@ static void elite_frame(const struct machine_hook_io *io)
             memcpy(g_load_name, s_tot.name, sizeof g_load_name - 1), g_load_name[sizeof g_load_name - 1] = 0;
         }
     }
+#if !ELITE_HOOKS
+    if (viewer_due()) {         // (tapped to: read only, and at this top level, not on the player's stack)
+        char t[16];
+        hms(t, sizeof t, s_tot.car.frames);
+        double ty = s_on && g_ev.id ? tally() : 0;
+        viewer_info_t vi = {s_io.frame, t, rank_of(ty), ty, s_logn, view_log};
+        if (s_logn > LOGN) vi.log_n = LOGN;
+        viewer_draw(&vi);
+    }
+#endif
     if (!s_on) return;
     // (a reset: the frame count starts again, and the keys it held went with the old machine)
     if (io->frame < s_last_frame) keyq_reset();
@@ -373,6 +394,13 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
     } else if (!strcmp(a, "save")) {
         save_totals();
         snprintf(reply, reply_size, "AGENT totals saved");
+#if !ELITE_HOOKS
+    } else if (!strcmp(a, "view")) {
+        viewer_status(reply, (int) reply_size);
+    } else if (!strncmp(a, "view ", 5)) {      // (the same swap as a tap on the panel)
+        viewer_set(!strcmp(a + 5, "on"));
+        viewer_status(reply, (int) reply_size);
+#endif
     } else if (!strcmp(a, "net")) {     // the network flying now, for the web panel's diagram: read only, each sense an int16 of 1/256ths in hex (a reply's at most 256 bytes)
         extern float g_wsp_last_f[], g_dock_last_f[];
         extern uint32_t g_wsp_last_frame, g_dock_last_frame;
