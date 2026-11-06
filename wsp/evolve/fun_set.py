@@ -19,6 +19,8 @@ def one(path, env):
     m = fun.measure(rows, F["died"] if F else 0)
     m["show"] = F["score"] if F else 0.0
     m["path"] = path
+    m["cols"] = sum(1 for l in lines if " COL drop " in " " + l)      # (a sudden loss with a ship close by: a scrape)
+    m["coldrop"] = sum(int(re.search(r"COL drop (\d+)", l).group(1)) for l in lines if re.search(r"COL drop (\d+)", l))
     return m
 
 
@@ -32,7 +34,7 @@ if __name__ == "__main__":
         M = list(ex.map(lambda p: one(p, env), paths))
     n = len(M)
     mean = lambda k: sum(m[k] for m in M) / n
-    print("%s %s: n %d  FUN %.1f  show %.1f | per fight: %.0f s, close-up %.1f s, action %.1f, dot %.1f (firing at dots %.1f), empty %.1f, longest nothing %.1f s, passes %.2f, looks %.1f s | died %d" % (
-        name, sys.argv[2] if len(sys.argv) > 2 else "C", n, mean("fun"), mean("show"), mean("secs"), mean("closeup"), mean("action"), mean("dot"), mean("dotfire"), mean("empty"), mean("longest"), mean("passes"), mean("look"), sum(m["died"] for m in M)))
+    print("%s %s: n %d  FUN %.1f  show %.1f | per fight: %.0f s, close-up %.1f s, action %.1f, dot %.1f (firing at dots %.1f), empty %.1f, longest nothing %.1f s, passes %.2f, looks %.1f s | scrapes %.2f, %.1f energy | died %d" % (
+        name, sys.argv[2] if len(sys.argv) > 2 else "C", n, mean("fun"), mean("show"), mean("secs"), mean("closeup"), mean("action"), mean("dot"), mean("dotfire"), mean("empty"), mean("longest"), mean("passes"), mean("look"), mean("cols"), mean("coldrop"), sum(m["died"] for m in M)))
     if os.environ.get("LIST"):
         for m in sorted(M, key=lambda m: m["fun"]): print("%6.1f %s" % (m["fun"], fun.line(m)), m["path"].split("/rec/")[-1])
