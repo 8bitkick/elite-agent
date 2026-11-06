@@ -44,6 +44,12 @@ h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.12; letter-spacing: -.02e
 h3 { font-size: 16px; margin: 24px 0 2px; }
 td.r { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--soft); }
 tr.warn td { background: rgba(242, 209, 58, .06); }
+.beat { background: var(--panel); border: 1px solid var(--yel); border-radius: 6px; padding: 12px 14px; margin: 0 0 14px; font-size: 15px; line-height: 1.4; display: flex; flex-direction: column; gap: 10px; }
+.beat b { color: var(--yel); }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13.5px; color: var(--soft); }
+.ctl select, .ctl input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: 13.5px 'JetBrains Mono', monospace; margin-left: 4px; }
+.ctl input { width: 96px; }
+.ctl button { background: var(--yel); color: var(--bg); border: 0; border-radius: 6px; padding: 7px 14px; font: 700 13.5px Inter, sans-serif; cursor: pointer; }
 .specs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 24px; }
 .specs div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
 .specs b { display: block; font: 700 20px 'JetBrains Mono', monospace; color: var(--cyan); white-space: nowrap; }
@@ -110,6 +116,12 @@ footer a { color: var(--soft); }
   <a class="go" href="./">▶ Watch it fly, live in your browser</a>
   <span class="modes">or jump to a pilot: <a style="color: var(--red)" href="./?mode=optimal">Optimal</a> · <a style="color: var(--yel)" href="./?mode=fair">Fair</a> · <a style="color: var(--purple)" href="./?mode=curious">Curious</a></span>
 </div>
+<form class="beat" action="./" method="get">
+  <div><b>Best so far: 15.5 game hours.</b> Each seed is a different career. We've tried two. Can you find a faster one?</div>
+  <div class="ctl"><label>Mode <select name="mode"><option value="optimal">Optimal</option><option value="fair">Fair</option><option value="curious">Curious</option></select></label>
+  <label>Seed <input name="skew" type="number" min="0" max="100000" value="7" required></label>
+  <button type="submit">Fly this seed</button></div>
+</form>
 <div class="specs">
   <div><b>9–25 KB</b><span>of weights per fight network</span></div>
   <div><b>187–406</b><span>non-zero weights in each</span></div>
@@ -133,6 +145,10 @@ footer a { color: var(--soft); }
   <div class="card" style="--c: var(--yel)"><h4>Play fair</h4><span class="q">Fair knows only what a player could see on the screen.</span><span class="big">16.7 h to Elite<small>9 KB dogfights, 13 KB docking, no deaths</small></span></div>
   <div class="card" style="--c: var(--purple)"><h4>Put on a show</h4><span class="q">Curious is scored on what a viewer gets to watch.</span><span class="big">8× the close-ups<small>25 KB, at a real cost in points and deaths</small></span></div>
 </div>
+
+<h2>An open world, and a seed</h2>
+<p>Elite doesn't have levels. You choose where to fly, what to trade and who to fight, and the path to Elite differs every time. The galaxy itself is fixed: the seed is only how many frames the machine waits on the title screen before the agent starts. That tiny delay changes every encounter after it.</p>
+<p>Runs are fully deterministic, so a seed is a whole career you can replay exactly, and whole careers have matched byte for byte between browser and Node. Two seeds of Optimal land 0.1 hours apart here, but we've barely sampled them, and a faster one may well exist.</p>
 
 <h2>How a network flies the ship</h2>
 <p>You can't strafe in Elite: you roll until a ship is above you, then pull up. A half turn takes about five seconds. A network gets the same controls as a player, and nothing else.</p>
@@ -276,6 +292,11 @@ footer a { color: var(--soft); }
   <li><b>Known bug.</b> The docking final sometimes flies into station traffic. Two such collisions killed a police-flagged ship in one 200-minute Curious log, which is what newly raised the Offender status there. It isn't fixed yet.</li>
 </ul>
 <p>What surprised us most is how ordinary this felt. “Don't shoot it until it's big” turned into one unit, and a viewer's complaint could be traced to a specific weight. Neural networks are rarely this easy to talk to.</p>
+
+<h2>Find a faster seed</h2>
+<p>That's the challenge. Try a seed in the box at the top, or fly one headless and get a results row to share. On a Raspberry Pi 5, a career took about 25 minutes:</p>
+<pre>MODE=optimal web/tools/fly.sh --game flicker --skew 7</pre>
+<p>Post your seed in <a href="https://github.com/8bitkick/elite-agent/issues">the repository's issues</a>. Anyone can replay it to check, and only results from the same build compare fairly.</p>
 
 <h2>Try it, read it</h2>
 <p><a href="./">Watch it fly</a> and switch modes at the top: the panel lights the same diagrams live. Weights, labs and logs are all in <a href="https://github.com/8bitkick/elite-agent">the repository</a>; start with <a href="https://github.com/8bitkick/elite-agent/blob/main/wsp/README.md">Fair's write-up</a> and <a href="https://github.com/8bitkick/elite-agent/blob/main/wsp/MODES.md">the modes' lab notes</a>, which include what failed.</p>
