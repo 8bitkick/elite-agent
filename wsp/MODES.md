@@ -24,21 +24,35 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: C rules** | 21.52 ppm (372 fights, 0 deaths) | the rules the interceptor is measured against |
 | Optimal: fair mode's network, as shipped | 21.18 | |
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
-| **Curious: C rules + show.c** | PENDING_CAM_C | |
-| **Curious: the camera** | PENDING_CAM_NET | |
+| **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
+| **Curious: the camera** | **23.8** (17 deaths) | motion 0.32, close kills 0.09: it holds the target too still, and kills from too far |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
 | | 120 held-out starts | docked |
 |---|---:|---:|
-| Optimal: C law | PENDING_DOCK_C | |
-| Optimal: fair mode's network as shipped | 191.6 | 105/120 |
-| **Optimal: the network, the jump within 20 degrees** | PENDING_DOCK_NET | |
+| Optimal: C law | 180.6 | 110/120, median 166 s |
+| Optimal: fair mode's network as shipped | 190.9 | 107/120, median 169 s |
+| **Optimal: the network, the jump within 20 degrees** (`elite_dock_opt.wsp`) | **179.6** | 105/120, median 158 s |
 | Curious (600 s window): C law | 311.1 | 92/120, 17 deaths |
-| Curious: the network as shipped | 305.0 | 97/120, 16 deaths |
-| **Curious: gentler, a wider way round** | 286.3 | 98/120, 11 deaths |
+| Curious: the network as shipped | 297.5 | 95/120 |
+| Curious: gentler, a wider way round | 294.8 | 97/120 (within noise: Curious keeps the shipped weights) |
 
-Careers (native `run_sim`, 25 game hours at most): PENDING_CAREERS
+(Curious mode's dockings start from wherever its wandering left it, up to 60,000 units out, so its lab needs the longer
+window; a sixth of its starts still end in a death or a timeout for either pilot.)
+
+Careers (native `run_sim`, seeds 13 and 101; Optimal to the Elite tally, Curious the tally at 25 game hours):
+
+| | seed 13 | seed 101 |
+|---|---:|---:|
+| Optimal, C rules | 14.8 h, 0 deaths | 15.1 h, 0 deaths |
+| Optimal, the interceptor | 17.0 h, 1 death | 15.9 h, 0 deaths |
+| Curious, C rules + show.c | 1,310 pts, 26 deaths | 1,358 pts, 29 deaths |
+| Curious, the camera (the interceptor off-show) | 1,404 pts, 24 deaths | 1,320 pts, 21 deaths |
+
+The interceptor's seed-13 career lost two hours to one early death (at 1.9 h, shields down after a won witchspace fight)
+and the path it took after: by 8 h it was travelling for a galactic hyperdrive while the C rules were already farming.
+Witchspace points a minute were level (12.5 against 12.2). A career is one path; the lab's paired fights are the measure.
 
 ## How the interceptor was written, and what the lab said
 
@@ -73,18 +87,26 @@ speeds up as it falls behind), a pass (aim aside) as a fast closer looms, a dead
 sitting dead centre, a slow roll while on it, the laser whenever in the sights (the meter counts the laser as motion).
 Each of those is one or two named units.
 
-PENDING_CAM_STORY
+What the lab said, on 55 validation fights (the C: 30.2): as first written 23.3; firing only on the chase 24.4; a wider
+dead zone lost (22.7-23.6: the target left the frame); the C's own range, firing whenever in the sights, and a hard turn
+only once the target is behind 24.9; holding closer, where it is drawn 35 pixels, 26.2; 48 pixels, 27.5. The slow roll
+(orbit) was level with none. The parts still short of the C are motion (0.30 against 0.55) and close kills: the C's show
+strafes while it follows and watches a flyby from the side view, which this network can't do (it has no view switch), and
+a pass that the meter counts needs the enemy to cross the frame, which a steering law that keeps it in the sights
+prevents. The next thing to write is a flyby: aim beside the target on purpose for a second as it closes, let it cross,
+then turn after it.
 
 ## Docking: the jump cone
 
 In Optimal mode the fair-mode docking network timed out on 5 of 60 starts the C law docked. Its trace: it asks for the
 in-system jump only once the planet is within 10 degrees of the nose; by then the station is inside the game's bubble and
 the jump is refused, and it flies 100,000 units at speed 40. The C law jumps earlier because its cruise steering is
-faster. One parameter, `jump_cos`: the jump asked for within 20 degrees: PENDING_DOCK60. At 26 degrees it jumps off
-course and loses it all back.
+faster. One parameter, `jump_cos`: the jump asked for within 20 degrees takes the network from 190.9 to 179.6 on 120 starts,
+level with the C law and 11 s faster in the median. At 16 degrees the gain halves; at 26 it jumps off course and loses it
+all back. That set is compiled in as Optimal mode's (`cplayer/dock_opt_weights.h`); the loader picks a set by mode.
 
-For Curious the same network with a gentler roll and pitch and a wider way round the station docked more and died less;
-the deaths are the measure that moved.
+For Curious, a gentler roll and pitch and a wider way round the station cut deaths from 16 to 11 of 120 on the network as
+first written, but on the shipped (evolved) parameters the same change is within noise, so Curious flies the shipped set.
 
 ## The page
 

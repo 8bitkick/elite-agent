@@ -35,24 +35,24 @@ def fl(x):
     return t + ("" if ("." in t or "e" in t or "n" in t) else ".0") + "f"
 
 
-def save_header(Wb, path, names, G):
+def save_header(Wb, path, names, G, prefix="DOCK"):
     with open(path, "w") as f:
         f.write("// the docking network, compiled in (sparse): wsp/elite_wsp/dock_export.py writes this\n")
         f.write("// the senses' geometry: " + ", ".join(SENSE_KEYS) + "\n")
-        f.write("static const double DOCK_SENSES[] = {" + ", ".join("%.9g" % G[k] for k in SENSE_KEYS) + "};\n")
-        f.write(f"#define DOCK_LAYERS {len(Wb)}\n")
-        f.write("static const int DOCK_SHAPE[] = {%s};\n" % ", ".join([str(Wb[0][0].shape[1])] + [str(W.shape[0]) for W, b in Wb]))
+        f.write("static const double " + prefix + "_SENSES[] = {" + ", ".join("%.9g" % G[k] for k in SENSE_KEYS) + "};\n")
+        f.write("#define " + prefix + "_LAYERS %d\n" % len(Wb))
+        f.write("static const int " + prefix + "_SHAPE[] = {%s};\n" % ", ".join([str(Wb[0][0].shape[1])] + [str(W.shape[0]) for W, b in Wb]))
         for i, (W, b) in enumerate(Wb):
             nz = np.nonzero(W.ravel())[0]
             f.write(f"// layer {i}: " + ", ".join(names[i]) + "\n")
-            f.write(f"static const int DOCK_N{i} = {len(nz)};\n")
-            f.write(f"static const int DOCK_I{i}[] = {{" + (", ".join(str(int(j)) for j in nz) or "0") + "};\n")
-            f.write(f"static const float DOCK_V{i}[] = {{" + (", ".join(fl(W.ravel()[j]) for j in nz) or "0.0f") + "};\n")
-            f.write(f"static const float DOCK_B{i}[] = {{" + ", ".join(fl(x) for x in b) + "};\n")
-        f.write("static const int *const DOCK_I[] = {%s};\n" % ", ".join(f"DOCK_I{i}" for i in range(len(Wb))))
-        f.write("static const float *const DOCK_V[] = {%s};\n" % ", ".join(f"DOCK_V{i}" for i in range(len(Wb))))
-        f.write("static const float *const DOCK_B[] = {%s};\n" % ", ".join(f"DOCK_B{i}" for i in range(len(Wb))))
-        f.write("static const int DOCK_N[] = {%s};\n" % ", ".join(f"DOCK_N{i}" for i in range(len(Wb))))
+            f.write(f"static const int {prefix}_N{i} = {len(nz)};\n")
+            f.write(f"static const int {prefix}_I{i}[] = {{" + (", ".join(str(int(j)) for j in nz) or "0") + "};\n")
+            f.write(f"static const float {prefix}_V{i}[] = {{" + (", ".join(fl(W.ravel()[j]) for j in nz) or "0.0f") + "};\n")
+            f.write(f"static const float {prefix}_B{i}[] = {{" + ", ".join(fl(x) for x in b) + "};\n")
+        f.write("static const int *const " + prefix + "_I[] = {%s};\n" % ", ".join(f"{prefix}_I{i}" for i in range(len(Wb))))
+        f.write("static const float *const " + prefix + "_V[] = {%s};\n" % ", ".join(f"{prefix}_V{i}" for i in range(len(Wb))))
+        f.write("static const float *const " + prefix + "_B[] = {%s};\n" % ", ".join(f"{prefix}_B{i}" for i in range(len(Wb))))
+        f.write("static const int " + prefix + "_N[] = {%s};\n" % ", ".join(f"{prefix}_N{i}" for i in range(len(Wb))))
 
 
 EVOLVED = os.path.join(WSP, "evolve", "es_dock_best.json")
@@ -69,10 +69,18 @@ def main(params=None, tag=""):
     G = {k: P[k] for k in SENSE_KEYS}
     save_wsp(Wb, os.path.join(WSP, f"elite_dock{tag}.wsp"), G)
     if not tag: save_header(Wb, os.path.join(ROOT, "cplayer", "dock_weights.h"), [L.names for L in layers], G)
+    elif tag in MODES: save_header(Wb, os.path.join(ROOT, "cplayer", f"dock{tag}_weights.h"), [L.names for L in layers], G, MODES[tag])
     nz = sum(int((np.abs(W) > 0).sum()) for W, b in Wb)
     nb = sum(int((np.abs(b) > 0).sum()) for W, b in Wb)
     return f"shape {[Wb[0][0].shape[1]] + [W.shape[0] for W, b in Wb]}, {nz} non-zero weights, {nb} biases"
 
 
+MODES = {"_opt": "DOCKO", "_cur": "DOCKC"}      # the other modes' sets (wsp/MODES.md): elite_dock_opt.*, cplayer/dock_opt_weights.h
+
+
 if __name__ == "__main__":
-    print(main())
+    import sys, json
+    if len(sys.argv) > 2 and sys.argv[1] in ("opt", "cur"):    # dock_export.py opt|cur params.json
+        print(main(json.load(open(sys.argv[2])), "_" + sys.argv[1]))
+    else:
+        print(main())
