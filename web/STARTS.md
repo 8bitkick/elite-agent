@@ -87,7 +87,7 @@ in its description.
 
 | What | Version |
 |---|---|
-| `web/core.wasm` | sha256 `ab9f66855bb5bb2b2f7d5a5dc669c964889434d9ca9187b96e1775ab8f5e38cb`, built by `web/build.sh` with clang 19 on arm64 (the careers above were flown on `16783057…`; the change since is the page's docking-action flag only, and both discs' 10-minute journals are unchanged) |
+| `web/core.wasm` | sha256 `0efef07bc027b2345cc5c962ef4ab7e9f71fb82e171ec3504831d2ef49d8b383`, built by `web/build.sh` with clang 19 on arm64 (the careers above were flown on `16783057…`; the change since is the page's docking-action flag only, and both discs' 10-minute journals are unchanged) |
 | Emulator | Kieran Connell's Master core, in `8bitkick/rp2350-bbc-micro@b8232984` (`src/cores/kc-beeb`), from [esp32-beeb](https://github.com/kieranhj/esp32-beeb) |
 | ROMs | MOS 3.20 set, `scarybeasts/beebjit@db16aaf0` (`roms/mos3.20`) |
 | flicker-free disc | `markmoxon/elite-source-code-bbc-master@e6581b58`, sha256 `3c7b7e55...` |

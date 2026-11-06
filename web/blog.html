@@ -138,7 +138,7 @@ footer a { color: var(--soft); }
   <div><b>9–25 KB</b><span>of weights per fight network</span></div>
   <div><b>187–406</b><span>non-zero weights in each</span></div>
   <div><b>60 lines</b><span>of plain C to run them, no ML library</span></div>
-  <div><b>RP2350</b><span>Optimal and Curious run on its Arm Cortex-M33, beside a BBC Master emulator</span></div>
+  <div><b>RP2350</b><span>All three run on its Arm Cortex-M33, beside a BBC Master emulator</span></div>
 </div>
 <div class="meta">
   <div><h3>Project</h3><p><a href="https://github.com/8bitkick">8bitkick</a>; weights written by Claude</p></div>
@@ -253,7 +253,7 @@ footer a { color: var(--soft); }
   <tr><td>Slowest frame, after one boot spike of 33 ms</td><td class="n">14.5 ms</td><td class="n">14.7 ms</td></tr>
   <tr><td>Weights in flash</td><td class="n">25.3 KB</td><td class="n">16.1 KB</td></tr>
 </table></div>
-<p>That's 20 and 16 minutes early in a career, with few fights and no late emulator frames. Docking adds 13.3 KB. Fair's 9 KB dogfight network doesn't run on the board yet: its build fails a stack check.</p>
+<p>That's 20 and 16 minutes early in a career, with few fights and no late emulator frames. Docking adds 13.3 KB. Fair runs on the board too, from its own plugin build: 7 minutes, 2.9 ms average, no late frames, though one frame took 26.6 ms. In the default Curious build, a tap anywhere on the panel swaps between the game and a live view of the network.</p>
 
 <h2>Limits</h2>
 <ul>
