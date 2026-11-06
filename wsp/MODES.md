@@ -230,3 +230,15 @@ The meter now counts what's in the picture; before, a big ship behind us counted
 | **Camera, all of it** | **52 s** | **4.8 s** | **9.6 s** | **37.1 s** | **30** |
 
 On screen 16% of a fight to 28%. Dots are still most of it, the long stretches at range between contacts.
+
+## The break-off
+
+What killed Curious: the C's break-off (hurt, two or more enemies: run tail-on at full speed to recharge) was overridden under the pilots, three ways. The network's speed law replaced its speed 40, so it stopped to turn with the pack closing (cur101:00485: speed 1-10, 8,988 to 6,400, the C at 40 stays near 8,000); the gentle camera flew some break-offs (cur13:00372: aft shield 255 to 0 in 6 s, dead at 9.7 s); and the network fired at 1 px on the run, draining energy (172 to 128 in 10 s). 22 of the test set's 30 deaths were in packs, most within 12 s of a hurt start. A break-off (`s_force_rear`, Curious only by default) now keeps the interceptor, speed 40 and the C's fire rule. No weights changed.
+
+| | deaths, test set | points a minute | close-up | career seed 13 | career seed 101 |
+|---|---:|---:|---:|---:|---:|
+| Before | 30 | 2.18 | 4.8 s | 867, 48 deaths | 733, 62 deaths |
+| **After** | **17** | **2.31** | **4.6 s** | **943, 22 deaths** | **971, 28 deaths** |
+| C rules | 14 | 3.34 | 0.6 s | 1,310, 26 deaths | 1,288, 29 deaths |
+
+Tried without gain: `form_rho` 1.0, `lead` 3, a witchspace speed cap, the interceptor for all of witchspace, `fire_rho_ws` 0.45 (more points, but firing at dots 0.6 to 2.6 s). Open: witchspace is most of the remaining gap (140 against 196 points in 17 test fights): the camera's rate is better, its fights end twice as soon. Offender counts unchanged: that's the docking collisions.
