@@ -10,6 +10,7 @@
 #include "ships.h"
 #include <math.h>
 #include "pilot.h"
+#include "show.h"
 #include "keyq.h"
 #include "galaxy.h"
 #include "elite_ram.h"
@@ -399,6 +400,7 @@ int main(int argc, char **argv) {
     { extern int g_ws_fight; if (getenv("WSFIGHT")) g_ws_fight = atoi(getenv("WSFIGHT")); }
     { extern int g_ws_shield; if (getenv("WSSHIELD")) g_ws_shield = atoi(getenv("WSSHIELD")); }
     { extern int g_dock_log; g_dock_log = getenv("DOCKLOG") != NULL; }
+    { extern show_params_t g_sp; if (getenv("CAMPULSE")) g_sp.pulse_e = atoi(getenv("CAMPULSE")); }     // (the camera's pulse-laser handover)
     { extern int g_rr_log; g_rr_log = getenv("RRLOG") != NULL; }
     s_collog = getenv("COLLOG") != NULL;
     s_turbolog = getenv("TURBOLOG") != NULL;

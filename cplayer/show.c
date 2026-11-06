@@ -49,6 +49,7 @@ show_params_t g_sp = {
     // knife-edge on any close pass; followed into the side and rear views for 4 s, after 1.5 s straight on
     .fb_odds = 0.25f, .fb_side = 500, .fb_start = 4000, .fb_speed = 10, .novel_look = 1, .knife_d = 900, .pass_knife = 1, .pass_cpa = 600,
     .follow_s = 4, .extend_s = 1.5f, .glance = 1, .glance_d = 1200, .glance_max = 2.0f, .glance_gap = 6.0f, .glance_px = 20,
+    .pulse_e = 230,      // (the camera pilot: the handover to the interceptor on a pulse laser, energy under this; CAMPULSE= in run_sim)
     // SHOWPIECES. A missile in 30% of fights, the bomb in half of those with a pack in close (rare by design)
     .msl_odds = 0.3f, .msl_near = 1200, .msl_far = 6000, .bomb_odds = 0.5f, .bomb_n = 3, .bomb_dist = 3000, .bomb_ws = 1,
     // WITCHSPACE. The nearest group (side views 25 -> 31% of fights); the Thargons first (cleared fast, then
@@ -265,8 +266,11 @@ int show_on(void) { return S.on; }
 // real danger, the energy under 128 or a missile homing on us with no ECM, the same "urgent" test as the margin's
 // (in witchspace the agent jumps out under bail_energy, 180: the handover comes above that, so the interceptor gets
 // its turn before the bail-out, as the margin's own switch-off used to give it)
+// (and on a pulse laser, sooner: a show fight on one is slow to kill and a pack kills us first. Seed 13's career died
+// 54 times in its first five hours at the 128 handover, the tally stuck under 20)
 int show_danger(const ship_t *sh, int n) {
-    if (energy() < (witchspace() ? 200 : 128)) return 1;
+    int pulse = !(laser(0) & 0x80);
+    if (energy() < (witchspace() ? 200 : pulse ? g_sp.pulse_e : 128)) return 1;
     if (has_ecm()) return 0;
     for (int i = 0; i < n; i++)
         if (sh[i].type == 1 && (sh[i].ai & 0x40) && ship_in_space(&sh[i]) && !ship_dead(&sh[i])) return 1;

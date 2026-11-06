@@ -85,6 +85,7 @@ CAMERA = dict(
     hurt_e=160.0,        # energy under which it's sharp
     fire_near=0.2,       # range / 4096 inside which the laser is allowed whatever the size (820: a pass at 600 by a small ship was never shot, 16 px)
     chase_far=1.0,       # 1: a chase only while the target isn't drawn big (0: as first written)
+    chase_gain=4.0,      # the error x this on a chase (measured: 2.5 and 4 level on the show meter, 4 ends the chase soonest: fights 42 s to 28): the aim held on the small cone at range (1: none)
     chase_close=0.15,    # closing speed (units a loop / 64: 10) under which a target ahead is a chase we don't win: shoot at range
 )
 
@@ -175,6 +176,13 @@ def _build(P, camera=False):
         L3.unit("exw-", {"ax-": kw, "ax+": -kw, "sharp+": M}, -M, "sharp: the sideways error's extra (left)")
         L3.unit("eyw+", {"ay+": kw, "ay-": -kw, "sharp+": M}, -M, "sharp: the error's extra (up)")
         L3.unit("eyw-", {"ay-": kw, "ay+": -kw, "sharp+": M}, -M, "sharp: the error's extra (down)")
+        # a chase: the same extra, gated by stuck (its own units: gated by both in one, the two gates would add a
+        # constant to the error when both were on). A shot at range needs the aim held on a small cone
+        kc = P["chase_gain"] - 1
+        L3.unit("exc+", {"ax+": kc, "ax-": -kc, "stuck": M}, -M, "a chase: the sideways error's extra (right)")
+        L3.unit("exc-", {"ax-": kc, "ax+": -kc, "stuck": M}, -M, "a chase: the sideways error's extra (left)")
+        L3.unit("eyc+", {"ay+": kc, "ay-": -kc, "stuck": M}, -M, "a chase: the error's extra (up)")
+        L3.unit("eyc-", {"ay-": kc, "ay+": -kc, "stuck": M}, -M, "a chase: the error's extra (down)")
     else:
         L3.unit("ex+", {"ax+": 1, "ax-": -1}, note="sideways error (right)")
         L3.unit("ex-", {"ax-": 1, "ax+": -1}, note="sideways error (left)")
@@ -194,11 +202,11 @@ def _build(P, camera=False):
     r0, cap = P["roll_ramp"], P["roll_cap"]
     W = (lambda d: d) if camera else (lambda d: {})       # (the camera's witchspace extras; none in the interceptor)
     for s in "+-":
-        L4.unit("over" + s, add({"ex" + s: 1 / r0, "cx" + s: -cap}, W({"exw" + s: 1 / r0})), note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
-    absx = add({"ex+": 1, "ex-": 1}, W({"exw+": 1, "exw-": 1}))
-    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, W({"eyw+": 1, "eyw-": -1}), neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
-    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1}), neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
-    if camera: L4.passthrough("exw+", "exw-")
+        L4.unit("over" + s, add({"ex" + s: 1 / r0, "cx" + s: -cap}, W({"exw" + s: 1 / r0, "exc" + s: 1 / r0})), note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
+    absx = add({"ex+": 1, "ex-": 1}, W({"exw+": 1, "exw-": 1, "exc+": 1, "exc-": 1}))
+    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, W({"eyw+": 1, "eyw-": -1, "eyc+": 1, "eyc-": -1}), neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
+    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1, "eyc-": 1, "eyc+": -1}), neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
+    if camera: L4.passthrough("exw+", "exw-", "exc+", "exc-")
     if camera:
         L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("shoot"), {"seen": 1}), -5.0,
                 "AND of six: in the sights, ahead, in range, cool, drawn big or a chase, a target (no kills at a distance, unless the chase is lost)")
@@ -212,7 +220,7 @@ def _build(P, camera=False):
     L5 = Layer(L4.names)
     UP, OH = sat_ref("up"), sat_ref("outhold")
     for s in "+-":
-        m = add({"ex" + s: 1 / r0, "over" + s: -1}, W({"exw" + s: 1 / r0}))      # min(|error|/ramp, cap x |clock x|)
+        m = add({"ex" + s: 1 / r0, "over" + s: -1}, W({"exw" + s: 1 / r0, "exc" + s: 1 / r0}))      # min(|error|/ramp, cap x |clock x|)
         # gated twice: by the side, and by being outside the nose hold: v + M(up) + M(outhold) - 2M
         L5.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold")
         L5.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -M, f"roll magnitude ({s}) if below, outside the nose hold")

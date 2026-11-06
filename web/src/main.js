@@ -327,7 +327,9 @@ async function main() {
     // the action worth real time, each frame: the dogfight network deciding, or the docking network flying its final
     const note = () => {
         const f = core.frameNo, fw = core.x.wasm_fight_when(), dw = core.x.wasm_dock_when();
-        if (fw > 0 && f - fw < 30) { s.lastAction = f; s.actionKind = "fight"; }
+        // (Curious: the show is the close-up. A fight with the target a dot, an approach from where ships spawn or a turn
+        // with it behind, runs at speed; real time from 10 px, the size the show meter counts as seen)
+        if (fw > 0 && f - fw < 30 && (MODE !== "curious" || core.x.wasm_fight_px() >= 10)) { s.lastAction = f; s.actionKind = "fight"; }
         else if (core.action === 2 && dw > 0 && f - dw < 30) { s.lastAction = f; s.actionKind = "dock"; }
         if (!checked && !RESUMED && f >= CHECK_FRAMES) { checked = true; check(); }
     };

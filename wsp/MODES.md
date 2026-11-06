@@ -121,6 +121,41 @@ the camera's look now follows the ship from view to view and holds while it's ne
 by); and, unfixed, the approaches from where ships spawn, 9,000 to 11,000 units of a dot closing at full speed. Test set
 25.1 to 25.4, deaths 28 to 25.
 
+## At risk: immediate-kill mode
+
+The camera flies while the ship is sound; danger hands the fight to the interceptor (`show_danger`): energy under 128,
+under 200 in witchspace (above the bail-out level), a missile homing with no ECM, and on a pulse laser under 230: a show
+fight on a pulse laser is slow to kill and a pack kills us first. The first five game hours of two careers, deaths and
+the tally:
+
+| pulse-laser handover | seed 13 | seed 101 |
+|---|---:|---:|
+| 128 | 51 deaths, tally 32 | 3, 44 |
+| 200 | 3, 76 | 12, 20 |
+| **230** | **3, 91** | **9, 72** |
+
+(One path each; the 128 row is the whole case.) The interceptor gets the fight for a moment and the camera has it back
+once the energy is up.
+
+## The viewer's meter
+
+The show meter scores the parts a fight should have. `evolve/fun.py` counts what the viewer sat through, in seconds,
+from the lab's per-frame log: close-up (the target 24 px or more in the view shown), action (10-24 px, or the laser on
+it), dot (under 10 px: an approach, or a turn with it behind), firing at dots, nothing on screen, the longest run of
+nothing, passes, looks out of a side or rear view, deaths. `fun_set.py val` runs it over a set.
+
+| validation, 55 fights | fun | a fight | close-up | action | dot | firing at dots | longest nothing |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| the camera | -38 | 27 s | 2.0 s | 3.8 s | 21.6 s | 1.0 s | 11.7 s |
+| C rules + show.c | -53 | 41 s | 1.2 s | 9.4 s | 30.1 s | 2.7 s | 15.7 s |
+
+Both are mostly dot: ships spawn 9,000 to 11,000 out and the approach at full speed is 20 s of a speck, then each pass
+sends the target astern and the turn back (full pitch, stopped) is 10 s of empty sky. The pilot can't shorten physics,
+so the page does: in Curious mode ACTION's real time starts when the target is drawn 10 px (`wasm_fight_px`); the
+approach and the turn run at speed. On a chase the aim is sharpened 4 x (`chase_gain`: fights at the cap 3 to 0, the
+average fight 42 s to 28). A turn flown at speed 16 instead of stopped was tried for the sake of the moving stars:
+longer fights, no better (fun -40).
+
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that
 speeds up as it falls behind), a pass (aim aside) as a fast closer looms, a dead zone so the target drifts instead of

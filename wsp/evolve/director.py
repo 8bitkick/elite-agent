@@ -138,10 +138,12 @@ def direct(f, w, every, cols, out, want_gif, secs):
     frame0 = 0          # (the per-frame log counts the fight's frames from 1, as the shots do)
     res = next((l for l in lines if l.startswith(path)), "")
     F = meter(lines)
+    import fun
     verdict = "show %.1f  parts %s  died %d  kills %d/%d  %.0f s" % (F["score"], json.dumps({k: round(v, 2) for k, v in F["parts"].items()}), F["died"], F["kills"], F["start_n"], F["frames"] / 50) if F else "(no meter line)"
-    title = "%s:%s  %s" % (run, base, verdict)
+    title = "%s:%s  %s  |  %s" % (run, base, verdict, fun.line(fun.measure(rows, F["died"] if F else 0))[:60])
     sheet(frames, rows, frame0, every, cols, os.path.join(d, "sheet.png"), title)
-    tl = [res, verdict] + timeline(rows, frame0)
+    import fun
+    tl = [res, verdict, fun.line(fun.measure(rows, F["died"] if F else 0))] + timeline(rows, frame0)
     open(os.path.join(d, "timeline.txt"), "w").write("\n".join(tl) + "\n")
     if want_gif: gif(frames, every, os.path.join(d, "fight.gif"), secs)
     print(d); print("\n".join(tl))
