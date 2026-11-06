@@ -112,3 +112,69 @@ for (const c of fairC) { c.width = 520; c.height = 390; }
 new IntersectionObserver((e) => { fairSeen = e[0].isIntersecting; }).observe(fairC[0]);
 drawFair();
 setInterval(() => { if (fairSeen && !matchMedia("(prefers-reduced-motion: reduce)").matches) { fi++; drawFair(); } }, 200);
+
+const COBRA_V = [[32,0,76],[-32,0,76],[0,26,24],[-120,-3,-8],[120,-3,-8],[-88,16,-40],[88,16,-40],[128,-8,-40],[-128,-8,-40],[0,26,-40],[-32,-24,-40],[32,-24,-40],[-36,8,-40],[-8,12,-40],[8,12,-40],[36,8,-40],[36,-12,-40],[8,-16,-40],[-8,-16,-40],[-36,-12,-40],[0,0,76],[0,0,90],[-80,-6,-40],[-80,6,-40],[-88,0,-40],[80,6,-40],[88,0,-40],[80,-6,-40],[0,0,224],[0,48,48],[96,0,-16],[-96,0,-16],[0,48,-32],[0,24,-112],[-48,0,-112],[48,0,-112],[0,-48,48],[0,-48,-32],[0,-24,-112]], COBRA_E = [[0,1],[0,4],[1,3],[3,8],[4,7],[6,7],[6,9],[5,9],[5,8],[2,5],[2,6],[3,5],[4,6],[1,2],[0,2],[8,10],[10,11],[7,11],[1,10],[0,11],[1,5],[0,6],[20,21],[12,13],[18,19],[14,15],[16,17],[15,16],[14,17],[13,18],[12,19],[2,9],[22,24],[23,24],[22,23],[25,26],[26,27],[25,27],[0,8],[0,3],[0,2],[0,1],[2,4],[1,2],[2,8],[1,3],[3,8],[2,9],[3,4],[3,9],[3,5],[3,10],[2,5],[2,10],[2,7],[3,6],[5,6],[5,7],[7,10],[6,10],[4,5],[9,10],[1,4],[8,9]];
+// ---- the hero: Elite's Cobra Mk III, turning as the camera network's real outputs say, each control pulsing with its value
+{
+    const cv = document.getElementById("cobra"), g = cv.getContext("2d"), W = (cv.width = 1040), H = (cv.height = 520);
+    const tr = senses.camera, L = panelData.camera.layers, COL = { roll: "56,214,232", pitch: "242,209,58", throttle: "27,175,122", fire: "240,72,72" };
+    const out = tr.map((f) => { const a = acts(L, f), o = a[a.length - 1]; return { roll: Math.max(-31, Math.min(31, o[0])), pitch: Math.max(-8, Math.min(8, o[1])), fire: o[2] > 0.5 ? 1 : 0, throttle: Math.max(0, Math.min(40, o[3])) }; });
+    let t = 0, turn = 0.9, rollA = 0, pitchA = 0, cur = { roll: 0, pitch: 0, fire: 0, throttle: 0 }, heroSeen = true;
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const rot = (p) => {
+        let [x, y, z] = p, c = Math.cos(rollA), s = Math.sin(rollA);           // the ship's own roll, about its nose
+        [x, y] = [x * c - y * s, x * s + y * c];
+        c = Math.cos(pitchA); s = Math.sin(pitchA); [y, z] = [y * c - z * s, y * s + z * c];      // its pitch
+        c = Math.cos(turn); s = Math.sin(turn); [x, z] = [x * c + z * s, -x * s + z * c];         // the slow turntable
+        c = Math.cos(0.32); s = Math.sin(0.32); [y, z] = [y * c - z * s, y * s + z * c];          // the viewer, a little above
+        const k = 2.5 * (900 / (900 - z));
+        return [W / 2 + x * k, H / 2 - y * k - 24];
+    };
+    const line = (pts, col, a, w) => { g.strokeStyle = `rgba(${col},${a})`; g.lineWidth = w; g.lineCap = "round"; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); g.stroke(); };
+    const arrow = (pts3, col, v) => {
+        const a = 0.5 + 0.5 * v, w = 3 + 5 * v, q = pts3.map(rot);
+        line(q, col, a, w);
+        const [p0, p1] = [q[q.length - 2], q[q.length - 1]], ang = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), h = 15 + 10 * v;
+        g.fillStyle = `rgba(${col},${a})`; g.beginPath(); g.moveTo(p1[0] + Math.cos(ang) * h * 0.7, p1[1] + Math.sin(ang) * h * 0.7);
+        g.lineTo(p1[0] + Math.cos(ang + 2.5) * h, p1[1] + Math.sin(ang + 2.5) * h); g.lineTo(p1[0] + Math.cos(ang - 2.5) * h, p1[1] + Math.sin(ang - 2.5) * h); g.fill();
+    };
+    const arc = (fn, sign) => { /* the arrow runs the way the value says */ const pts = []; for (let i = 0; i <= 30; i++) pts.push(fn((-110 + (220 * i) / 30) * (Math.PI / 180) * (sign < 0 ? -1 : 1))); return pts; };
+    const label = (i, name, val, col, on) => {
+        const x = 16 + i * 254, y = H - 62;
+        g.fillStyle = "rgb(9,11,15)"; g.fillRect(x, y, 246, 50); g.fillStyle = `rgba(${col},${0.08 + 0.3 * on})`; g.fillRect(x, y, 246 * Math.max(0.02, on), 50); g.strokeStyle = `rgba(${col},${0.4 + 0.6 * on})`; g.lineWidth = 1 + 2 * on; g.strokeRect(x + 0.5, y + 0.5, 246, 50);
+        g.font = "700 22px 'JetBrains Mono', monospace"; g.textBaseline = "middle"; g.textAlign = "left"; g.fillStyle = `rgb(${col})`; g.fillText(name, x + 12, y + 26);
+        g.textAlign = "right"; g.fillStyle = "rgb(232,234,238)"; g.fillText(val, x + 234, y + 26);
+    };
+    function frame() {
+        g.fillStyle = "rgb(16,19,25)"; g.fillRect(0, 0, W, H);
+        const r = Math.abs(cur.roll) / 31, p = Math.abs(cur.pitch) / 8, th = cur.throttle / 40, pulse = 0.5 + 0.5 * Math.sin(t * 0.25);
+        // the ship, from its blueprint's vertices and edges
+        g.strokeStyle = "rgba(232,234,238,.9)"; g.lineWidth = 1.3; g.beginPath();
+        for (const [a, b] of COBRA_E) { const A = rot(COBRA_V[a]), B = rot(COBRA_V[b]); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); }
+        g.stroke();
+        // the controls, each brighter and thicker with its value, each its direction by its sign
+        arrow(arc((a) => [42 * Math.cos(a + 1.57), 42 * Math.sin(a + 1.57), 118], cur.roll), COL.roll, Math.min(1, r * (0.75 + 0.25 * pulse)));
+        arrow(arc((a) => [-165, 58 * Math.sin(a), 58 * Math.cos(a) - 8], cur.pitch), COL.pitch, Math.min(1, p * (0.75 + 0.25 * pulse)));
+        arrow([[0, -56, -70], [0, -56, -70 + 50 + 110 * th]], COL.throttle, th * (0.75 + 0.25 * pulse));
+        if (cur.fire) line([rot([0, 0, 92]), rot([0, 0, 330])], COL.fire, 0.95, 4);
+        label(0, "roll", (cur.roll > 0 ? "+" : "") + Math.round(cur.roll), COL.roll, r);
+        label(1, "pitch", (cur.pitch > 0 ? "+" : "") + Math.round(cur.pitch), COL.pitch, p);
+        label(2, "throttle", String(Math.round(cur.throttle)), COL.throttle, th);
+        label(3, "fire", cur.fire ? "FIRE" : "-", COL.fire, cur.fire);
+    }
+    let last = 0;
+    function run(ms) {
+        if (heroSeen && !still && ms - last >= 33) {
+            last = ms; t++;
+            const o = out[Math.floor(t / 3) % out.length];     // (the trace is 10 a second, this 30)
+            cur = o; turn += 0.006;
+            rollA += (o.roll / 256) * 0.55; pitchA = pitchA * 0.985 + (o.pitch / 256) * 0.55;
+            frame();
+        }
+        requestAnimationFrame(run);
+    }
+    cur = out.find((o) => o.fire) || out[0];
+    frame();
+    new IntersectionObserver((e) => { heroSeen = e[0].isIntersecting; }).observe(cv);
+    requestAnimationFrame(run);
+}
