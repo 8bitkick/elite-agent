@@ -78,7 +78,7 @@ a.brand:hover { color: var(--fg); text-decoration: underline; text-underline-off
 .games, .modes { display: inline-flex; }
 .games a, .modes a { padding: 4px 10px; font-size: 13px; color: var(--dim); background: var(--panel); text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; }
 .games a:last-child, .modes a:last-child { border-right: 0; }
-.games a.on { background: rgb(10, 40, 46); color: var(--cyan); }
+.games a.on, .modes a.on { background: rgb(10, 40, 46); color: var(--cyan); }
 #phone .tools .games { flex: 1; }
 #phone .tools .games a { flex: 1; text-align: center; }
 #tip { position: fixed; z-index: 6; max-width: 290px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
