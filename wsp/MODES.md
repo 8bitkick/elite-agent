@@ -243,3 +243,15 @@ log's frames show. A fix belongs in the docking final, for all modes; not done.
 The pass unit as written never fired (`pass_rho` 3 and 99 flew identical fights: its gate wanted the clock at its
 extreme). A rewrite that does fire measured no different on 317 fights (scrapes 0.05 and 0.04 a fight, deaths 30 and
 29, within noise) and isn't in.
+
+## The break-off
+
+What killed Curious: the C's break-off (hurt, two or more enemies: run tail-on at full speed to recharge) was overridden under the pilots, three ways. The network's speed law replaced its speed 40, so it stopped to turn with the pack closing (cur101:00485: speed 1-10, 8,988 to 6,400, the C at 40 stays near 8,000); the gentle camera flew some break-offs (cur13:00372: aft shield 255 to 0 in 6 s, dead at 9.7 s); and the network fired at 1 px on the run, draining energy (172 to 128 in 10 s). 22 of the test set's 30 deaths were in packs, most within 12 s of a hurt start. A break-off (`s_force_rear`, Curious only by default) now keeps the interceptor, speed 40 and the C's fire rule. No weights changed.
+
+| | deaths, test set | points a minute | close-up | career seed 13 | career seed 101 |
+|---|---:|---:|---:|---:|---:|
+| Before | 30 | 2.18 | 4.8 s | 867, 48 deaths | 733, 62 deaths |
+| **After** | **17** | **2.31** | **4.6 s** | **943, 22 deaths** | **971, 28 deaths** |
+| C rules | 14 | 3.34 | 0.6 s | 1,310, 26 deaths | 1,288, 29 deaths |
+
+Tried without gain: `form_rho` 1.0, `lead` 3, a witchspace speed cap, the interceptor for all of witchspace, `fire_rho_ws` 0.45 (more points, but firing at dots 0.6 to 2.6 s). Open: witchspace is most of the remaining gap (140 against 196 points in 17 test fights): the camera's rate is better, its fights end twice as soon. Offender counts unchanged: that's the docking collisions.

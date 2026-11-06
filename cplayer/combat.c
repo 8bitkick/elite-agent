@@ -339,7 +339,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     extern int show_danger(const ship_t *, int);
     static int cam_gate = -1;      // (CAMGATE=1, the labs: the camera only while show.c's margin is on, the old gate, for comparison)
     if (cam_gate < 0) cam_gate = getenv("CAMGATE") ? atoi(getenv("CAMGATE")) : 0;
-    int shownet = g_curious && wsp_on() && wsp_show_on() && (cam_gate ? show_on() : !show_danger(s, n));
+    int shownet = g_curious && wsp_on() && wsp_show_on() && (cam_gate ? show_on() : !show_danger(s, n)) && !s_force_rear;      // (a break-off is danger: the sharp stick)
     int cam = g_curious && show_on() && s_cam && !shownet;
     g_wsp_net = shownet ? 1 : !g_fair ? 2 : 0;       // (the camera; Optimal's and Curious's interceptor; fair mode's own)
     if (cam) {
@@ -475,7 +475,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     else if (dist > P->near) want = P->spd_near;
     else want = P->spd_close;
     if (s_force_rear && !rc) want = 40;
-    if (wsp_on() && !rc && !ev) want = s_wsp.speed;
+    if (wsp_on() && !rc && !ev && !s_force_rear) want = s_wsp.speed;      // (not on a break-off: tail to them at full speed. The network's speed law stopped to turn, with their guns on us: Curious only, as break_off_mode is)
     // evade: shields down and another enemy's nose on us within range: jink out of its line. In
     // bursts (0.8 s, then 2.5 s of fighting: attacked from behind someone's always facing us, and
     // jinking for ever meant never shooting back), and not when our own shot's nearly lined up
@@ -505,7 +505,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     double r = ti && ti->area ? sqrt((double) ti->area) : 80;
     int near_ = v.z > 0 && hypot(v.x, v.y) < P->fire_r * r && v.z < 30000;
     int hot = laser_temp() > P->hot;
-    if (wsp_on()) near_ = s_wsp.fire, hot = 0;      // (the network's own fire gate, laser heat included)
+    if (wsp_on() && !s_force_rear) near_ = s_wsp.fire, hot = 0;      // (the network's own fire gate, laser heat included)
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
@@ -785,8 +785,8 @@ PT_THREAD(engage(float seconds)) {
                 double vpx = 0; for (int i = 0; i < nt; i++) { double q = show_px_in_view(th[i], space_view()); if (q > vpx) vpx = q; }
                 const shiptype_t *tty = t ? ship_type(t->type) : NULL;
                 double td = t ? dist_of(t) : 0, tpx = t ? 256 * (tty && tty->area ? sqrt((double) tty->area) : 80) / (td + 1) : 0;
-                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d be%d al%d cm%d cb%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f iv%d vp%.0f", now(), mcnt(), behind, nd, rr, speed(), (R(A_BETA) & 0x80) ? -(R(A_BETA) & 0x7F) : R(A_BETA), (int) IO->ram[0x47], s_rr_cam, s_rr_cb, jstx() - 128,      /* (ALP1, the Master's roll rate) */
-                      jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0, t ? show_in_view(t, space_view()) : 0, vpx);
+                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d be%d al%d cm%d cb%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f iv%d vp%.0f en%d fs%d as%d n%d", now(), mcnt(), behind, nd, rr, speed(), (R(A_BETA) & 0x80) ? -(R(A_BETA) & 0x7F) : R(A_BETA), (int) IO->ram[0x47], s_rr_cam, s_rr_cb, jstx() - 128,      /* (ALP1, the Master's roll rate) */
+                      jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0, t ? show_in_view(t, space_view()) : 0, vpx, energy(), fsh(), ash(), g_wsp_last_net);
                 if (t) dbgf_("RT %d n%.4f,%.4f,%.4f r%.4f,%.4f,%.4f s%.4f,%.4f,%.4f ro%d pi%d sp%d", mcnt(), t->nosev[0], t->nosev[1], t->nosev[2],
                              t->roofv[0], t->roofv[1], t->roofv[2], t->sidev[0], t->sidev[1], t->sidev[2], t->roll, t->pitch, t->speed);   // (the target's heading: cfly's model of its arc)
                 s_rr_fire = 0;
