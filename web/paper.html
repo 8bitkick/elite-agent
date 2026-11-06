@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flying Elite in Weight Space</title>
+<meta name="description" content="Weight-space programming applied to a 1986 space game: small neural networks written by an LLM, unit by unit, flying Acornsoft Elite in a browser and on a microcontroller.">
+<meta property="og:title" content="Flying Elite in Weight Space">
+<meta property="og:description" content="Small neural networks written by an LLM, unit by unit, with no training, flying Acornsoft Elite in a browser and on a microcontroller.">
+<meta property="og:image" content="https://8bitkick.cc/elite-agent/og.png">
+<meta name="theme-color" content="#090b0f">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg: rgb(9, 11, 15); --panel: rgb(16, 19, 25); --line: rgb(40, 45, 56); --dim: rgb(110, 116, 128); --soft: rgb(150, 156, 168); --fg: rgb(232, 234, 238);
+  --yel: rgb(242, 209, 58); --cyan: rgb(56, 214, 232); --green: rgb(27, 175, 122); --red: rgb(240, 72, 72); --purple: rgb(178, 112, 255); }
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.62 Inter, system-ui, sans-serif; }
+a { color: var(--cyan); text-underline-offset: 2px; }
+nav { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font: 600 13px 'JetBrains Mono', ui-monospace, monospace; }
+nav a { color: var(--fg); text-decoration: none; }
+nav .fly { color: var(--cyan); }
+main { max-width: 760px; margin: 0 auto; padding: 44px 16px 72px; }
+h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 14px; }
+.sub { color: var(--soft); font-size: 19px; line-height: 1.45; margin: 0 0 26px; }
+.live { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 28px; }
+.go { background: var(--cyan); color: var(--bg); font-weight: 700; font-size: 16px; padding: 10px 18px; border-radius: 6px; text-decoration: none; }
+.go:hover { filter: brightness(1.12); }
+.modes { font-size: 14px; color: var(--soft); }
+.modes a { font-weight: 600; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 40px; border-block: 1px solid var(--line); padding: 12px 0; margin-bottom: 30px; font-size: 14px; }
+.meta h3 { margin: 0; font: 600 11px Inter, sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+.meta p { margin: 2px 0 0; }
+.tldr { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--cyan); padding: 18px 20px; border-radius: 6px; margin-bottom: 22px; }
+.tldr b.t { display: block; font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .08em; color: var(--cyan); margin-bottom: 8px; }
+.tldr p { margin: 0 0 10px; } .tldr p:last-child { margin: 0; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 40px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 6px; padding: 14px; font-size: 14px; line-height: 1.4; display: flex; flex-direction: column; gap: 6px; }
+.card h4 { margin: 0; font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .06em; color: var(--c); text-transform: uppercase; }
+.card .q { color: var(--soft); }
+.card .big { margin-top: auto; padding-top: 6px; font-weight: 700; font-size: 20px; line-height: 1.15; }
+.card .big small { display: block; font-weight: 400; font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+h2 { font-size: 25px; line-height: 1.25; letter-spacing: -.01em; margin: 46px 0 12px; }
+.exp { display: block; font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--c, var(--dim)); margin-bottom: 4px; }
+p { margin: 0 0 15px; }
+figure { margin: 22px 0; }
+figcaption { font-size: 13.5px; line-height: 1.45; color: var(--soft); margin-top: 8px; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #000; }
+.cmdr { position: relative; }
+.wide { width: min(calc(100vw - 32px), 940px); position: relative; left: 50%; transform: translateX(-50%); }
+.netbox { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.nethead { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; padding: 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.seg { display: flex; flex: 1 1 auto; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1 1 auto; background: var(--panel); color: var(--dim); border: 0; border-right: 1px solid var(--line); font: 600 12.5px Inter, sans-serif; padding: 7px 8px; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: rgb(26, 31, 40); }
+.btn { background: var(--panel); border: 1px solid var(--line); color: var(--fg); font: 13px Inter, sans-serif; padding: 4px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.netscroll { overflow-x: auto; }
+#net { display: block; width: 100%; min-width: 720px; height: auto; }
+#netcap { font: 12.5px 'JetBrains Mono', monospace; color: var(--soft); padding: 8px 10px; border-top: 1px solid var(--line); min-height: 34px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 18px 0 8px; }
+.tw { overflow-x: auto; }
+th { text-align: left; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+th, td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 12px; padding-right: 0; }
+tr.us td { font-weight: 600; }
+details { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 14px 0; font-size: 14.5px; }
+summary { cursor: pointer; padding: 9px 14px; font-weight: 600; font-size: 13.5px; color: var(--soft); }
+details dl { margin: 0; padding: 0 14px 12px; display: grid; grid-template-columns: 110px 1fr; gap: 5px 12px; }
+dt { color: var(--dim); } dd { margin: 0; }
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font: 13px/1.55 'JetBrains Mono', ui-monospace, monospace; margin: 16px 0; }
+code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .88em; }
+.c { color: var(--dim); } .w { color: var(--cyan); } .o { color: var(--purple); }
+ul { padding-left: 20px; margin: 0 0 15px; } li { margin-bottom: 8px; }
+.cite { font-size: 14px; color: var(--soft); }
+footer { border-top: 1px solid var(--line); margin-top: 44px; padding-top: 16px; font-size: 13.5px; color: var(--dim); }
+footer a { color: var(--soft); }
+@media (max-width: 620px) { body { font-size: 16px; } .cards { grid-template-columns: 1fr; } main { padding-top: 28px; } details dl { grid-template-columns: 1fr; gap: 0; } dd { margin-bottom: 8px; } }
+</style>
+</head>
+<body>
+<nav><a href="https://github.com/8bitkick/elite-agent">8bitkick/elite-agent</a><a class="fly" href="./">Watch it fly →</a></nav>
+<main>
+<h1>Flying Elite in Weight Space</h1>
+<p class="sub">Neural networks written by hand, by an LLM, with no training, flying a 1986 space game in your browser and on a microcontroller.</p>
+<div class="live">
+  <a class="go" href="./">▶ Watch it fly, live in your browser</a>
+  <span class="modes">or jump to a pilot: <a style="color: var(--red)" href="./?mode=optimal">Optimal</a> · <a style="color: var(--yel)" href="./?mode=fair">Fair</a> · <a style="color: var(--purple)" href="./?mode=curious">Curious</a></span>
+</div>
+<div class="meta">
+  <div><h3>Project</h3><p><a href="https://github.com/8bitkick">8bitkick</a>; weights written by Claude</p></div>
+  <div><h3>Applies</h3><p><a href="https://rikiyat.github.io/blog/weight-space-programming/">Takehi et al., MIT CSAIL</a> (no affiliation)</p></div>
+  <div><h3>Published</h3><p>November 6, 2026</p></div>
+</div>
+
+<div class="tldr">
+  <b class="t">TL;DR</b>
+  <p>This month, MIT CSAIL showed that frontier LLMs can write neural network weights directly, as a program, with no gradients. We tried it on something awkward and joyful: Acornsoft Elite, flown on an emulated BBC Master through nothing but its joystick and keys.</p>
+  <p>Every unit in these networks has a name and a job. An LLM wrote them, watched them fly, read how they lost, and changed the weights behind the failure. There's a pilot for each goal. One wins efficiently and one plays fair from the screen alone, and both reach Elite, the game's top rank, in about 16 game hours. The third tries to put on a good show instead. They are small enough to run beside the emulator on a Pimoroni Presto, a palm-sized microcontroller board.</p>
+</div>
+
+<div class="cards">
+  <div class="card" style="--c: var(--red)"><h4>Win</h4><span class="q">Optimal reads the game's memory and wants points a minute.</span><span class="big">15.5 h to Elite<small>16 KB of weights, no deaths in two careers</small></span></div>
+  <div class="card" style="--c: var(--yel)"><h4>Play fair</h4><span class="q">Fair knows only what a player could see on the screen.</span><span class="big">16.7 h to Elite<small>9 KB dogfights, 13 KB docking, no deaths</small></span></div>
+  <div class="card" style="--c: var(--purple)"><h4>Put on a show</h4><span class="q">Curious is scored on what a viewer gets to watch.</span><span class="big">8× the close-ups<small>25 KB, at a real cost in points and deaths</small></span></div>
+</div>
+
+<h2>What Elite asks of a pilot</h2>
+<p>Elite gives you a stick and a keyboard. You can't strafe: to reach a ship you roll until it's above you, then pull up. Roll runs to ±31 and pitch only to ±8, in units of about 1/256 of a radian a game loop, so a half turn takes about five seconds, and a ship flying the other way is a long way off by then. Top speed is 40. The game reads its keys once a loop, about every two video frames, and the laser fires from whichever of the four views is on screen, which will matter later.</p>
+<p>The networks use exactly these controls. Each decision comes out as four numbers: roll, pitch, fire and speed. Those become joystick positions and key presses on the emulated machine, as if from a player's hands.</p>
+
+<h2>What Fair is allowed to see</h2>
+<p>Optimal cheats openly: it reads every ship's position from RAM. Fair doesn't. It gets what's drawn, at the precision it's drawn, plus the game's published rules and its own notes.</p>
+<figure class="cmdr">
+  <img src="paper-cmdr.png" width="768" height="560" alt="Elite's status screen: Commander Claude, Rating Deadly, above the dashboard: shield, fuel, temperature and altitude bars at left, the scanner in the middle, speed, roll, pitch and energy banks at right." loading="lazy">
+  <figcaption>The real game, mid-career. Fair reads the dashboard as bars, not numbers: energy to one of four banks, shields and laser temperature to one part in 16. The scanner in the middle gives a dot and a stick for each ship, to the nearest 512 units sideways.</figcaption>
+</figure>
+<div class="tw"><table>
+  <tr><th>Fair can use</th><th>Fair can't use</th></tr>
+  <tr><td>A ship's pixel in the view, so its direction is nearly exact</td><td>Its exact range, which it must judge from drawn size or the scanner</td></tr>
+  <tr><td>Its heading, but only once it's near enough to draw as a wireframe, not a dot (Sidewinder about 5,000 units, Cobra Mk III 12,800)</td><td>Its energy, its AI state, or whether it's hostile</td></tr>
+  <tr><td>Scanner dots, dashboard bars and on-screen messages</td><td>Where a ship is once it has left the screen, beyond its own tracking and memory</td></tr>
+</table></div>
+<p>So Fair's network has senses the others don't need: how stale its last sighting is, how unsure the range is, how unsure the motion is, and whether the heading was actually seen. It flies knowing what it doesn't know. It's still a machine, with a machine's reflexes and arithmetic. The fairness is about information, not hands.</p>
+
+<h2>Writing a pilot in weights</h2>
+<p>In weight-space programming, an LLM reads and writes a network's weights directly, reasoning about what each part should compute. Here, the program is a stack of ReLU layers whose units are written to mean things. A logical AND is just a sum and a bias. This is the unit that decides to fire on the camera network, as stored:</p>
+<pre><span class="c"># layer 4, unit "fire": AND of six saturated 0-or-1 tests.</span>
+<span class="o">fire</span> = relu(  <span class="w">+1</span>·in_the_sights  <span class="w">+1</span>·ahead  <span class="w">+1</span>·in_range  <span class="w">+1</span>·laser_cool
+             <span class="w">+1</span>·shot_allowed   <span class="w">+1</span>·a_target                  <span class="w">−5</span> )
+
+<span class="c"># layer 2, unit "stuck": a chase we aren't winning. It allows a shot at range.</span>
+<span class="o">stuck</span> = relu( <span class="w">+1</span>·ahead  <span class="w">+1</span>·not_closing  <span class="w">−1</span>·drawn_big  <span class="w">−1</span> )</pre>
+<p>Optimal's and Curious's networks were written from scratch for their goals, not transcribed from the agent's C rules. The networks run on about 60 lines of plain C, with no ML library. The diagrams below are the demo's own code, running that forward pass in your browser on the senses each network really saw, and every line is a non-zero weight.</p>
+<figure class="wide">
+  <div class="netbox">
+    <div class="nethead"><div class="seg" id="nettabs" role="group" aria-label="Network"></div><button class="btn" id="netplay">❚❚ Pause</button></div>
+    <div class="netscroll"><canvas id="net" aria-label="A network diagram, its units lit as it decides, replaying recorded senses"></canvas></div>
+    <div id="netcap">&nbsp;</div>
+  </div>
+  <figcaption>Recorded from the lab on main's build: the three fight networks on one identical snapshot of a pirate pack, and one dock. The Optimal and Fair clips loop quickly, for a reason the next sections explain.</figcaption>
+</figure>
+
+<h2><span class="exp" style="--c: var(--yel)">Experiment 1</span>Can it fly fair?</h2>
+<p>Yes, close to the hand-written rules it replaced. The dogfight network scores 97.1% of the C rules' points a fight minute on 450 held-out fights, and fair-mode careers with both networks reach Elite in 16.7 and 17.0 game hours with no deaths. The docking network flies from hyperspace exit to docked, matching the station's roll on the way in, and it's 2.8% cheaper than the C law on 69 held-out docks, with a sixth of the stick reversals.</p>
+<details><summary>Setup</summary><dl>
+  <dt>Dogfights</dt><dd>23 senses → 30, 26, 16, 14 → 4 outputs. 2,256 weights, 187 non-zero.</dd>
+  <dt>Docking</dt><dd>47 senses → 112, 179, 42, 30 → 7 outputs. 1,471 non-zero weights.</dd>
+  <dt>Method</dt><dd>Written unit by unit, first with the C rules' numbers, then tuned by evolution in the lab. No gradients.</dd>
+  <dt>Measure</dt><dd>Fights recorded from two careers, each flown from the identical snapshot in a fresh process. 90% interval on the ratio: 94.5–99.7%.</dd>
+</dl></details>
+
+<h2><span class="exp" style="--c: var(--red)">Experiment 2</span>Can it fly for points, weights only?</h2>
+<p>Nearly. The interceptor was written for points a minute using exact senses, with no evolution at all: every constant was chosen from the game's geometry, measured, and fixed by reasoning. It scores 20.85 points a minute against the C rules' 21.52 over 372 held-out fights, with no deaths, and reaches Elite in 15.5 and 15.6 game hours on two seeds, against 14.8 and 15.1 for the C rules. So it doesn't beat them. It does get within 3% with 244 non-zero weights.</p>
+<details><summary>Setup</summary><dl>
+  <dt>Network</dt><dd>23 senses → 35, 32, 33, 18, 14 → 4 outputs. 4,019 weights, 244 non-zero.</dd>
+  <dt>Tried and cut</dt><dd>Steering with the target's motion across the sky sounded good and cost points, with or without a nose hold. A hold of the roll near the nose made a limit cycle. Both are zero now, kept as named parameters.</dd>
+  <dt>Measure</dt><dd>Careers are one path each, so the paired fights are the real measure.</dd>
+</dl></details>
+
+<h2><span class="exp" style="--c: var(--purple)">Experiment 3</span>Can you program for fun?</h2>
+<p>This is the part no training curve would suggest. On the same snapshot, Optimal and Fair end the fight in about four seconds, shooting a ship drawn two pixels wide. It's excellent flying and terrible television. So Curious asks a different question: what does a person watching actually see?</p>
+<p>The camera network flies gently, leaves a dead zone so ships drift across the frame, brakes into a pass, and holds fire until a ship is big. Its objective is a meter counting seconds of what's in the picture. On that same snapshot it stayed for 165 seconds and drew the target up to 85 pixels. Most of its best changes came from someone watching it and saying what was wrong, then an LLM reading a frame-by-frame trace to find the unit responsible:</p>
+<ul>
+  <li><b>“Just firing at dots for ages.”</b> The laser now holds for 64 px or a very close pass. Only a chase that's truly being lost is shot at range, which took fights stuck at the lab's time cap from 13 of 55 to 2.</li>
+  <li><b>It looked backwards while the target was in front.</b> The view ran on timers, and since the laser fires from the view shown, this wasted shots too. It now follows the target.</li>
+  <li><b>Every pass ran the same dull cycle.</b> Across at full speed, 4,800 units apart by the end of the turn, then all the way back. A braking unit keeps closing speed in proportion to range.</li>
+  <li><b>It held a Cobra in frame for 55 seconds without firing.</b> One new AND: big, and no longer growing, means shoot. The meter disliked this change. We kept it, because the meter was wrong.</li>
+  <li><b>The flyby never flew.</b> Its gate needed the target at an extreme of the clock, so sweeping its threshold from 3 to 99 changed nothing at all. A corrected version made no measurable difference, so it isn't in.</li>
+</ul>
+<div class="tw"><table>
+  <tr><th>317 held-out fights</th><th class="n">Fight</th><th class="n">Close-up</th><th class="n">Mid-size</th><th class="n">Dots</th><th class="n">Deaths</th></tr>
+  <tr><td>C rules</td><td class="n">37 s</td><td class="n">0.6 s</td><td class="n">5.5 s</td><td class="n">31.4 s</td><td class="n">14</td></tr>
+  <tr class="us"><td>The camera</td><td class="n">52 s</td><td class="n">4.8 s</td><td class="n">9.6 s</td><td class="n">37.1 s</td><td class="n">30</td></tr>
+</table></div>
+<p>Time with a ship readable on screen rises from 16% of a fight to 28%. The price is real: at 25 game hours it scores 867 and 733 points with 48 and 62 deaths, against 1,310 and 1,288 points with 26 and 29 deaths for the C rules. Most of each fight is still a dot, because ships appear about 9,000 units out. A show pilot is allowed to die, but this one isn't good enough yet.</p>
+<details><summary>Setup</summary><dl>
+  <dt>Network</dt><dd>23 senses → 42, 43, 45, 23, 15 → 4 outputs. 6,319 weights, 406 non-zero. No evolution.</dd>
+  <dt>Handover</dt><dd>When the ship is in danger, the fight goes to the interceptor, which ends it quickly.</dd>
+  <dt>Meter</dt><dd>Close-up: a hostile drawn 24 px or more in the picture. Mid-size: 10–24 px. Dots: everything else.</dd>
+</dl></details>
+
+<h2>Small enough for a microcontroller</h2>
+<p>The agent runs inside the emulated game's own world with no OS, heap or ML library, so the same C compiles for a <a href="https://shop.pimoroni.com/products/presto">Pimoroni Presto</a>, a small RP2350 screen. It emulates the BBC Master and flies it at once.</p>
+<p>We put this build on a real board. Over its first 19 logged minutes, the whole agent, networks included, averaged about 1.7 ms of each 20 ms video frame, with the emulator holding 100% speed and no late frames. The slowest single frame took 33 ms, so there's still a spike to find. The plugin is 391 KB in a 1 MB slot and used at most 2,208 bytes of its 3,072-byte stack. These are early numbers from one session.</p>
+<div class="tw"><table>
+  <tr><th>Network</th><th class="n">Weights in flash</th><th class="n">Non-zero</th></tr>
+  <tr><td>Fair: dogfights</td><td class="n">9.0 KB</td><td class="n">187</td></tr>
+  <tr><td>Optimal: interceptor</td><td class="n">16.1 KB</td><td class="n">244</td></tr>
+  <tr><td>Curious: camera</td><td class="n">25.3 KB</td><td class="n">406</td></tr>
+  <tr><td>Docking (each of two sets)</td><td class="n">13.3 KB</td><td class="n">1,471</td></tr>
+</table></div>
+
+<h2>What this does and doesn't show</h2>
+<ul>
+  <li><b>This isn't the post's zero-shot result.</b> Its strongest experiment writes a network with no environment feedback. Ours had a fast lab and many rounds of measuring, so it's closer to programming than to one-shot generation.</li>
+  <li><b>A person was in the loop.</b> Goals, taste and many of the diagnoses came from someone watching. The LLM wrote the weights and traced the causes.</li>
+  <li><b>The C rules still win on points.</b> The appeal isn't that this beats a good hand-written controller yet. It's that a network can be read, argued with and fixed one unit at a time.</li>
+  <li><b>Our samples are small.</b> Careers are two seeds each, and fights are chaotic: a tiny change can move a set's average. We confirm on held-out sets, and we've still been fooled.</li>
+  <li><b>Known bug.</b> The docking final sometimes flies into station traffic. Two such collisions killed a police-flagged ship in one 200-minute Curious log, which is what newly raised the Offender status there. It isn't fixed yet.</li>
+</ul>
+<p>What surprised us most is how ordinary this felt. “Don't shoot it until it's big” turned into one unit, and a viewer's complaint could be traced to a specific weight. Neural networks are rarely this easy to talk to.</p>
+
+<h2>Try it, read it</h2>
+<p><a href="./">Watch it fly</a> and switch modes at the top: the panel lights the same diagrams live. Weights, labs and logs are all in <a href="https://github.com/8bitkick/elite-agent">the repository</a>; start with <a href="https://github.com/8bitkick/elite-agent/blob/main/wsp/README.md">Fair's write-up</a> and <a href="https://github.com/8bitkick/elite-agent/blob/main/wsp/MODES.md">the modes' lab notes</a>, which include what failed.</p>
+<p class="cite">The technique: Rikiya Takehi, Jayden Teoh, Alex Zhang, and Omar Khattab. <a href="https://rikiyat.github.io/blog/weight-space-programming/">“Sparks of Weight-Space Programming: LLMs can natively read &amp; write neural network weights.”</a> November 2026.</p>
+<footer>Elite © Ian Bell and David Braben. BBC Master emulation by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a>; flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master">Mark Moxon's source project</a>. An independent project, not affiliated with MIT, Acornsoft or the post's authors.</footer>
+</main>
+<script type="module" src="paper.js"></script>
+</body>
+</html>

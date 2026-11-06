@@ -75,7 +75,7 @@ const cx = (h) => CH_X + (h / HMAX) * CH_W;
 const cy = (t) => CH_Y + CH_H - (Math.min(t, 7000) / 7000) * CH_H;
 
 /** a forward pass, every layer's activations (the senses first) */
-function acts(layers, f) {
+export function acts(layers, f) {
     const out = [Float64Array.from(f)];
     let h = out[0];
     layers.forEach((L, i) => {
