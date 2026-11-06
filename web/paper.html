@@ -50,6 +50,8 @@ tr.warn td { background: rgba(242, 209, 58, .06); }
 .ctl select, .ctl input { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: 13.5px 'JetBrains Mono', monospace; margin-left: 4px; }
 .ctl input { width: 96px; }
 .ctl button { background: var(--yel); color: var(--bg); border: 0; border-radius: 6px; padding: 7px 14px; font: 700 13.5px Inter, sans-serif; cursor: pointer; }
+.yard { border-left: 3px solid var(--line); padding-left: 14px; color: var(--soft); margin-top: 34px; }
+.yard b { color: var(--fg); }
 .specs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 24px; }
 .specs div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
 .specs b { display: block; font: 700 20px 'JetBrains Mono', monospace; color: var(--cyan); white-space: nowrap; }
@@ -234,8 +236,10 @@ footer a { color: var(--soft); }
   <figcaption>Recorded in the lab: the three fight networks on one identical snapshot, and one dock. The Optimal and Fair clips are short because those fights are.</figcaption>
 </figure>
 
+<p class="yard"><b>The yardstick throughout is “the C rules”:</b> the agent's own AI-tuned controller, its parameters fitted with CMA-ES in the fight lab and measured over 9,327 recorded fights. It's no easy baseline.</p>
+
 <h2><span class="exp" style="--c: var(--yel)">Experiment 1</span>Can it fly fair?</h2>
-<p>Yes, close to the hand-written rules it replaced. The dogfight network scores 97.1% of the C rules' points a fight minute on 450 held-out fights, and fair-mode careers with both networks reach Elite in 16.7 and 17.0 game hours with no deaths. The docking network flies from hyperspace exit to docked, matching the station's roll on the way in, and it's 2.8% cheaper than the C law on 69 held-out docks, with a sixth of the stick reversals.</p>
+<p>Yes, close to the C rules it replaced. The dogfight network scores 97.1% of the C rules' points a fight minute on 450 held-out fights, and fair-mode careers with both networks reach Elite in 16.7 and 17.0 game hours with no deaths. The docking network flies from hyperspace exit to docked, matching the station's roll on the way in, and it's 2.8% cheaper than the C law on 69 held-out docks, with a sixth of the stick reversals.</p>
 <details><summary>Setup</summary><dl>
   <dt>Dogfights</dt><dd>23 senses → 30, 26, 16, 14 → 4 outputs. 2,256 weights, 187 non-zero.</dd>
   <dt>Docking</dt><dd>47 senses → 112, 179, 42, 30 → 7 outputs. 1,471 non-zero weights.</dd>
@@ -244,7 +248,7 @@ footer a { color: var(--soft); }
 </dl></details>
 
 <h2><span class="exp" style="--c: var(--red)">Experiment 2</span>Can it fly for points, weights only?</h2>
-<p>Nearly. The interceptor was written for points a minute using exact senses, with no evolution at all: every constant was chosen from the game's geometry, measured, and fixed by reasoning. It scores 20.85 points a minute against the C rules' 21.52 over 372 held-out fights, with no deaths, and reaches Elite in 15.5 and 15.6 game hours on two seeds, against 14.8 and 15.1 for the C rules. So it doesn't beat them. It does get within 3% with 244 non-zero weights.</p>
+<p>Nearly. The interceptor was written for points a minute using exact senses, with no evolution at all: every constant was chosen from the game's geometry, measured, and fixed by reasoning. It scores 20.85 points a minute against the C rules' 21.52 over 372 held-out fights, with no deaths, and reaches Elite in 15.5 and 15.6 game hours on two seeds, against 14.8 and 15.1 for the C rules. So it doesn't beat them. It does get within 3% of a machine-tuned controller, with 244 non-zero weights.</p>
 <details><summary>Setup</summary><dl>
   <dt>Network</dt><dd>23 senses → 35, 32, 33, 18, 14 → 4 outputs. 4,019 weights, 244 non-zero.</dd>
   <dt>Tried and cut</dt><dd>Steering with the target's motion across the sky sounded good and cost points, with or without a nose hold. A hold of the roll near the nose made a limit cycle. Both are zero now, kept as named parameters.</dd>
@@ -287,7 +291,7 @@ footer a { color: var(--soft); }
 <ul>
   <li><b>This isn't the post's zero-shot result.</b> Its strongest experiment writes a network with no environment feedback. Ours had a fast lab and many rounds of measuring, so it's closer to programming than to one-shot generation.</li>
   <li><b>A person was in the loop.</b> Goals, taste and many of the diagnoses came from someone watching. The LLM wrote the weights and traced the causes.</li>
-  <li><b>The C rules still win on points.</b> The appeal isn't that this beats a good hand-written controller yet. It's that a network can be read, argued with and fixed one unit at a time.</li>
+  <li><b>The C rules still win on points.</b> They're a tough yardstick: machine-tuned and measured over thousands of fights. The appeal isn't beating them yet. It's that a network can be read, argued with and fixed one unit at a time.</li>
   <li><b>Our samples are small.</b> Careers are two seeds each, and fights are chaotic: a tiny change can move a set's average. We confirm on held-out sets, and we've still been fooled.</li>
   <li><b>Known bug.</b> The docking final sometimes flies into station traffic. Two such collisions killed a police-flagged ship in one 200-minute Curious log, which is what newly raised the Offender status there. It isn't fixed yet.</li>
 </ul>
