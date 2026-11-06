@@ -52,6 +52,8 @@ tr.warn td { background: rgba(242, 209, 58, .06); }
 .ctl button { background: var(--yel); color: var(--bg); border: 0; border-radius: 6px; padding: 7px 14px; font: 700 13.5px Inter, sans-serif; cursor: pointer; }
 .yard { border-left: 3px solid var(--line); padding-left: 14px; color: var(--soft); margin-top: 34px; }
 .yard b { color: var(--fg); }
+.presto img { max-width: 420px; margin: 0 auto; }
+.presto figcaption { text-align: center; }
 .specs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 24px; }
 .specs div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
 .specs b { display: block; font: 700 20px 'JetBrains Mono', monospace; color: var(--cyan); white-space: nowrap; }
@@ -128,7 +130,7 @@ footer a { color: var(--soft); }
   <div><b>9–25 KB</b><span>of weights per fight network</span></div>
   <div><b>187–406</b><span>non-zero weights in each</span></div>
   <div><b>60 lines</b><span>of plain C to run them, no ML library</span></div>
-  <div><b>RP2350</b><span>runs on an Arm Cortex-M33, beside a BBC Master emulator</span></div>
+  <div><b>RP2350</b><span>Optimal and Curious run on its Arm Cortex-M33, beside a BBC Master emulator</span></div>
 </div>
 <div class="meta">
   <div><h3>Project</h3><p><a href="https://github.com/8bitkick">8bitkick</a>; weights written by Claude</p></div>
@@ -279,7 +281,18 @@ footer a { color: var(--soft); }
 </dl></details>
 
 <h2>Small enough for a microcontroller</h2>
-<p>There's no OS, heap or ML library, so the same C compiles for a <a href="https://shop.pimoroni.com/products/presto">Pimoroni Presto</a>, a small RP2350 board with a screen. Its Arm Cortex-M33 emulates the BBC Master and flies it at once. Early numbers, from 15 minutes on a real board with the networks switched on: the whole agent averaged 2.3 ms of each 20 ms frame, the slowest frame took 14.5 ms, and the emulator held 100% speed.</p>
+<p>There's no OS, heap or ML library, so the same C compiles for a <a href="https://shop.pimoroni.com/products/presto">Pimoroni Presto</a>, an RP2350 board with a screen. Its Arm Cortex-M33, here at 250 MHz, emulates the BBC Master and flies it at once. We ran Curious for 20 minutes and Optimal for 16 on a real board:</p>
+<figure class="presto"><img src="paper-presto.jpg" width="760" height="740" alt="A webcam photo of the Presto's screen: Elite's front view with the interceptor's lasers converging on a distant ship in the sights." loading="lazy"><figcaption>The interceptor firing, on the board itself. Webcam photo.</figcaption></figure>
+<div class="tw"><table>
+  <tr><th>On the board</th><th class="n">Curious</th><th class="n">Optimal</th></tr>
+  <tr><td>Whole agent, average per frame (budget 20 ms)</td><td class="n">2.3 ms</td><td class="n">2.0 ms</td></tr>
+  <tr><td>Busiest minute's average</td><td class="n">5.5 ms</td><td class="n">2.7 ms</td></tr>
+  <tr><td>Slowest frame, after the one spike at boot</td><td class="n">14.5 ms</td><td class="n">14.7 ms</td></tr>
+  <tr><td>Stack used, of 3,072 bytes</td><td class="n">2,180</td><td class="n">2,176</td></tr>
+  <tr><td>Late emulator frames</td><td class="n">0</td><td class="n">0</td></tr>
+</table></div>
+<p>These are short runs early in a career, with few fights. One frame soon after each boot took about 33 ms, unexplained so far, without making the emulator late. <b>Fair doesn't run on the board yet:</b> its build fails a stack check. The Presto can also stream its networks' live senses to its own web page, drawn with these same diagrams, on a development branch.</p>
+
 <div class="tw"><table>
   <tr><th>Network</th><th class="n">Weights in flash</th><th class="n">Non-zero</th></tr>
   <tr><td>Fair: dogfights</td><td class="n">9.0 KB</td><td class="n">187</td></tr>
