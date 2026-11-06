@@ -770,6 +770,7 @@ PT_THREAD(engage(float seconds)) {
             g_en_mode = 0;
             { PT_START(tk0); off = combat_keys(sh, n, t, &keys, &view); PT_ADD(2, tk0); }
         flown:
+#if !APP_LOADED       // (the labs' per-frame log: off the Presto app's stack)
             if (g_rr_log) {
                 // RR: frame, game loop, every enemy behind us (1), the nearest's range and its change since last
                 // frame, our speed, the stick's roll (jx) and pitch, the view; and what was flying: show on, witchspace,
@@ -791,6 +792,7 @@ PT_THREAD(engage(float seconds)) {
                              t->roofv[0], t->roofv[1], t->roofv[2], t->sidev[0], t->sidev[1], t->sidev[2], t->roll, t->pitch, t->speed);   // (the target's heading: cfly's model of its arc)
                 s_rr_fire = 0;
             }
+#endif
             // outnumbered and hurting: the energy bomb destroys every ship about but Thargoids and
             // the mission ships, each scoring its kill points; before the pod
             if (R(A_BOMB) && (energy() < 140 || (fsh() > ash() ? fsh() : ash()) < 60)) {
