@@ -1,0 +1,199 @@
+"""Two more dogfight networks, written for their mode's goal, not from the C rules' laws or numbers.
+
+interceptor (Optimal/efficient): points a minute. Its senses are exact, so it can trust the sky's motion:
+  - feed-forward: the stick is moved with the target's motion across the sky, not only towards where it is
+  - a hard turn: when the target is far off the nose, full pitch while the roll comes round
+  - speed as one continuous law: fast with room to close, easing by the turn still to do and by the closing speed
+  - fire: the nose inside the cone, measured to the led aim point, not the target itself
+
+camera (Curious, while the show is on): what a viewer sees. Same senses, a different program:
+  - a dead zone: inside it the stick is left alone, so ships drift across the frame instead of sitting dead centre
+  - hold the range at which the target is drawn big; don't fly through it
+  - a pass: as it looms and closes, aim beside it, so it goes by the window, on whichever side it already is
+  - a gentler stick
+  - hold fire until the kill will be seen close (sooner in witchspace, where a swarm doesn't wait)
+
+Every constant is a named parameter, chosen from the game's geometry (below) and then left to evolution.
+Each builds to the 23 senses and 4 outputs of wsp_pilot.c.
+"""
+import math
+from .features import NAMES as FEATURES
+from .layers import Layer, sat_ref, neg, add
+
+M = 6.0     # gate headroom
+
+# rad a loop x 16 in the wx, wy senses; a rate (roll 31, pitch 8 at most) of 1 turns the view about 1/256 rad a loop
+INTERCEPTOR = dict(
+    lead=3.0,            # game loops ahead to aim
+    orbit=0.0,           # a slow roll while on the target (the camera's: the target circles the sights, the picture turns)
+    roll_gain=170.0,     # roll rate a radian of error
+    roll_ramp=0.05,      # rad: inside this of the nose the roll eases with the offset
+    roll_cap=1.1,        # the roll error's cap as clock-x
+    pitch_gain=110.0,    # pitch rate a radian
+    pitch_cone=0.6,      # pitch eases as the sideways error grows
+    ff_pitch=0.0,        # feed-forward: pitch with the target's motion (measured: it costs points, with and without a nose hold)
+    ff_roll=0.0,         # feed-forward: roll with its sideways motion
+    hard_th=0.22,        # off angle / pi past which it's a hard turn
+    hard_gain=8.0,       # pitch rate in a hard turn
+    hard_cone=0.8,       # (not when it's out on the wing: roll first)
+    hyst=0.3,            # above/below kept on the side the stick is pitching
+    nose_hold=0.0,       # inside this many fire cones of the nose, no roll (measured: any hold makes a limit cycle; the roll must keep going)
+    fire_r=1.5,          # hit radii
+    fire_range=7.5,      # range / 4096
+    hot=0.9,             # laser temperature to hold fire above
+    v_th=0.08,           # off angle / pi within which it flies; past it, it stops to turn (14 degrees)
+    r_near=0.2, r_mid=0.45, r_far=1.0,             # range / 4096: the bands' edges (800; 1,850; 4,100)
+    v_close=0.0, v_near=4.0, v_mid=31.0, v_far=31.0,   # the speed in each band, from inside r_near outwards
+    v_turn=0.0,          # the speed while turning
+)
+
+CAMERA = dict(
+    lead=2.0,
+    dead=0.1,            # rad: inside this of the aim the stick is left alone
+    orbit=5.0,           # a slow roll while on the target: the picture turns round it
+    roll_gain=80.0,      # gentle
+    roll_ramp=0.1,
+    roll_cap=0.8,
+    pitch_gain=40.0,
+    pitch_cone=0.8,
+    hard_th=0.5,
+    hard_gain=8.0,
+    hard_cone=0.8,
+    hyst=0.3,
+    nose_hold=0.0,
+    pass_rho=1.8,        # angular radius x 16 at which it counts as looming (inside ~700 for a Cobra)
+    pass_k=0.5,          # aim this far aside a unit of looming past pass_rho
+    pass_close=0.4,      # (only a fast closer: 26 units a loop)
+    fire_r=1.6,
+    fire_range=4.0,
+    hot=0.9,
+    fire_rho=1.3,        # hold fire until it's drawn this big (angular radius x 16): a Cobra inside ~1,000, 20 px
+    fire_rho_ws=0.6,     # in witchspace, sooner
+    v_th=0.1,
+    rho_hold=2.2,        # hold the range where it's drawn this big (35 px for a Cobra: ~580 units)
+    v_base=10.0,         # the speed when it's that big (it moves ~20-30: we fall behind, the gap opens, we speed up: a follow)
+    v_k=25.0,            # more speed a unit of angular size short of rho_hold: 40 when it's a dot
+    v_turn=0.0,
+)
+
+
+def _build(P, camera=False):
+    lead = P["lead"] / 16
+    L1 = Layer(FEATURES)
+    for k in "xy":
+        L1.unit(f"a{k}+", {f"u{k}": 1, f"w{k}": lead}, note=f"the aim {k}, led, positive half")
+        L1.unit(f"a{k}-", {f"u{k}": -1, f"w{k}": -lead}, note=f"the aim {k}, led, negative half")
+        L1.unit(f"c{k}+", {f"c{k}": 1}, note=f"clock {k}, positive half")
+        L1.unit(f"c{k}-", {f"c{k}": -1}, note=f"clock {k}, negative half")
+        L1.unit(f"w{k}+", {f"w{k}": 1 / 16}, note=f"the sky's motion {k}, rad a loop, positive half")
+        L1.unit(f"w{k}-", {f"w{k}": -1 / 16}, note=f"the sky's motion {k}, negative half")
+    L1.sat_pair("up", {"cy": 1, "jy": -P["hyst"]}, 0.0, "target above the nose (kept while the stick pitches that way)")
+    L1.sat_pair("hard", {"th": 1}, -P["hard_th"], "far off the nose: a hard turn")
+    L1.sat_pair("ahead", {"uz": 1}, 0.0, "target ahead")
+    L1.sat_pair("inrange", {"dist": -1}, P["fire_range"], "within laser range")
+    L1.sat_pair("cool", {"hot": -1}, P["hot"], "laser cool enough")
+    L1.unit("seen", {"seen": 1}, note="a target")
+    L1.sat_pair("aligned", {"th": -1}, P["v_th"], "within v_th of the nose: fly, don't turn")
+    if camera:
+        L1.unit("gap", {"rho": -1}, P["rho_hold"], "how far short of the hold size it's drawn")
+    else:
+        for b in ["near", "mid", "far"]:
+            L1.sat_pair("d" + b, {"dist": 1}, -P["r_" + b], f"range past r_{b}")
+    L1.unit("cone", {"rho": P["fire_r"] / (16 * math.pi)}, note="the fire cone, off-angle units")
+    L1.unit("th", {"th": 1}, note="the off angle, carried")
+    if camera:
+        L1.sat_pair("big", add({"rho": 1}, {"ws": P["fire_rho"] - P["fire_rho_ws"]}), -P["fire_rho"], "drawn big enough to shoot (sooner in witchspace)")
+        L1.sat_pair("cl", {"close": 1}, -P["pass_close"], "closing")
+        L1.unit("loom", {"rho": 1}, -P["pass_rho"], "looming: drawn past pass_rho")
+    else:
+        L1.unit("big+", {"one": 1}, note="(no size gate)")
+        L1.unit("big-", {"one": 0}, note="(no size gate)")
+
+    # ------------------------------------------------------------------ the aim point, signed, with the pass beside it
+    L2 = Layer(L1.names)
+    if camera: L2.passthrough("cl+", "cl-")
+    L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "hard+", "hard-",
+                   "ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "aligned+", "aligned-", "big+", "big-", "th")
+    if camera:
+        L2.unit("band", {"gap": P["v_k"]}, P["v_base"], "the speed by how big it's drawn: v_base at the hold size, more the smaller")
+    else:
+        vc, vn, vm, vf = P["v_close"], P["v_near"], P["v_mid"], P["v_far"]
+        L2.unit("band", add(sat_ref("dnear", vn - vc), sat_ref("dmid", vm - vn), sat_ref("dfar", vf - vm)), vc, "the speed by range band")
+    L2.unit("conev", {"cone": math.pi}, note="the cone, rad")
+    L2.sat_pair("outhold", {"ax+": 1, "ax-": 1, "ay+": 1, "ay-": 1, "cone": -math.pi * P["nose_hold"]}, 0.0, "outside the nose hold: roll allowed", S=4000.0)
+    if camera:
+        k, g = P["pass_k"], sat_ref("cl", 2.0)
+        L2.unit("px+", add({"loom": k, "cx+": 2.0}, g), -4.0, "a pass: aim aside, on the right, while it looms and closes")
+        L2.unit("px-", add({"loom": k, "cx-": 2.0}, g), -4.0, "a pass: aim aside, on the left, while it looms and closes")
+    for k in "xy":
+        L2.unit(f"a{k}+", {f"a{k}+": 1, f"a{k}-": -1}, note=f"aim {k}, positive half")
+        L2.unit(f"a{k}-", {f"a{k}-": 1, f"a{k}+": -1}, note=f"aim {k}, negative half")
+
+    # ------------------------------------------------------------------ the error, past the dead zone; the bits' ANDs
+    L3 = Layer(L2.names)
+    L3.passthrough("cx+", "cx-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "ay+", "ay-", "band", "aligned+", "aligned-")
+    L3.unit("bandover", {"band": 1}, -40.0, "the band past 40 (the game's top speed)")
+    if camera:
+        dz = P["dead"]
+        # a pass pushes the aim the other way from where the target is: x - px on its side
+        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1}, -dz, "sideways error past the dead zone (right)")
+        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1}, -dz, "sideways error past the dead zone (left)")
+        L3.unit("ey+", {"ay+": 1, "ay-": -1}, -dz, "error past the dead zone (up)")
+        L3.unit("ey-", {"ay-": 1, "ay+": -1}, -dz, "error past the dead zone (down)")
+    else:
+        L3.unit("ex+", {"ax+": 1, "ax-": -1}, note="sideways error (right)")
+        L3.unit("ex-", {"ax-": 1, "ax+": -1}, note="sideways error (left)")
+        L3.unit("ey+", {"ay+": 1, "ay-": -1}, note="error (up)")
+        L3.unit("ey-", {"ay-": 1, "ay+": -1}, note="error (down)")
+    cc = P["hard_cone"]
+    L3.unit("h_up", add({"cy+": 1, "cy-": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0)), -2.0, "far off, above: pull up hard")
+    L3.unit("h_dn", add({"cy-": 1, "cy+": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0)), -2.0, "far off, below: push down hard")
+    L3.sat_pair("fin", {"conev": 1, "th": -math.pi}, 0.0, "the nose inside the fire cone (the target itself: the laser hits where the nose points now)", S=20000.0)
+    L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
+    if camera: L3.passthrough("cl+", "cl-")
+
+    # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
+    L4 = Layer(L3.names)
+    r0, cap = P["roll_ramp"], P["roll_cap"]
+    for s in "+-":
+        L4.unit("over" + s, {"ex" + s: 1 / r0, "cx" + s: -cap}, note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
+    absx = {"ex+": 1, "ex-": 1}
+    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
+    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
+    if camera:
+        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), {"seen": 1}), -4.0,
+                "AND of five: in the sights, ahead, in range, cool, a target (the strafing: the laser is part of the show)")
+        L4.unit("orbit", add(sat_ref("big"), sat_ref("aligned")), -1.0, "on the target and it's drawn big: the slow roll")
+    else:
+        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,
+                "AND of six: in the sights, ahead, in range, cool, big enough, a target")
+    L4.unit("spd", add({"band": 1, "bandover": -1}, {k: 40 * v for k, v in sat_ref("aligned").items()}), -40.0 + P["v_turn"], "the speed: min(band, 40) if aligned, else v_turn (stop to turn)")
+    L4.passthrough("ex+", "ex-", "up+", "up-", "h_up", "h_dn", "wy+", "wy-", "wx+", "wx-", "outhold+", "outhold-")
+
+    L5 = Layer(L4.names)
+    UP, OH = sat_ref("up"), sat_ref("outhold")
+    for s in "+-":
+        m = {"ex" + s: 1 / r0, "over" + s: -1}      # min(|error|/ramp, cap x |clock x|)
+        # gated twice: by the side, and by being outside the nose hold: v + M(up) + M(outhold) - 2M
+        L5.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold")
+        L5.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -M, f"roll magnitude ({s}) if below, outside the nose hold")
+    L5.passthrough("p_up", "p_dn", "h_up", "h_dn", "wy+", "wy-", "wx+", "wx-", "fire", "spd")
+    if camera: L5.passthrough("orbit")
+
+    OUT = Layer(L5.names, relu=False)
+    g = P["roll_gain"]; fr = P.get("ff_roll", 0.0) * 256; fp = P.get("ff_pitch", 0.0) * 256
+    OUT.unit("alpha", add({"roll_up+": -g, "roll_up-": g, "roll_dn+": g, "roll_dn-": -g, "wx+": -fr, "wx-": fr},
+                          {"orbit": P["orbit"]} if camera else {}), note="roll rate")
+    OUT.unit("beta", {"p_up": P["pitch_gain"], "p_dn": -P["pitch_gain"], "h_up": P["hard_gain"], "h_dn": -P["hard_gain"], "wy+": fp, "wy-": -fp},
+             note="pitch rate, + nose up, with the feed-forward")
+    OUT.unit("fire", {"fire": 1.0}, note="press the laser when > 0.5")
+    OUT.unit("speed", {"spd": 1.0}, note="the speed")
+    return [L1, L2, L3, L4, L5, OUT]
+
+
+def build_interceptor(P=None):
+    return _build({**INTERCEPTOR, **(P or {})}, camera=False)
+
+
+def build_camera(P=None):
+    return _build({**CAMERA, **(P or {})}, camera=True)

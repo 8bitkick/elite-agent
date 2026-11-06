@@ -30,6 +30,7 @@ __attribute__((export_name("wasm_init"))) int wasm_init(int mode, int machine) {
     extern int g_fair, g_curious;
     g_fair = mode == 1 ? 3 : 0;
     g_curious = mode == 2;
+    { extern int g_pilots; g_pilots = 1; }       // (every mode flies its own AI pilot models)
     memset(&io, 0, sizeof io);
     io.ram = ram; io.hold = p_hold; io.tap = p_tap; io.log = p_log; io.note = p_note; io.analogue = p_analogue;
     io.machine = machine;
@@ -60,6 +61,9 @@ __attribute__((export_name("wasm_action"))) int wasm_action(void) {
 extern float g_wsp_last_f[], g_dock_last_f[]; extern uint32_t g_wsp_last_frame, g_dock_last_frame;
 __attribute__((export_name("wasm_fight_senses"))) float *wasm_fight_senses(void) { return g_wsp_last_f; }
 __attribute__((export_name("wasm_fight_when"))) uint32_t wasm_fight_when(void) { return g_wsp_last_frame; }
+// which dogfight network made the last decision: 0 fair mode's, 1 the camera (Curious, the show on), 2 the interceptor
+extern int g_wsp_last_net;
+__attribute__((export_name("wasm_fight_net"))) int wasm_fight_net(void) { return g_wsp_last_net; }
 __attribute__((export_name("wasm_dock_senses"))) float *wasm_dock_senses(void) { return g_dock_last_f; }
 __attribute__((export_name("wasm_dock_when"))) uint32_t wasm_dock_when(void) { return g_dock_last_frame; }
 

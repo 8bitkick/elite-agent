@@ -41,6 +41,8 @@ export class Core {
     get cash() { return this.x.wasm_cash() / 10; }
     get action() { return this.x.wasm_action(); }
     get frameNo() { return this.x.wasm_frame_no(); }
+    /** the dogfight network that decided last: "fight" (fair mode's), "camera" or "interceptor" */
+    get fightNet() { return ["fight", "camera", "interceptor"][this.x.wasm_fight_net()] || "fight"; }
     senses(which) {
         const n = which === "fight" ? 23 : 47;
         const p = which === "fight" ? this.x.wasm_fight_senses() : this.x.wasm_dock_senses();

@@ -11,13 +11,23 @@
 #include "wsp_pilot.h"
 // the weight-space pilot (wsp_pilot.c, wsp/README.md) flies the stick, fires and sets the throttle in a fight: in fair mode
 // by default, its own pilot; WSP=1 in efficient mode too, WSP=0 the C law in fair mode (comparisons)
+// g_pilots: each mode flies its own AI pilot models (wsp/README.md): fair mode's two, Optimal's interceptor, Curious's camera
+// while the show is on (the interceptor otherwise); 0: the C rules in Optimal and Curious (fair mode always flies its networks).
+// The page sets it (player_wasm.c); PILOTS= in run_sim and the lab; WSP= and WSPSHOW= override it, for the labs
+int g_pilots = 0;
 static int wsp_on(void) {
     static int v = -1;
     if (v < 0) { const char *e = getenv("WSP"); v = e ? *e != '0' : -2; }
-    return v == -2 ? g_fair != 0 : v;
+    return v == -2 ? (g_fair != 0 || g_pilots) : v;
 }
+static int wsp_show_on(void) {
+    static int v = -1;
+    if (v < 0) { const char *e = getenv("WSPSHOW"); v = e ? *e != '0' : -2; }
+    return v == -2 ? g_pilots : v;
+}
+extern int g_wsp_net;       // which network decides: wsp_pilot.c
 static wsp_out_t s_wsp;
-float g_wsp_last_f[WSP_NF]; uint32_t g_wsp_last_frame;     // (the senses of the last decision, for the web page's panel)
+float g_wsp_last_f[WSP_NF]; uint32_t g_wsp_last_frame; int g_wsp_last_net;     // (the senses of the last decision, for the web page's panel)
 #if APP_LOADED
 static FILE *wsp_log(void) { return NULL; }      // (the Presto app: no files)
 #else
@@ -324,7 +334,9 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         if (!s_cam && well_in) s_cam = 1, s_cam_since = now();
         else if (s_cam && well_out) s_cam = 0, s_cam_since = now();
     }
-    int cam = g_curious && show_on() && s_cam;
+    int shownet = g_curious && show_on() && wsp_on() && wsp_show_on();     // (the camera pilot: the stick, the speed, the laser)
+    int cam = g_curious && show_on() && s_cam && !shownet;
+    g_wsp_net = shownet ? 1 : !g_fair ? 2 : 0;       // (the camera; Optimal's and Curious's interceptor; fair mode's own)
     if (cam) {
         extern double g_aim_tol, cfly_steer(vec_t, int, int, double, keyset_t *);
         static int ctype = -1, cslot = -1;
@@ -345,7 +357,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         int decided;
         float *wf = g_wsp_last_f;           // (the senses, kept for the web page's panel; off the Presto app's stack)
         s_wsp = wsp_pilot_at(&wi, IO->frame, &decided, wf);
-        g_wsp_last_frame = IO->frame;
+        g_wsp_last_frame = IO->frame; g_wsp_last_net = g_wsp_net;
         extern int g_want_jx, g_want_jy; g_want_jx = s_wsp.jstx, g_want_jy = s_wsp.jsty;
         // (the teacher: what the C's planner would do here, while acquiring - the same test as its own block below.
         // WSPTEACH=1 logs it, for distil.py; WSPHYB=1 flies it, the ceiling for a perfect copy)
@@ -482,7 +494,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
             }
         }
     }
-    if (!rc) want = show_speed(sh, dist, want);       // (curious mode's show: show.c)
+    if (!rc && !g_wsp_net) want = show_speed(sh, dist, want);       // (curious mode's show: show.c; the camera pilot sets its own)
     speed_keys(speed(), want, keys);
     const shiptype_t *ti = ship_type(sh->type);
     double r = ti && ti->area ? sqrt((double) ti->area) : 80;
@@ -492,7 +504,8 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
     int view = rear ? 1 : 0, friendly = 0;
     for (int i = 0; i < n; i++)
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
-    if (show_fire(sh, dist, near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK))) ks_add(keys, K_FIRE), s_rr_fire = 1, g_fire_now = 1;
+    int can_ = near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK);
+    if (g_wsp_net ? can_ : show_fire(sh, dist, can_)) ks_add(keys, K_FIRE), s_rr_fire = 1, g_fire_now = 1;
     else if (g_opp_fire && !show_on() && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
     {
         extern int g_steer_log;

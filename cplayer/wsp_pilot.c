@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include "wsp_pilot.h"
 #include "pilot_weights.h"
+#include "interceptor_weights.h"     // (Optimal mode's own: wsp/elite_wsp/author_modes.py)
+#include "camera_weights.h"          // (Curious mode's, while the show is on)
 
 #define MAXL 8
 #define MAXW 256
@@ -51,6 +53,12 @@ static double s_sa, s_sb, s_sf, s_ss;
 static int s_hold = 1;
 static uint64_t s_rng = 88172645463325252ULL;
 
+// which network decides (combat.c sets it each decision): 0 fair mode's, 1 the camera (Curious, the show on), 2 the
+// interceptor (Optimal). Each compiled in; WSPW=, WSPWS= and WSPINTW= load others at run time
+int g_wsp_net;
+static int s_nl2, s_shape2[MAXL + 1], s_nl3, s_shape3[MAXL + 1];
+static const float *s_W2[MAXL], *s_B2[MAXL], *s_W3[MAXL], *s_B3[MAXL];
+
 static void load(void) {
     static int done;
     if (done) return;
@@ -58,9 +66,15 @@ static void load(void) {
     s_nl = WSP_LAYERS;
     for (int i = 0; i <= s_nl; i++) s_shape[i] = WSP_SHAPE[i];
     for (int i = 0; i < s_nl; i++) s_W[i] = WSP_W[i], s_B[i] = WSP_B[i];
+    s_nl2 = CAM_LAYERS; for (int i = 0; i <= s_nl2; i++) s_shape2[i] = CAM_SHAPE[i]; for (int i = 0; i < s_nl2; i++) s_W2[i] = CAM_W[i], s_B2[i] = CAM_B[i];
+    s_nl3 = INT_LAYERS; for (int i = 0; i <= s_nl3; i++) s_shape3[i] = INT_SHAPE[i]; for (int i = 0; i < s_nl3; i++) s_W3[i] = INT_W[i], s_B3[i] = INT_B[i];
 #if !APP_LOADED
     const char *path = getenv("WSPW");
     if (path && *path) read_net(path, &s_nl, s_shape, s_W, s_B);
+    const char *ps = getenv("WSPWS");
+    if (ps && *ps) read_net(ps, &s_nl2, s_shape2, s_W2, s_B2);
+    const char *pi = getenv("WSPINTW");
+    if (pi && *pi) read_net(pi, &s_nl3, s_shape3, s_W3, s_B3);
     const char *rp = getenv("WSPR");
     if (rp && *rp) read_net(rp, &s_rnl, s_rshape, s_RW, s_RB);
     const char *n = getenv("WSPN");
@@ -154,7 +168,9 @@ wsp_out_t wsp_pilot_at(const wsp_in_t *in, uint32_t frame, int *decided, float f
     wsp_features(in, f);
     if (s_last != 0xFFFFFFFFu && frame >= s_last && frame - s_last < (uint32_t) s_hold) { *decided = 0; return hands(s_act); }
     float m[4], r[4];
-    forward(s_nl, s_shape, s_W, s_B, f, m);
+    if (g_wsp_net == 1) forward(s_nl2, s_shape2, s_W2, s_B2, f, m);
+    else if (g_wsp_net == 2) forward(s_nl3, s_shape3, s_W3, s_B3, f, m);
+    else forward(s_nl, s_shape, s_W, s_B, f, m);
     // (the written outputs clamped to what the hands can do, so a learned correction is never lost in the clip)
     m[0] = m[0] > 31 ? 31 : m[0] < -31 ? -31 : m[0];
     m[1] = m[1] > 8 ? 8 : m[1] < -8 ? -8 : m[1];

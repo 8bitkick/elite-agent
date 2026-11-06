@@ -6,7 +6,12 @@ export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", 
 const IDLE_TEXT = "rgb(150,156,168)", IDLE_EDGE = "rgb(58,64,78)";      // (the network's idle units, readable on a phone)
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
-const PX = 1016, PW = 880, NET_Y = 322, GAP = 62, CW = Math.floor((PW - 5 * GAP) / 6);
+const PX = 1016, PW = 880, NET_Y = 322;
+// the columns: a network's layers, inputs and outputs included (fair mode's dogfight network 6, the mode networks 7)
+let NCOL = 6, GAP = 62, CW = Math.floor((PW - 5 * GAP) / 6);
+function setCols(n) { NCOL = n; GAP = n > 6 ? 40 : 62; CW = Math.floor((PW - (n - 1) * GAP) / n); }
+// the pilot by network, as the status line names it
+const PILOT = { fight: "Dogfight AI", interceptor: "Interceptor AI", camera: "Camera AI" };
 // the units' height: each network's tallest column fills the space down to the game screen's bottom
 let CH = 20;
 const fitRows = (n) => { CH = Math.max(14, Math.floor((BOT - NET_Y - 24 + 2) / n) - 2); };
@@ -44,6 +49,7 @@ export const INPUT_NOTE = {
         "the angle to the station's centre", "the angle to the slot's centre", "1 with nothing in the way before the slot",
         "our own stick, up and down", "last loop: steering from above", "last loop: in the final", "last loop: committed"],
 };
+INPUT_NOTE.interceptor = INPUT_NOTE.camera = INPUT_NOTE.fight;      // (the same senses)
 export const COL_NOTE = {
     INPUTS: "what the network is told, read off the screen",
     TESTS: "yes-or-no tests on the inputs, each made of ReLU units",
@@ -60,8 +66,8 @@ export const rankOf = (t) => RANKS.filter(([k]) => t >= k).pop()[1];
 const rgb = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const colX = (c) => PX + c * (CW + GAP);
-const rowY = (c, r) => NET_Y + 24 + r * (CH + 2) * (c === 5 ? 2 : 1);
-const rowH = (c) => (c === 5 ? CH * 2 + 2 : CH);
+const rowY = (c, r) => NET_Y + 24 + r * (CH + 2) * (c === NCOL - 1 ? 2 : 1);
+const rowH = (c) => (c === NCOL - 1 ? CH * 2 + 2 : CH);
 const cx = (h) => CH_X + (h / HMAX) * CH_W;
 const cy = (t) => CH_Y + CH_H - (Math.min(t, 7000) / 7000) * CH_H;
 
@@ -91,7 +97,7 @@ function trace(lanes, c, a, b) {
 
 function lanesFor(links) {
     const lanes = [];
-    for (let c = 0; c < 5; c++) {
+    for (let c = 0; c < NCOL - 1; c++) {
         const srcs = [...new Set(links.filter((l) => l[0] === c).map((l) => l[1]))].sort((a, b) => a - b);
         const x0 = colX(c) + CW;
         lanes.push(new Map(srcs.map((a, k) => [a, x0 + 10 + (k * (GAP - 20)) / Math.max(1, srcs.length - 1)])));
@@ -105,10 +111,7 @@ export class Panel {
         canvas.width = 1920 - X0; canvas.height = H;
         this.ctx = canvas.getContext("2d");
         // the dogfight network's routes: every non-zero weight, column i to i + 1
-        const fl = [];
-        data.fight.layers.forEach((L, i) => L.W.forEach((row, o) => row.forEach((w, j) => { if (w) fl.push([i, j, o, w]); })));
-        this.fightLinks = fl;
-        this.fightLanes = lanesFor(fl.map(([i, j, o]) => [i, j, o]));
+        this.fnets = {};      // (each dogfight-type network's links and lanes, made when first drawn)
         this.dockLanes = lanesFor(data.dock.links);
     }
 
@@ -163,7 +166,7 @@ export class Panel {
         const last = s.log[s.log.length - 1], cut = (t, n) => (t.length <= n ? t : t.slice(0, n - 1) + "…");
         let at = last ? last[0] : s.frame, text = last ? `Agent: ${last[1]}` : "", tcol = GREEN;
         if (s.view === "dock" && s.senses) { at = s.frame; text = `Docking AI: ${s.note || ""}`; tcol = rgb(CYAN); }
-        else if (s.view === "fight" && s.senses) { text = `Dogfight AI: ${last ? last[1] : ""}`; tcol = rgb(YEL); }
+        else if (s.view === "fight" && s.senses) { text = `${PILOT[s.fightNet] || PILOT.fight}: ${last ? last[1] : ""}`; tcol = rgb(YEL); }
         if (text) {
             const mm = Math.floor(at / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
@@ -198,7 +201,7 @@ export class Panel {
             names.forEach((name, r) => {
                 const y = rowY(c, r);
                 this.hits.push({ x, y, w: CW, h: rowH(c), c, r, name, title, v: valOf ? valOf(c, r) : null });
-                if (c === 5) { outRows(x, y, r, name); return; }
+                if (c === NCOL - 1) { outRows(x, y, r, name); return; }
                 const L = lit(c, r);
                 const g = this.ctx;
                 g.fillStyle = L > 0.02 ? rgb(mix(PANEL, color(c, r), 0.12 + 0.88 * L)) : rgb(PANEL);
@@ -229,25 +232,38 @@ export class Panel {
         }
     }
 
+    /** a dogfight-type network's links and lanes, by name (fight: fair mode's; interceptor; camera) */
+    fnet(name) {
+        if (!this.fnets[name]) {
+            const fl = [];
+            this.d[name].layers.forEach((L, i) => L.W.forEach((row, o) => row.forEach((w, j) => { if (w) fl.push([i, j, o, w]); })));
+            setCols(this.d[name].cols.length);
+            this.fnets[name] = { links: fl, lanes: lanesFor(fl.map(([i, j, o]) => [i, j, o])) };
+        }
+        return this.fnets[name];
+    }
+
     drawFight(s) {
-        const F = this.d.fight, f = s.senses;
-        fitRows(Math.max(...F.cols.map(([, names], c) => names.length * (c === 5 ? 2 : 1))));
+        const name = s.fightNet && this.d[s.fightNet] ? s.fightNet : "fight", F = this.d[name], f = s.senses;
+        setCols(F.cols.length);
+        const { links, lanes } = this.fnet(name);
+        fitRows(Math.max(...F.cols.map(([, names], c) => names.length * (c === NCOL - 1 ? 2 : 1))));
         const vals = f ? acts(F.layers, f) : null;
         const base = [44, 49, 64];
-        const segs = this.fightLinks.map(([i, j, o, w]) => {
+        const segs = links.map(([i, j, o, w]) => {
             const flow = vals ? (w * vals[i][j]) / (i === F.layers.length - 1 ? F.outscale[o] : F.scale[i + 1][o]) : 0;
             const L = Math.min(1, Math.abs(flow));
             const c3 = rgb(mix(base, flow >= 0 ? YEL : CYAN, L * 0.6));
-            return [L, c3, trace(this.fightLanes, i, j, o)];
+            return [L, c3, trace(lanes, i, j, o)];
         });
         this.drawRoutes(segs);
         const lit = (c, r) => (vals ? Math.min(1, Math.abs(vals[c][r]) / F.scale[c][r]) : 0);
         this.drawCells(F.cols, vals, lit, (c, r) => (c === 0 && vals && vals[0][r] < 0 ? CYAN : YEL), (x, y, r, name) => {
-            const v = vals ? Math.max(-F.outscale[r], Math.min(F.outscale[r], vals[5][r])) : 0;
+            const v = vals ? Math.max(-F.outscale[r], Math.min(F.outscale[r], vals[F.layers.length][r])) : 0;
             const txt = r < 2 ? (v >= 0 ? "+" : "") + Math.round(v) : r === 2 ? (v > 0.5 ? "FIRE" : "") : String(Math.round(v));
             this.drawOut(x, y, name, v, F.outscale[r], r < 2, YEL, txt);
         }, (c, r) => (vals ? vals[c][r] : null));
-        this.net = "fight";
+        this.net = name;
     }
 
     dockPhase(f, A) {
@@ -264,6 +280,7 @@ export class Panel {
 
     drawDock(s) {
         const D = this.d.dock, f = s.senses;
+        setCols(6);
         fitRows(Math.max(...D.cols.map(([, , rows], c) => rows.length * (c === 5 ? 2 : 1))));
         const A = this.dockActs;
         // each shown cell's value and scale: (column, row)

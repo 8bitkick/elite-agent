@@ -22,6 +22,10 @@ const GAMES = {
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
 const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "6cb32dd0b7d9c8762bf67d5d2c7a3e6a2179799f0ccf38a0d0fe20946bb375fa" };
 const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
+// the mode (?mode=): Optimal (reads the game's RAM; its own interceptor network flies the fights), Fair (only what a player can
+// see; the two AI pilot models), Curious (explores; the camera network flies the fights while the show is on)
+const PMODES = { optimal: { n: 0, name: "Optimal" }, fair: { n: 1, name: "Fair" }, curious: { n: 2, name: "Curious" } };
+const MODE = PMODES[Q.get("mode")] ? Q.get("mode") : "fair";
 // the last save, kept in this browser: the commander block (the same for both games, at its own address in each) and the career's
 // counters. A reload or a change of game carries on from it. ?fresh, ?skew or ?check: a fresh career, the save left alone
 const COMMANDER = "BITKICK", SAVE_KEY = "elite-agent-save1", A_TP = { flicker: 0x1234, solid: 0x0C34 };
@@ -142,12 +146,32 @@ async function main() {
     const by = `Emulated by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a> (GPL-3.0) in WebAssembly · <a href="https://github.com/8bitkick/elite-agent/tree/main/web">source</a>`;
     const elite = GAME === "solid" ? `Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon's source` : `flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master">Mark Moxon</a>`;
     for (const id of ["credit", "p-credit"]) { const c = $(id); if (c) c.innerHTML = `<b>Acornsoft Elite</b>, BBC Master · Elite © Ian Bell and David Braben · ${elite}<br>${by}`; }
+    const NOTE = {
+        optimal: "Optimal mode: the agent reads the game's RAM. Its fights are flown by the interceptor, a network written for points a minute; the docking by the docking network.",
+        fair: "Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB, docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.",
+        curious: "Curious mode: the agent explores every galaxy. While it's on top, the camera network flies the fights for the viewer: close, drifting, a pass, the kill seen big; otherwise the interceptor.",
+    };
+    for (const id of ["netnote"]) { const n = $(id); if (n) n.textContent = NOTE[MODE]; }
+    { const f = document.querySelector("#phone footer p"); if (f) f.textContent = NOTE[MODE]; }
+    for (const box of document.querySelectorAll(".modes")) {
+        box.innerHTML = "";
+        for (const [k, m] of Object.entries(PMODES)) {
+            const q = new URLSearchParams(location.search);
+            if (k === "fair") q.delete("mode"); else q.set("mode", k);
+            q.delete("skew");
+            const a = document.createElement("a");
+            a.textContent = m.name; a.href = "?" + q.toString(); a.className = k === MODE ? "on" : "";
+            a.title = { optimal: "Reads the game's RAM; its own interceptor network flies the fights", fair: "Only what a player can see; two AI pilot models", curious: "Explores every galaxy; the camera network flies the fights for the viewer" }[k];
+            box.appendChild(a);
+        }
+    }
     for (const box of document.querySelectorAll(".games")) {
         box.innerHTML = "";
         for (const [k, g] of Object.entries(GAMES)) {
             const q = new URLSearchParams(location.search);
             if (k === "flicker") q.delete("game"); else q.set("game", k);
             q.delete("skew");
+            if (MODE !== "fair") q.set("mode", MODE);
             const a = document.createElement("a");
             a.textContent = box.closest("#p-nav") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
@@ -155,7 +179,7 @@ async function main() {
     }
     const shown = performance.now(), MIN_CARD_MS = 1000;      // (the card, and who made the game, for at least a second)
     const card = document.querySelector("#loading .card"), who = document.createElement("div");
-    who.textContent = GAMES[GAME].credit;
+    who.textContent = `${PMODES[MODE].name} mode · ${GAMES[GAME].credit}`;
     who.style.cssText = "color:var(--dim);font-size:14px;text-align:center;line-height:1.4";
     card.appendChild(who);
     loading(0.05, "Loading the machine, its ROMs and Elite's disc…");
@@ -235,7 +259,7 @@ async function main() {
     loading(0.5, "Booting the BBC Master and loading Elite…");
     await new Promise((r) => setTimeout(r, 30));
     core.name = COMMANDER;
-    if (!core.start(SKEW)) throw new Error("no Elite the player knows on this disc");
+    if (!core.start(SKEW, PMODES[MODE].n)) throw new Error("no Elite the player knows on this disc");
     if (RESUMED) core.load = COMMANDER;
     s.started = true;
     await new Promise((r) => setTimeout(r, Math.max(0, MIN_CARD_MS - (performance.now() - shown))));
@@ -310,7 +334,7 @@ async function main() {
     const check = async () => {
         const h = await sha256(s.journal.join(""));
         s.journalHash = h; s.journal = null;
-        const ref = CHECK_FRAMES === 30000 ? REFERENCE[`${GAME}_${SKEW}`] : null;
+        const ref = CHECK_FRAMES === 30000 && MODE === "fair" ? REFERENCE[`${GAME}_${SKEW}`] : null;
         const verdict = !ref ? "no reference for this game and skew" : h === ref ? "matches the reference: this machine flies the same career" : "DOESN'T MATCH the reference: please report it";
         console.log(`journal sha256 at frame ${CHECK_FRAMES}: ${h} (${verdict})`);
     };
@@ -339,7 +363,7 @@ async function main() {
         // 1× ACTION kicking in: its button lit in the colour of the AI flying (and for the seconds after, while it's still at
         // 1×), the speed button saying so. At MAX otherwise, how fast MAX is on this machine
         showSpeed();
-        s.frame = f + OFF; s.tally = core.tally; s.cash = core.cash;
+        s.frame = f + OFF; s.tally = core.tally; s.cash = core.cash; s.fightNet = core.fightNet;
         if (s.frame - s.tallyPts[s.tallyPts.length - 1][0] > 500) s.tallyPts.push([s.frame, s.tally]);
         const fight = core.senses("fight"), dock = core.senses("dock");
         if (s.lastDock > s.lastDepart) { s.view = "docked"; s.senses = null; }
@@ -356,7 +380,8 @@ async function main() {
     const reset = () => {
         if (!confirm("Start again from Jameson at Lave? This career's save will be lost.")) return;
         try { localStorage.removeItem(SAVE_KEY); } catch {}
-        location.search = GAME === "flicker" ? "" : `?game=${GAME}`;
+        const q = new URLSearchParams(); if (GAME !== "flicker") q.set("game", GAME); if (MODE !== "fair") q.set("mode", MODE);
+        location.search = q.toString() ? "?" + q.toString() : "";
     };
     for (const id of ["reset", "p-reset"]) { const b = $(id); if (b) b.onclick = reset; }
     const toggleSound = () => {

@@ -436,6 +436,7 @@ int main(int argc, char **argv) {
     { extern double g_dk_g; if (getenv("DKG")) g_dk_g = atof(getenv("DKG")); }
     { extern double g_dk_xon; if (getenv("DKXON")) g_dk_xon = atof(getenv("DKXON")); }
     { extern int g_curious; if (getenv("CURIOUS")) g_curious = atoi(getenv("CURIOUS")); }
+    { extern int g_pilots; if (getenv("PILOTS")) g_pilots = atoi(getenv("PILOTS")); }      // (each mode's own AI pilots)
     {   // fair mode (fair.h, docs/FAIR.md): FAIR=1 the information limits; FAIRHANDS=1 the hand limits too; FAIRMASK=bits (1 see, 2 dashboard, 8 stick, 16 keys)
         extern int g_fair, g_fair_misjump, g_fair_stick_rate, g_fair_key_cap, g_fair_key_gap; extern double g_fair_noise;
         if (getenv("FAIR") && atoi(getenv("FAIR"))) g_fair = 3;           // (the information limits)

@@ -25,6 +25,33 @@ def scales(layers, X):
         out.append(np.maximum(np.percentile(np.abs(h), 95, axis=1), 1e-3))
     return [s.round(5).tolist() for s in out]
 
+SHOW = {'ux': 'aim right', 'uy': 'aim up', 'uz': 'aim ahead', 'wx': 'drift x', 'wy': 'drift y', 'th': 'off nose', 'cx': 'clock x',
+        'cy': 'clock y', 'rho': 'size', 'dist': 'range', 'close': 'closing', 'own': 'our speed', 'hot': 'laser heat', 'energy': 'energy',
+        'ws': 'witchspace', 'jx': 'stick x', 'jy': 'stick y', 'seen': 'target', 'one': 'bias', 'hseen': 'hdg seen', 'age': 'age',
+        'rsd': 'range ±', 'vsd': 'motion ±'}
+
+def read_fight_log(path):
+    F = []
+    for line in open(path):
+        a = line.split("|")[0].split()
+        if len(a) == 25 and a[0] == "D": F.append([float(x) for x in a[2:]])
+    return np.array(F[:: max(1, len(F) // 4000)], np.float32)
+
+def fight_net(net, F):
+    """a dogfight-type network (23 senses, 4 outputs, any number of layers) as the panel draws it"""
+    flayers = [(net.W[i], net.b[i], i < net.n - 1) for i in range(net.n)]
+    return dict(layers=dense([(W, b) for W, b, _ in flayers]),
+                cols=[["INPUTS", [SHOW[str(x)] for x in net.features]]] + [[f"LAYER {i + 1}", [str(x) for x in net.names[i]]] for i in range(net.n - 1)]
+                     + [["OUTPUT", ["roll", "pitch", "fire", "throttle"]]],
+                scale=scales(flayers, F)[:-1], outscale=[31, 8, 1, 40])
+
+def add(name, npz, log, out):
+    """panel_data.py --add NAME net.npz WSPLOG out.json: another dogfight-type network into an existing panel.json"""
+    d = json.load(open(out))
+    d[name] = fight_net(Net(npz), read_fight_log(log))
+    json.dump(d, open(out, "w"), separators=(",", ":"))
+    print(f"{out}: {name} added, {os.path.getsize(out) // 1024} KB")
+
 def main(fight_log, dock_log, out):
     # ---- the dogfight network: its own columns, every unit
     net = Net(os.path.join(REPO, "wsp", "elite_pilot.npz"))
@@ -38,10 +65,7 @@ def main(fight_log, dock_log, out):
         if len(a) == 25 and a[0] == "D": F.append([float(x) for x in a[2:]])
     F = np.array(F[:: max(1, len(F) // 4000)], np.float32)
     flayers = [(net.W[i], net.b[i], i < net.n - 1) for i in range(net.n)]
-    fight = dict(layers=dense([(W, b) for W, b, _ in flayers]),
-                 cols=[["INPUTS", [SHOW[str(x)] for x in net.features]]] + [[f"LAYER {i + 1}", [str(x) for x in net.names[i]]] for i in range(4)]
-                      + [["OUTPUT", ["roll", "pitch", "fire", "throttle"]]],
-                 scale=scales(flayers, F)[:-1], outscale=[31, 8, 1, 40])
+    fight = fight_net(net, F)
     # ---- the docking network: the curated columns, the routes between them
     DP.load()
     X = []
@@ -58,4 +82,5 @@ def main(fight_log, dock_log, out):
     print(f"{out}: {os.path.getsize(out) // 1024} KB")
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    if sys.argv[1] == "--add": add(*sys.argv[2:6])
+    else: main(*sys.argv[1:4])
