@@ -44,6 +44,25 @@ h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.12; letter-spacing: -.02e
 h3 { font-size: 16px; margin: 24px 0 2px; }
 td.r { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--soft); }
 tr.warn td { background: rgba(242, 209, 58, .06); }
+.specs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 24px; }
+.specs div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+.specs b { display: block; font: 700 20px 'JetBrains Mono', monospace; color: var(--cyan); white-space: nowrap; }
+.specs span { display: block; font-size: 13px; line-height: 1.35; color: var(--soft); margin-top: 3px; }
+.cobra { display: block; width: 100%; max-width: 720px; margin: 0 auto; }
+figure > figcaption { text-align: left; }
+.fairgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fairgrid h4 { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .05em; text-transform: uppercase; margin: 0 0 6px; }
+.fairgrid canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
+.fairgrid p { font-size: 13px; line-height: 1.35; color: var(--soft); margin: 6px 0 0; }
+table.read td { font-size: 13.5px; } table.read td:not(:first-child) { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+.flow { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; align-items: stretch; }
+.fbox { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; font-weight: 600; font-size: 14.5px; text-align: center; flex: 1; }
+.fbox small { display: block; font-weight: 400; font-size: 12.5px; color: var(--soft); line-height: 1.3; margin-top: 2px; }
+.fbox.net { border-top: 3px solid var(--c); color: var(--c); }
+.fsplit { display: grid; grid-template-columns: 1fr 3fr; gap: 10px; }
+.fcol { display: flex; flex-direction: column; gap: 6px; }
+.flab { font: 700 11px 'JetBrains Mono', monospace; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); text-align: center; }
+.frow { display: flex; gap: 10px; flex: 1; }
 h2 { font-size: 25px; line-height: 1.25; letter-spacing: -.01em; margin: 46px 0 12px; }
 .exp { display: block; font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--c, var(--dim)); margin-bottom: 4px; }
 p { margin: 0 0 15px; }
@@ -79,7 +98,7 @@ ul { padding-left: 20px; margin: 0 0 15px; } li { margin-bottom: 8px; }
 .cite { font-size: 14px; color: var(--soft); }
 footer { border-top: 1px solid var(--line); margin-top: 44px; padding-top: 16px; font-size: 13.5px; color: var(--dim); }
 footer a { color: var(--soft); }
-@media (max-width: 620px) { body { font-size: 16px; } .cards { grid-template-columns: 1fr; } main { padding-top: 28px; } details dl { grid-template-columns: 1fr; gap: 0; } dd { margin-bottom: 8px; } }
+@media (max-width: 620px) { .specs { grid-template-columns: 1fr 1fr; } .fairgrid { grid-template-columns: 1fr; } .fsplit { grid-template-columns: 1fr; } .frow { flex-direction: column; } body { font-size: 16px; } .cards { grid-template-columns: 1fr; } main { padding-top: 28px; } details dl { grid-template-columns: 1fr; gap: 0; } dd { margin-bottom: 8px; } }
 </style>
 </head>
 <body>
@@ -91,6 +110,12 @@ footer a { color: var(--soft); }
   <a class="go" href="./">▶ Watch it fly, live in your browser</a>
   <span class="modes">or jump to a pilot: <a style="color: var(--red)" href="./?mode=optimal">Optimal</a> · <a style="color: var(--yel)" href="./?mode=fair">Fair</a> · <a style="color: var(--purple)" href="./?mode=curious">Curious</a></span>
 </div>
+<div class="specs">
+  <div><b>9–25 KB</b><span>of weights per fight network</span></div>
+  <div><b>187–406</b><span>non-zero weights in each</span></div>
+  <div><b>60 lines</b><span>of plain C to run them, no ML library</span></div>
+  <div><b>RP2350</b><span>runs on an Arm Cortex-M33, beside a BBC Master emulator</span></div>
+</div>
 <div class="meta">
   <div><h3>Project</h3><p><a href="https://github.com/8bitkick">8bitkick</a>; weights written by Claude</p></div>
   <div><h3>Applies</h3><p><a href="https://rikiyat.github.io/blog/weight-space-programming/">Takehi et al., MIT CSAIL</a> (no affiliation)</p></div>
@@ -99,8 +124,8 @@ footer a { color: var(--soft); }
 
 <div class="tldr">
   <b class="t">TL;DR</b>
-  <p>This month, MIT CSAIL showed that frontier LLMs can write neural network weights directly, as a program, with no gradients. We tried it on something awkward and joyful: Acornsoft Elite, flown on an emulated BBC Master through nothing but its joystick and keys.</p>
-  <p>Every unit in these networks has a name and a job. An LLM wrote them, watched them fly, read how they lost, and changed the weights behind the failure. There's a pilot for each goal. One wins efficiently and one plays fair from the screen alone, and both reach Elite, the game's top rank, in about 16 game hours. The third tries to put on a good show instead. They are small enough to fit beside the emulator on a Pimoroni Presto, a palm-sized microcontroller board.</p>
+  <p>This month, MIT CSAIL showed that frontier LLMs can write neural network weights directly, as a program, with no gradients. We tried it on Acornsoft Elite, flown on an emulated BBC Master through nothing but its joystick and keys.</p>
+  <p>Every unit has a name and a job. An LLM wrote them, watched them fly, read how they lost, and changed the weights behind the failure. There's a pilot for each goal: win, play fair from the screen alone, or put on a show. The results are tiny enough to run on a microcontroller.</p>
 </div>
 
 <div class="cards">
@@ -110,63 +135,87 @@ footer a { color: var(--soft); }
 </div>
 
 <h2>How a network flies the ship</h2>
-<p>Elite gives you a stick and a keyboard. You can't strafe: to reach a ship you roll until it's above you, then pull up. Roll runs to ±31 and pitch only to ±8, in units of about 1/256 of a radian a game loop, so a half turn takes about five seconds, and a ship flying the other way is a long way off by then. Top speed is 40.</p>
-<p>The networks use exactly these controls. A dogfight network has four outputs, and each one ends at something a player could hold or press on a BBC Master:</p>
+<p>You can't strafe in Elite: you roll until a ship is above you, then pull up. A half turn takes about five seconds. A network gets the same controls as a player, and nothing else.</p>
+<figure><svg class="cobra" viewBox="10 20 780 370" role="img" aria-label="A wireframe Cobra Mk III, drawn from Elite's blueprint, with coloured arrows for roll around its nose, pitch around its wings, throttle along its length, and the laser firing forward.">
+<path d="M454.7 178.5 L390.2 213.8 M454.7 178.5 L407.9 106.5 M390.2 213.8 L166.3 238.7 M166.3 238.7 L106.7 241.0 M407.9 106.5 L364.4 100.0 M324.2 79.2 L364.4 100.0 M324.2 79.2 L235.5 109.8 M146.9 176.2 L235.5 109.8 M146.9 176.2 L106.7 241.0 M338.7 131.8 L146.9 176.2 M338.7 131.8 L324.2 79.2 M166.3 238.7 L146.9 176.2 M407.9 106.5 L324.2 79.2 M390.2 213.8 L338.7 131.8 M454.7 178.5 L338.7 131.8 M106.7 241.0 L203.3 216.7 M203.3 216.7 L267.8 181.4 M364.4 100.0 L267.8 181.4 M390.2 213.8 L203.3 216.7 M454.7 178.5 L267.8 181.4 M390.2 213.8 L146.9 176.2 M454.7 178.5 L324.2 79.2 M422.5 196.2 L445.0 201.0 M199.3 161.8 L227.5 139.2 M227.5 189.2 L199.3 197.5 M243.6 130.4 L271.8 122.1 M271.8 157.8 L243.6 180.4 M271.8 122.1 L271.8 157.8 M243.6 130.4 L243.6 180.4 M227.5 139.2 L227.5 189.2 M199.3 161.8 L199.3 197.5 M338.7 131.8 L235.5 109.8 M155.0 211.0 L146.9 204.7 M155.0 189.6 L146.9 204.7 M155.0 211.0 L155.0 189.6 M316.1 101.4 L324.2 107.7 M324.2 107.7 L316.1 122.9 M316.1 101.4 L316.1 122.9 M454.7 178.5 L106.7 241.0 M454.7 178.5 L166.3 238.7 M454.7 178.5 L338.7 131.8 M454.7 178.5 L390.2 213.8 M338.7 131.8 L407.9 106.5 M390.2 213.8 L338.7 131.8 M338.7 131.8 L106.7 241.0 M390.2 213.8 L166.3 238.7 M166.3 238.7 L106.7 241.0 M338.7 131.8 L235.5 109.8 M166.3 238.7 L407.9 106.5 M166.3 238.7 L235.5 109.8 M166.3 238.7 L146.9 176.2 M166.3 238.7 L203.3 216.7 M338.7 131.8 L146.9 176.2 M338.7 131.8 L203.3 216.7 M338.7 131.8 L364.4 100.0 M166.3 238.7 L324.2 79.2 M146.9 176.2 L324.2 79.2 M146.9 176.2 L364.4 100.0 M364.4 100.0 L203.3 216.7 M324.2 79.2 L203.3 216.7 M407.9 106.5 L146.9 176.2 M235.5 109.8 L203.3 216.7 M390.2 213.8 L407.9 106.5 M106.7 241.0 L235.5 109.8" fill="none" stroke="rgb(232,234,238)" stroke-width="1.2" stroke-linecap="round"/>
+<path d="M445.0 201.0 L673.8 249.9" fill="none" stroke="rgb(240,72,72)" stroke-width="2.5" stroke-dasharray="7 5"/>
+<path d="M528.2 248.5 L531.7 240.8 L534.6 232.5 L537.0 223.8 L538.8 215.0 L540.0 206.2 L540.5 197.5 L540.3 189.1 L539.5 181.2 L538.0 174.0 L535.9 167.5 L533.2 161.9 L530.0 157.4 L526.4 154.0 L522.3 151.7 L518.0 150.6 L513.4 150.8 L508.6 152.2 L503.9 154.8 L499.1 158.6 L494.5 163.4 L490.2 169.3 L486.1 176.0 L482.5 183.4 L479.3 191.5 L476.6 200.0 L474.5 208.7 L473.0 217.6 L472.2 226.4 L472.0 234.9 L472.5 243.1 L473.7 250.7 L475.5 257.5 L477.9 263.6 L480.8 268.6 L484.2 272.6 L488.1 275.5 L492.3 277.2" fill="none" stroke="rgb(56,214,232)" stroke-width="3.5" stroke-linecap="round"/><path d="M499.8 280.1 L479.8 280.6 L485.5 266.1 Z" fill="rgb(56,214,232)"/><path d="M82.5 329.6 L92.6 337.2 L103.3 343.3 L114.4 347.8 L125.6 350.7 L136.8 351.8 L147.7 351.1 L158.1 348.6 L167.8 344.5 L176.7 338.7 L184.5 331.4 L191.1 322.8 L196.4 312.9 L200.2 302.0 L202.6 290.3 L203.4 278.1 L202.6 265.5 L200.2 252.8 L196.4 240.3 L191.1 228.2 L184.5 216.7 L176.7 206.0 L167.8 196.5 L158.1 188.2 L147.7 181.3 L136.8 175.9 L125.6 172.2 L114.4 170.3 L103.3 170.1 L92.6 171.6" fill="none" stroke="rgb(242,209,58)" stroke-width="3.5" stroke-linecap="round"/><path d="M84.7 172.8 L101.8 162.4 L104.0 177.8 Z" fill="rgb(242,209,58)"/><path d="M187.2 238.7 L200.1 241.5 L213.0 244.2 L225.9 247.0 L238.8 249.8 L251.7 252.5 L264.6 255.3 L277.4 258.0 L290.3 260.8 L303.2 263.5 L316.1 266.3 L329.0 269.0 L341.9 271.8 L354.8 274.5 L367.7 277.3 L380.6 280.1 L393.5 282.8 L406.3 285.6" fill="none" stroke="rgb(27,175,122)" stroke-width="3.5" stroke-linecap="round"/><path d="M414.2 287.2 L394.5 291.0 L397.8 275.8 Z" fill="rgb(27,175,122)"/>
+<text x="512" y="126" fill="rgb(56,214,232)" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" text-anchor="start">roll</text><text x="125" y="142" fill="rgb(242,209,58)" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" text-anchor="end">pitch</text><text x="173" y="255" fill="rgb(27,175,122)" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" text-anchor="end">throttle</text><text x="682" y="255" fill="rgb(240,72,72)" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" text-anchor="start">fire</text>
+</svg><figcaption>A Cobra Mk III, drawn from the vertices in Elite's own ship blueprint.</figcaption></figure>
 <div class="tw"><table>
-  <tr><th>Output</th><th>Range</th><th>What reaches the game</th></tr>
-  <tr><td><code>roll</code></td><td class="r">−31 to +31</td><td>Analogue joystick, left and right (ADC channel 0). About 4 stick units for each unit of roll rate, from the centre at 128, with finer steps under 4.</td></tr>
-  <tr><td><code>pitch</code></td><td class="r">−8 to +8</td><td>Joystick, up and down (ADC channel 1). About 16 stick units a unit. The game ignores the first 32 units of stick, so gentle pitch is coarse.</td></tr>
-  <tr><td><code>fire</code></td><td class="r">above 0.5</td><td>Holds the <b>A</b> key, unless a non-hostile ship is in the sights, a check that stays in C. The laser fires from the view on screen.</td></tr>
-  <tr><td><code>throttle</code></td><td class="r">0 to 40</td><td>Holds <b>SPACE</b> (faster) or <b>?</b> (slower) until the speed matches.</td></tr>
+  <tr><th>Output</th><th>Range</th><th>What the game receives</th></tr>
+  <tr><td><code style="color:var(--cyan)">roll</code></td><td class="r">±31</td><td>Joystick left and right</td></tr>
+  <tr><td><code style="color:var(--yel)">pitch</code></td><td class="r">±8</td><td>Joystick up and down</td></tr>
+  <tr><td><code style="color:var(--green)">throttle</code></td><td class="r">0–40</td><td>Holds <b>SPACE</b> or <b>?</b> until the speed matches</td></tr>
+  <tr><td><code style="color:var(--red)">fire</code></td><td class="r">over 0.5</td><td>Holds <b>A</b>. The laser fires from the view on screen</td></tr>
 </table></div>
-<p>Key changes land two frames after they're asked for, and the game reads its keys once a game loop, about every two frames. The docking network has the same stick and throttle, the <b>J</b> key for the in-system jump, and three outputs that come back as its own inputs next loop, its only memory. Everything else stays in ordinary C: choosing targets, missiles, ECM, the escape pod, trading, and which view to show.</p>
+<p>The docking network adds the <b>J</b> key for the in-system jump, plus three outputs that feed back as its own inputs: its only memory.</p>
 
 <h2>What is fair?</h2>
-<p>Optimal cheats openly: it reads every ship's position from RAM. Fair's rule is that it may know only what a player could know from the screen, the game's published rules and its own notes. That rule is about information, not hands. It's still a machine, with perfect attention and arithmetic, and it reacts within the frame.</p>
-<p>One thing to be clear about: <b>Fair doesn't do computer vision.</b> It reads ships from RAM and immediately degrades them to what the screen would show, through a model of the display, and a tracker works only from that. So fairness rests on that model being honest, and the code is open for checking it.</p>
-<figure class="cmdr">
-  <img src="paper-cmdr.png" width="768" height="560" alt="Elite's status screen: Commander Claude, Rating Deadly, above the dashboard: shield, fuel, temperature and altitude bars at left, the scanner in the middle, speed, roll, pitch and energy banks at right." loading="lazy">
-  <figcaption>The real game, mid-career. Fair reads the dashboard as bars, not numbers: energy to one of four banks, shields and laser temperature to one part in 16. The scanner gives a dot and a stick for each ship, to the nearest 512 units sideways.</figcaption>
+<p>Optimal cheats openly, reading exact ships from RAM. Fair may know only what a player could get from the screen, the game's rules and its own notes.</p>
+<p><b>Fair doesn't do computer vision.</b> It reads RAM, then immediately reduces each ship to what the display would show. A tracker, a Kalman filter per ship, works only from that. Here's one real fight, three ways:</p>
+<figure class="wide">
+  <div class="fairgrid">
+    <div><h4 style="color:var(--red)">1. RAM</h4><canvas id="fram"></canvas><p>Exact, plus bytes no screen shows.</p></div>
+    <div><h4 style="color:var(--yel)">2. Screen</h4><canvas id="fscr"></canvas><p>Lines: a direction, no range. Yellow: coarse scanner blips.</p></div>
+    <div><h4 style="color:var(--cyan)">3. Fair filter</h4><canvas id="ffil"></canvas><p>Bars: its estimate and doubt. Grey ×: the truth, for you only.</p></div>
+  </div>
+  <div class="tw"><table class="read">
+    <tr><th>Nearest ship</th><th style="color:var(--red)">RAM</th><th style="color:var(--yel)">Screen</th><th style="color:var(--cyan)">Fair filter</th></tr>
+    <tr><td>Type</td><td id="r-t"></td><td id="s-t"></td><td id="f-t"></td></tr>
+    <tr><td>Range</td><td id="r-r"></td><td id="s-r"></td><td id="f-r"></td></tr>
+    <tr><td>Energy</td><td id="r-e"></td><td id="s-e"></td><td id="f-e"></td></tr>
+    <tr><td>Hostile</td><td id="r-h"></td><td id="s-h"></td><td id="f-h"></td></tr>
+  </table></div>
+  <figcaption>Top-down, our ship at the triangle, the rings at 8,000 and 16,000 units. Recorded from the lab with Fair flying.</figcaption>
 </figure>
-<h3>What it reads from RAM, and how a player would know it</h3>
 <div class="tw"><table>
-  <tr><th>Read from RAM</th><th>How a player gets the same thing</th></tr>
-  <tr><td>Each ship's position, type and whether it's exploding</td><td>Only through the display model: its pixel, its drawn size, its scanner dot. A slot number is used just to follow one ship between frames, as an eye follows a moving dot.</td></tr>
-  <tr><td>Energy, shields, laser temperature, altitude</td><td>The dashboard's bars, returned at the bar's precision, not the exact value.</td></tr>
-  <tr><td>Our speed, and the stick position</td><td>The speed bar, and what your own hands did.</td></tr>
-  <tr><td>Game loop counter</td><td>Watching the screen redraw: each loop draws a new frame of the ships.</td></tr>
-  <tr><td>Current view, cash, fuel, cargo, equipment, legal status</td><td>Printed on screen, on the dashboard or on a docked page.</td></tr>
-  <tr><td>Top byte of the kill tally</td><td>The “RIGHT ON COMMANDER” message, printed each time it counts up.</td></tr>
-  <tr class="warn"><td>Planet, sun and station positions, and the station's axes</td><td>On screen or on the compass, and the slot's axis always points at the planet. <b>A simplification:</b> their distances aren't reduced to screen precision, so a player would have to estimate them.</td></tr>
+  <tr><th>Fair also reads</th><th>How a player knows it</th></tr>
+  <tr><td>Energy, shields, heat</td><td>The dashboard's bars, at the bars' precision</td></tr>
+  <tr><td>Speed, stick</td><td>The speed bar, and their own hands</td></tr>
+  <tr><td>Game loop counter</td><td>Watching the screen redraw</td></tr>
+  <tr><td>Cash, cargo, view, legal status</td><td>Printed on screen</td></tr>
+  <tr><td>Tally's top byte</td><td>“RIGHT ON COMMANDER”, shown each time it counts up</td></tr>
+  <tr class="warn"><td>Planet and station positions</td><td>On screen or compass. <b>A simplification:</b> their distances aren't reduced to screen precision</td></tr>
 </table></div>
-<h3>What it never reads, and works out instead</h3>
-<div class="tw"><table>
-  <tr><th>Hidden</th><th>What Fair does instead, as a player would</th></tr>
-  <tr><td>A ship's exact range</td><td>Judges it from drawn size, using the blueprint, or from the scanner dot. The tracker keeps its own error bar.</td></tr>
-  <tr><td>Ship type and heading</td><td>A far ship is a dot, so it has only a colour until it's near enough to draw as a wireframe: about 5,000 units for a Sidewinder, 12,800 for a Cobra Mk III.</td></tr>
-  <tr><td>A ship's energy</td><td>Starts from the blueprint, subtracts its own hits, and adds the recharge rate.</td></tr>
-  <tr><td>Whether a ship is hostile</td><td>Goes by model and behaviour: it fired at us, or its nose stayed on us while closing. This one is hard. Fair's first careers shot a launched Transporter that was still an unidentified dot. It counts as police, so the agent became a fugitive and lost 310 ships in 45 game hours.</td></tr>
-  <tr><td>A ship that has left the screen</td><td>Follows it on the scanner, or predicts where it should be for 3 seconds.</td></tr>
-</table></div>
-<p>So the network's 23 senses each have a source a player could point at: direction and drift from the pixel, size and range from the drawing or scanner, closing speed from the range changing, and energy, heat and speed from the bars. Four more are unusual: how stale the last sighting is, how unsure the range is, how unsure the motion is, and whether the heading was actually seen. It flies knowing what it doesn't know.</p>
-<p>Two game choices are allowed but worth flagging: it saves at every dock and reloads after a death, and it uses the game's hidden forced mis-jump to farm Thargoids in witchspace, which is most of a career's points. An optional hand limit, slowing the stick and capping keys, costs about 5% of the points a fight minute in the lab. It's off in these results.</p>
+<p>Telling friend from foe is the hard part. Fair's first careers shot a just-launched Transporter while it was still an unidentified dot. It counts as police, the agent became a fugitive, and it lost 310 ships in 45 game hours. Fair still has a machine's perfect attention and instant reactions: the rule limits information, not hands.</p>
+
+<h2>Who picks the pilot?</h2>
+<p>Not an AI. The monitor is one line of plain C, run every frame, so a network can be swapped mid-fight:</p>
+<div class="flow">
+  <div class="fbox">Career planner, in C<small>trade, route, target, missiles</small></div>
+  <div class="fsplit">
+    <div class="fcol"><span class="flab">Heading in to dock</span><div class="fbox net" style="--c:var(--cyan)">Docking network<small>Optimal has its own set</small></div></div>
+    <div class="fcol"><span class="flab">Hostile in range</span>
+      <div class="frow">
+        <div class="fbox net" style="--c:var(--yel)">Fair<small>fair's dogfight network</small></div>
+        <div class="fbox net" style="--c:var(--red)">Optimal<small>the interceptor</small></div>
+        <div class="fbox net" style="--c:var(--purple)">Curious<small>the camera. In danger, the interceptor until it recovers</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+<pre>g_wsp_net = shownet ? <span style="color:var(--purple)">CAMERA</span> : !g_fair ? <span style="color:var(--red)">INTERCEPTOR</span> : <span style="color:var(--yel)">FAIR</span>;
+
+<span class="c"># Curious's danger: energy under 128 (200 in witchspace, 230 on a pulse laser),</span>
+<span class="c"># or a homing missile with no ECM.</span></pre>
 
 <h2>Writing a pilot in weights</h2>
-<p>In weight-space programming, an LLM reads and writes a network's weights directly, reasoning about what each part should compute. Here, the program is a stack of ReLU layers whose units are written to mean things. A logical AND is just a sum and a bias. This is the unit that decides to fire on the camera network, as stored:</p>
+<p>In weight-space programming, an LLM writes weights directly, reasoning about what each part should compute. Here that means ReLU units written to mean things. A logical AND is just a sum and a bias:</p>
 <pre><span class="c"># layer 4, unit "fire": AND of six saturated 0-or-1 tests.</span>
 <span class="o">fire</span> = relu(  <span class="w">+1</span>·in_the_sights  <span class="w">+1</span>·ahead  <span class="w">+1</span>·in_range  <span class="w">+1</span>·laser_cool
              <span class="w">+1</span>·shot_allowed   <span class="w">+1</span>·a_target                  <span class="w">−5</span> )
 
 <span class="c"># layer 2, unit "stuck": a chase we aren't winning. It allows a shot at range.</span>
 <span class="o">stuck</span> = relu( <span class="w">+1</span>·ahead  <span class="w">+1</span>·not_closing  <span class="w">−1</span>·drawn_big  <span class="w">−1</span> )</pre>
-<p>Optimal's and Curious's networks were written from scratch for their goals, not transcribed from the agent's C rules. The networks run on about 60 lines of plain C, with no ML library. The diagrams below are the demo's own code, running that forward pass in your browser on the senses each network really saw, and every line is a non-zero weight.</p>
+<p>Below is the live demo's own diagram code, running that forward pass in your browser on senses each network really saw. Every line is a non-zero weight.</p>
 <figure class="wide">
   <div class="netbox">
     <div class="nethead"><div class="seg" id="nettabs" role="group" aria-label="Network"></div><button class="btn" id="netplay">❚❚ Pause</button></div>
     <div class="netscroll"><canvas id="net" aria-label="A network diagram, its units lit as it decides, replaying recorded senses"></canvas></div>
     <div id="netcap">&nbsp;</div>
   </div>
-  <figcaption>Recorded from the lab on main's build: the three fight networks on one identical snapshot of a pirate pack, and one dock. The Optimal and Fair clips loop quickly, for a reason the next sections explain.</figcaption>
+  <figcaption>Recorded in the lab: the three fight networks on one identical snapshot, and one dock. The Optimal and Fair clips are short because those fights are.</figcaption>
 </figure>
 
 <h2><span class="exp" style="--c: var(--yel)">Experiment 1</span>Can it fly fair?</h2>
@@ -209,8 +258,7 @@ footer a { color: var(--soft); }
 </dl></details>
 
 <h2>Small enough for a microcontroller</h2>
-<p>The agent runs inside the emulated game's own world with no OS, heap or ML library, so the same C compiles for a <a href="https://shop.pimoroni.com/products/presto">Pimoroni Presto</a>, a small RP2350 screen. It emulates the BBC Master and flies it at once.</p>
-<p>We are checking this on a real board now, and will publish the measured figures here when that run finishes.</p>
+<p>There's no OS, heap or ML library, so the same C compiles for a <a href="https://shop.pimoroni.com/products/presto">Pimoroni Presto</a>, a small RP2350 board with a screen. Its Arm Cortex-M33 emulates the BBC Master and flies it at once. Early numbers, from 15 minutes on a real board with the networks switched on: the whole agent averaged 2.3 ms of each 20 ms frame, the slowest frame took 14.5 ms, and the emulator held 100% speed.</p>
 <div class="tw"><table>
   <tr><th>Network</th><th class="n">Weights in flash</th><th class="n">Non-zero</th></tr>
   <tr><td>Fair: dogfights</td><td class="n">9.0 KB</td><td class="n">187</td></tr>

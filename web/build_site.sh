@@ -9,7 +9,7 @@ rm -rf _site && mkdir -p _site
 AV=$(cat core.wasm panel.json galaxies.json | sha1sum | cut -c1-10)
 npx esbuild src/main.js --bundle --format=esm --minify --outfile=_site/app.js --define:ASSET_V="\"$AV\"" --log-level=warning
 npx esbuild src/paper.js --bundle --format=esm --minify --outfile=_site/paper.js --log-level=warning
-cp index.html style.css core.wasm panel.json galaxies.json gh.png og.png paper.html paper-cmdr.png paper_senses.json _site/
+cp index.html style.css core.wasm panel.json galaxies.json gh.png og.png paper.html paper-cmdr.png paper_senses.json paper_fair.json _site/
 mkdir -p _site/chapters && cp chapters/deadly.cmdr _site/chapters/
 V=$(cat _site/app.js _site/style.css | sha1sum | cut -c1-10)
 sed -i -e '/<iframe id="beeb"/d' -e "s|href=\"style.css\"|href=\"style.css?v=$V\"|" -e "s|src=\"app.js\"|src=\"app.js?v=$V\"|" _site/index.html
