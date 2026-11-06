@@ -1,7 +1,7 @@
 // The page: the panel, with the machine inside the WebAssembly: Kieran Connell's Master core (the Presto's and
 // run_sim's) and the player in one binary (core_wasm.c), which flies exactly what the headless run_core.mjs and native
 // run_sim fly. No start snapshot: the machine boots from power-on on every visit, in about a second.
-import { Panel, INPUT_NOTE, COL_NOTE } from "./panel.js";
+import { Panel, INPUT_NOTE, COL_NOTE, fightCol } from "./panel.js";
 import { Core } from "../core.js";
 import { addFile } from "./save.js";
 
@@ -341,7 +341,7 @@ async function main() {
         console.log(`journal sha256 at frame ${CHECK_FRAMES}: ${h} (${verdict})`);
     };
     const showSpeed = () => {
-        const hot = inAction(), col = s.actionKind === "fight" ? "rgb(242,209,58)" : "rgb(56,214,232)";     // (lit: ACTION in force, in the colour of the AI flying)
+        const hot = inAction(), col = s.actionKind === "fight" ? `rgb(${fightCol(core.fightNet).join(",")})` : "rgb(56,214,232)";     // (lit: ACTION in force, in the colour of the AI flying)
         s.actionHot = hot ? s.actionKind : null;
         for (const id of SPEED_BTNS) {
             const b = $(id); if (!b) continue;
@@ -443,7 +443,7 @@ function phoneStrip() {
     // the speed, beside it: lit in the colour of the AI flying while 1× ACTION is in force
     const spd = s.rate ? `${s.rate < 9.95 ? s.rate.toFixed(1) : Math.round(s.rate)}×` : "";      // (measured: what it's really doing)
     const tx = 6 + g.measureText(time).width + 14;
-    g.font = `600 24px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = s.actionHot === "fight" ? "rgb(242,209,58)" : s.actionHot ? "rgb(56,214,232)" : "rgb(154,161,174)";
+    g.font = `600 24px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = s.actionHot === "fight" ? `rgb(${fightCol(s.fightNet).join(",")})` : s.actionHot ? "rgb(56,214,232)" : "rgb(154,161,174)";
     g.fillText(paused2() ? "❚❚" : spd, tx, LINE_MID);
     const x = tx + Math.max(g.measureText("100×").width, g.measureText(spd).width) + 14;
     if (panelRef && panelRef.line) {

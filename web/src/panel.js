@@ -5,6 +5,9 @@
 export const BG = "rgb(9,11,15)", PANEL = [16, 19, 25], LINE = "rgb(40,45,56)", DIM = "rgb(110,116,128)", FG = "rgb(232,234,238)";
 const IDLE_TEXT = "rgb(150,156,168)", IDLE_EDGE = "rgb(58,64,78)";      // (the network's idle units, readable on a phone)
 export const YEL = [242, 209, 58], CYAN = [56, 214, 232], GREEN = "rgb(27,175,122)";
+// each dogfight network's colour: fair mode's yellow, Optimal's interceptor red, Curious's camera purple
+export const FIGHT_COL = { fight: YEL, interceptor: [240, 72, 72], camera: [178, 112, 255] };
+export const fightCol = (net) => FIGHT_COL[net] || YEL;
 const SANS = "Inter, system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace";
 const PX = 1016, PW = 880, NET_Y = 322;
 // the columns: a network's layers, inputs and outputs included (fair mode's dogfight network 6, the mode networks 7)
@@ -166,7 +169,7 @@ export class Panel {
         const last = s.log[s.log.length - 1], cut = (t, n) => (t.length <= n ? t : t.slice(0, n - 1) + "…");
         let at = last ? last[0] : s.frame, text = last ? `Agent: ${last[1]}` : "", tcol = GREEN;
         if (s.view === "dock" && s.senses) { at = s.frame; text = `Docking AI: ${s.note || ""}`; tcol = rgb(CYAN); }
-        else if (s.view === "fight" && s.senses) { text = `${PILOT[s.fightNet] || PILOT.fight}: ${last ? last[1] : ""}`; tcol = rgb(YEL); }
+        else if (s.view === "fight" && s.senses) { text = `${PILOT[s.fightNet] || PILOT.fight}: ${last ? last[1] : ""}`; tcol = rgb(fightCol(s.fightNet)); }
         if (text) {
             const mm = Math.floor(at / 3000), hh = Math.floor(mm / 60);
             this.text(`${hh}:${String(mm % 60).padStart(2, "0")}`, PX, 282, `14px ${MONO}`, DIM);
@@ -177,7 +180,7 @@ export class Panel {
         // the speed, as big as the clock: a play mark at real time, a fast-forward mark and how many times faster in
         // turbo; what's flying above it
         const net = s.view === "dock", fight = s.view === "fight";
-        const col = net ? rgb(CYAN) : fight ? rgb(YEL) : FG, right = PX + PW;
+        const col = net ? rgb(CYAN) : fight ? rgb(fightCol(s.fightNet)) : FG, right = PX + PW;
         let cyc, h;
         const n = s.turbo ? Math.max(1, s.rate || 1) : 1, txt = s.paused ? "PAUSED" : `${n < 10 ? n.toFixed(n === 1 ? 0 : 1) : Math.round(n)}×`;
         this.text(txt, right, 52, `700 60px ${MONO}`, col, "right");
@@ -244,7 +247,7 @@ export class Panel {
     }
 
     drawFight(s) {
-        const name = s.fightNet && this.d[s.fightNet] ? s.fightNet : "fight", F = this.d[name], f = s.senses;
+        const name = s.fightNet && this.d[s.fightNet] ? s.fightNet : "fight", F = this.d[name], f = s.senses, COL = fightCol(name);
         setCols(F.cols.length);
         const { links, lanes } = this.fnet(name);
         fitRows(Math.max(...F.cols.map(([, names], c) => names.length * (c === NCOL - 1 ? 2 : 1))));
@@ -253,15 +256,15 @@ export class Panel {
         const segs = links.map(([i, j, o, w]) => {
             const flow = vals ? (w * vals[i][j]) / (i === F.layers.length - 1 ? F.outscale[o] : F.scale[i + 1][o]) : 0;
             const L = Math.min(1, Math.abs(flow));
-            const c3 = rgb(mix(base, flow >= 0 ? YEL : CYAN, L * 0.6));
+            const c3 = rgb(mix(base, flow >= 0 ? COL : CYAN, L * 0.6));
             return [L, c3, trace(lanes, i, j, o)];
         });
         this.drawRoutes(segs);
         const lit = (c, r) => (vals ? Math.min(1, Math.abs(vals[c][r]) / F.scale[c][r]) : 0);
-        this.drawCells(F.cols, vals, lit, (c, r) => (c === 0 && vals && vals[0][r] < 0 ? CYAN : YEL), (x, y, r, name) => {
+        this.drawCells(F.cols, vals, lit, (c, r) => (c === 0 && vals && vals[0][r] < 0 ? CYAN : COL), (x, y, r, name) => {
             const v = vals ? Math.max(-F.outscale[r], Math.min(F.outscale[r], vals[F.layers.length][r])) : 0;
             const txt = r < 2 ? (v >= 0 ? "+" : "") + Math.round(v) : r === 2 ? (v > 0.5 ? "FIRE" : "") : String(Math.round(v));
-            this.drawOut(x, y, name, v, F.outscale[r], r < 2, YEL, txt);
+            this.drawOut(x, y, name, v, F.outscale[r], r < 2, COL, txt);
         }, (c, r) => (vals ? vals[c][r] : null));
         this.net = name;
     }
