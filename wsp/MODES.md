@@ -51,7 +51,8 @@ Careers (native `run_sim`, seeds 13 and 101; Optimal to the Elite tally, Curious
 | Optimal, C rules | 14.8 h, 0 deaths | 15.1 h, 0 deaths |
 | Optimal, the interceptor | 17.0 h, 1 death | 15.9 h, 0 deaths |
 | Curious, C rules + show.c | 1,310 pts, 26 deaths | 1,358 pts, 29 deaths |
-| Curious, the camera (the interceptor off-show) | 1,404 pts, 24 deaths | 1,320 pts, 21 deaths |
+| Curious, the camera gated by the show's margin (the interceptor off-show) | 1,404 pts, 24 deaths | 1,320 pts, 21 deaths |
+| Curious, the camera every fight, handover under 230 energy on a pulse laser | 1,169 pts, 44 deaths | 962 pts, 34 deaths |
 
 The interceptor's seed-13 career lost two hours to one early death (at 1.9 h, shields down after a won witchspace fight)
 and the path it took after: by 8 h it was travelling for a galactic hyperdrive while the C rules were already farming.
