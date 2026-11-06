@@ -24,7 +24,7 @@ nav .repo { display: inline-flex; align-items: center; gap: 8px; }
 nav .fly { color: var(--cyan); }
 main { max-width: 760px; margin: 0 auto; padding: 44px 16px 72px; }
 h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 14px; }
-.sub { color: var(--soft); font-size: 19px; line-height: 1.45; margin: 0 0 26px; }
+.sub { color: var(--soft); font-size: 19px; line-height: 1.45; margin: 0 0 14px; }
 .live { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 28px; }
 .go { background: var(--cyan); color: var(--bg); font-weight: 700; font-size: 16px; padding: 10px 18px; border-radius: 6px; text-decoration: none; }
 .go:hover { filter: brightness(1.12); }
@@ -55,6 +55,7 @@ tr.warn td { background: rgba(242, 209, 58, .06); }
 .yard b { color: var(--fg); }
 .presto img { max-width: 420px; margin: 0 auto; }
 .presto figcaption { text-align: center; }
+.intro { margin: 0 0 22px; }
 .hero { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 0 0 16px; overflow: hidden; }
 #cobra { display: block; width: 100%; height: auto; }
 .herocap { padding: 7px 12px; font-size: 13px; color: var(--soft); border-top: 1px solid var(--line); }
@@ -120,6 +121,7 @@ footer a { color: var(--soft); }
 <main>
 <h1>Flying Elite in Weight Space</h1>
 <p class="sub">Tiny neural networks, under 30 KB each, written directly by an LLM with no gradient training, flying a 1986 space game in your browser and on a microcontroller.</p>
+<p class="intro"><a href="https://rikiyat.github.io/blog/weight-space-programming/">MIT CSAIL showed</a> that LLMs can write network weights directly, as a program. We tried it on Acornsoft Elite. An LLM wrote each named unit, watched the pilot fly, and changed the weights behind each failure. There's a pilot for each goal: win, play fair from the screen alone, or put on a show.</p>
 <figure class="hero"><canvas id="cobra" aria-label="Elite's Cobra Mk III in wireframe, turning, with roll, pitch, throttle and fire pulsing as a network commands them"></canvas>
 <figcaption class="herocap">The four outputs of the camera network, replayed from a real fight, on the Cobra from Elite's own blueprint.</figcaption></figure>
 <div class="live">
@@ -142,11 +144,6 @@ footer a { color: var(--soft); }
   <div><h3>Project</h3><p><a href="https://github.com/8bitkick">8bitkick</a>; weights written by Claude</p></div>
   <div><h3>Applies</h3><p><a href="https://rikiyat.github.io/blog/weight-space-programming/">Takehi et al., MIT CSAIL</a> (no affiliation)</p></div>
   <div><h3>Published</h3><p>November 6, 2026</p></div>
-</div>
-
-<div class="tldr">
-  <b class="t">TL;DR</b>
-  <p>MIT CSAIL showed that LLMs can write network weights directly, as a program. We tried it on Elite. An LLM wrote each named unit, watched the pilot fly, and changed the weights behind each failure. There's a pilot for each goal: win, play fair from the screen alone, or put on a show.</p>
 </div>
 
 <h2>An open world, and a seed</h2>
