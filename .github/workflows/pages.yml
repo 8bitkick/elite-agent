@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: build the site (the pinned core.wasm, its hash checked; the page)
         run: web/build_site.sh
-      - name: the dev page, at /dev/, from the wsp-modes branch (the main page publishes without it if this fails)
+      - name: the dev page, at /dev/, from the wsp-modes branch (wsp/MODES.md there; the main page publishes without it if this fails)
         continue-on-error: true
         run: |
           git fetch -q --depth 1 origin wsp-modes
