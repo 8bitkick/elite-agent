@@ -28,7 +28,7 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
 | **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show on only while clearly on top; the meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
 | Curious: the camera, gated as the C's show is | 23.8 (17 deaths) | last night's: motion 0.32, close kills 0.09 |
-| **Curious: the camera, every fight** | **22.6** (35 deaths) | close kills 0.20, passes 0.53, motion 0.38; fights 85 s against the C's 42: it holds fire until the target is drawn 20 px, and a show fight on a pulse laser is long. Witchspace 35.9 |
+| **Curious: the camera, every fight** | **22.4** (34 deaths) | close kills 0.19, passes 0.53, motion 0.38; fights 85 s against the C's 42: it holds fire until the target is drawn 20 px, and a show fight on a pulse laser is long. Witchspace 34.2 |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
@@ -91,7 +91,10 @@ for it, one unit: `sharp`, on in witchspace or with the energy under 160, which 
 amplifies the error (the stick 2.5 x sharper) and brings the hard turn in from 40 degrees. Witchspace went from 0 to 35.9
 (the C: 36.5) and deaths on the test set from 37 to 19; putting the "drawn big" gate back on the laser (no kills at a
 distance: the kill is the close-up) took close kills from 0.12 to 0.20 and deaths back up to 35. Curious mode is meant
-to be watched, and a death now and then is part of it; the kill at a distance isn't.
+to be watched, and a death now and then is part of it; the kill at a distance isn't. The C show's glance into a side
+view at a pass (`show_view`) now runs whenever the camera flies, not only while the margin's show is on: it's
+presentation, and the network's senses don't depend on the view (validation 23.5 to 24.5). The rear laser works as
+before: the senses are mirrored into the rear view when the target is behind.
 
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that

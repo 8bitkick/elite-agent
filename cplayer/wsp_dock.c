@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "state.h"           // (g_fair: a constant 0 in a build without fair mode, the Presto's)
 #include "wsp_dock.h"
 #include "dock_weights.h"
 #include "dock_opt_weights.h"      // Optimal mode's set (wsp/MODES.md: the jump asked for sooner); Curious flies fair mode's
@@ -23,7 +24,7 @@ static void load(void) {
     done = 1;
     net_t *n = &s_net;
     // the mode's own set: Optimal's (the same network with its own numbers), else fair mode's (Curious flies it too)
-    extern int g_fair, g_curious;
+    extern int g_curious;
     const int *SHAPE = DOCK_SHAPE, *const *I = DOCK_I, *N = DOCK_N; const float *const *V = DOCK_V, *const *B = DOCK_B; const double *S = DOCK_SENSES; int NL = DOCK_LAYERS;
     if (!g_fair && !g_curious) { SHAPE = DOCKO_SHAPE, I = DOCKO_I, N = DOCKO_N, V = DOCKO_V, B = DOCKO_B, S = DOCKO_SENSES, NL = DOCKO_LAYERS; }
     n->nl = NL;
