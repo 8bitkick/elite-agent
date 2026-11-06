@@ -384,6 +384,19 @@ async function main() {
         location.search = q.toString() ? "?" + q.toString() : "";
     };
     for (const id of ["reset", "p-reset"]) { const b = $(id); if (b) b.onclick = reset; }
+    // jump to Deadly: the film career's save (chapters/deadly.cmdr: Orqulela, 2,598 kills, 18,147 Cr, 10.6 game hours in),
+    // kept as this browser's save, and the career carried on from it in the game and mode chosen
+    const deadly = async () => {
+        if (!confirm("Jump to Deadly rank? This career's save will be replaced by the film career's save at Deadly.")) return;
+        const r = await fetch("chapters/deadly.cmdr"); if (!r.ok) { alert("the Deadly save didn't load"); return; }
+        const block = new Uint8Array(await r.arrayBuffer());
+        const jump = { frame: 1901411, data: btoa(String.fromCharCode(...block)), game: GAME,
+            career: { tally: 2598.05, cash: 18147.3, system: "Orqulela", visits: [[2, 77, 242]], kills: 2598, stars: 0, docks: 0, deaths: 0 } };
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(jump)); } catch { alert("this browser keeps no save"); return; }
+        const q = new URLSearchParams(); if (GAME !== "flicker") q.set("game", GAME); if (MODE !== "fair") q.set("mode", MODE);
+        const to = q.toString() ? "?" + q.toString() : ""; if (location.search === to) location.reload(); else location.search = to;
+    };
+    for (const id of ["deadly", "p-deadly"]) { const b = $(id); if (b) b.onclick = deadly; }
     const toggleSound = () => {
         if (!sound.ctx) sound.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 31250 });
         sound.ctx.resume();

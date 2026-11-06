@@ -28,7 +28,7 @@ INTERCEPTOR = dict(
     orbit=0.0,           # a slow roll while on the target (the camera's: the target circles the sights, the picture turns)
     roll_gain=170.0,     # roll rate a radian of error
     roll_ramp=0.05,      # rad: inside this of the nose the roll eases with the offset
-    roll_cap=1.1,        # the roll error's cap as clock-x
+    roll_cap=1.5,        # the roll error's cap as clock-x (measured: 1.1 -> 1.5 gained a point; 2.0 and 2.5 gave it back)
     pitch_gain=110.0,    # pitch rate a radian
     pitch_cone=0.6,      # pitch eases as the sideways error grows
     ff_pitch=0.0,        # feed-forward: pitch with the target's motion (measured: it costs points, with and without a nose hold)
@@ -67,13 +67,22 @@ CAMERA = dict(
     fire_r=1.6,
     fire_range=4.0,
     hot=0.9,
-    fire_rho=1.3,        # hold fire until it's drawn this big (angular radius x 16): a Cobra inside ~1,000, 20 px
+    fire_rho=1.3,        # hold fire until it's drawn this big (angular radius x 16): a Cobra inside ~1,000, 20 px (measured: 2.5 and 3.0 left fights unfinished)
     fire_rho_ws=0.6,     # in witchspace, sooner
     v_th=0.1,
     rho_hold=3.0,        # hold the range where it's drawn this big (48 px for a Cobra: ~430 units; measured best of 1.6, 2.2, 3.0)
     v_base=10.0,         # the speed when it's that big (it moves ~20-30: we fall behind, the gap opens, we speed up: a follow)
     v_k=25.0,            # more speed a unit of angular size short of rho_hold: 40 when it's a dot
     v_turn=0.0,
+    # witchspace: a swarm of Thargoids that doesn't wait. As first written the camera flew it as any fight and never got
+    # one in the sights (the lab: acquired never, 0 of 6 killed, the energy under the bail-out level in 20 s, jumped out).
+    # The ws sense switches these on: the error amplified (a sharper stick), the dead zone and the pass off, the hard
+    # turn from nearer the nose
+    ws_gain=2.5,         # the error x this when sharp (roll 80 -> 200, pitch 40 -> 100 a radian)
+    hard_th_ws=0.22,     # the hard turn from here when sharp
+    # ... and the same regime when hurt: the test set had the camera, flying every fight, killed in 37 of 317 (the
+    # gated one 17): a show fight is flown while the energy lasts; under hurt_e the network fights to finish it
+    hurt_e=160.0,        # energy under which it's sharp
 )
 
 
@@ -88,7 +97,11 @@ def _build(P, camera=False):
         L1.unit(f"w{k}+", {f"w{k}": 1 / 16}, note=f"the sky's motion {k}, rad a loop, positive half")
         L1.unit(f"w{k}-", {f"w{k}": -1 / 16}, note=f"the sky's motion {k}, negative half")
     L1.sat_pair("up", {"cy": 1, "jy": -P["hyst"]}, 0.0, "target above the nose (kept while the stick pitches that way)")
-    L1.sat_pair("hard", {"th": 1}, -P["hard_th"], "far off the nose: a hard turn")
+    if camera:
+        # sharp: witchspace, or hurt (energy under hurt_e: 10 a unit of the sense, so it's fully on 25 energy under)
+        L1.sat_pair("sharp", {"ws": 10.0, "energy": -10.0}, 10.0 * P["hurt_e"] / 255, "witchspace or hurt: fight to finish it (ws weighted to win over full energy)")
+    else:
+        L1.sat_pair("hard", {"th": 1}, -P["hard_th"], "far off the nose: a hard turn")
     L1.sat_pair("ahead", {"uz": 1}, 0.0, "target ahead")
     L1.sat_pair("inrange", {"dist": -1}, P["fire_range"], "within laser range")
     L1.sat_pair("cool", {"hot": -1}, P["hot"], "laser cool enough")
@@ -111,8 +124,13 @@ def _build(P, camera=False):
 
     # ------------------------------------------------------------------ the aim point, signed, with the pass beside it
     L2 = Layer(L1.names)
-    if camera: L2.passthrough("cl+", "cl-")
-    L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "hard+", "hard-",
+    if camera: L2.passthrough("cl+", "cl-", "sharp+", "sharp-")
+    L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-")
+    if camera:
+        L2.sat_pair("hard", {"th": 1, "sharp+": P["hard_th"] - P["hard_th_ws"]}, -P["hard_th"], "far off the nose: a hard turn (from nearer the nose when sharp)")
+    else:
+        L2.passthrough("hard+", "hard-")
+    L2.passthrough(
                    "ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "aligned+", "aligned-", "big+", "big-", "th")
     if camera:
         L2.unit("band", {"gap": P["v_k"]}, P["v_base"], "the speed by how big it's drawn: v_base at the hold size, more the smaller")
@@ -123,8 +141,8 @@ def _build(P, camera=False):
     L2.sat_pair("outhold", {"ax+": 1, "ax-": 1, "ay+": 1, "ay-": 1, "cone": -math.pi * P["nose_hold"]}, 0.0, "outside the nose hold: roll allowed", S=4000.0)
     if camera:
         k, g = P["pass_k"], sat_ref("cl", 2.0)
-        L2.unit("px+", add({"loom": k, "cx+": 2.0}, g), -4.0, "a pass: aim aside, on the right, while it looms and closes")
-        L2.unit("px-", add({"loom": k, "cx-": 2.0}, g), -4.0, "a pass: aim aside, on the left, while it looms and closes")
+        L2.unit("px+", add({"loom": k, "cx+": 2.0, "sharp+": -2 * M}, g), -4.0, "a pass: aim aside, on the right, while it looms and closes (not when sharp)")
+        L2.unit("px-", add({"loom": k, "cx-": 2.0, "sharp+": -2 * M}, g), -4.0, "a pass: aim aside, on the left, while it looms and closes (not when sharp)")
     for k in "xy":
         L2.unit(f"a{k}+", {f"a{k}+": 1, f"a{k}-": -1}, note=f"aim {k}, positive half")
         L2.unit(f"a{k}-", {f"a{k}-": 1, f"a{k}+": -1}, note=f"aim {k}, negative half")
@@ -136,10 +154,16 @@ def _build(P, camera=False):
     if camera:
         dz = P["dead"]
         # a pass pushes the aim the other way from where the target is: x - px on its side
-        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1}, -dz, "sideways error past the dead zone (right)")
-        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1}, -dz, "sideways error past the dead zone (left)")
-        L3.unit("ey+", {"ay+": 1, "ay-": -1}, -dz, "error past the dead zone (up)")
-        L3.unit("ey-", {"ay-": 1, "ay+": -1}, -dz, "error past the dead zone (down)")
+        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1, "sharp+": dz}, -dz, "sideways error past the dead zone (right; no dead zone when sharp)")
+        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1, "sharp+": dz}, -dz, "sideways error past the dead zone (left)")
+        L3.unit("ey+", {"ay+": 1, "ay-": -1, "sharp+": dz}, -dz, "error past the dead zone (up)")
+        L3.unit("ey-", {"ay-": 1, "ay+": -1, "sharp+": dz}, -dz, "error past the dead zone (down)")
+        # sharp: the error again, x (ws_gain - 1), gated: added to the error below it sharpens the stick
+        kw = P["ws_gain"] - 1
+        L3.unit("exw+", {"ax+": kw, "ax-": -kw, "sharp+": M}, -M, "sharp: the sideways error's extra (right)")
+        L3.unit("exw-", {"ax-": kw, "ax+": -kw, "sharp+": M}, -M, "sharp: the sideways error's extra (left)")
+        L3.unit("eyw+", {"ay+": kw, "ay-": -kw, "sharp+": M}, -M, "sharp: the error's extra (up)")
+        L3.unit("eyw-", {"ay-": kw, "ay+": -kw, "sharp+": M}, -M, "sharp: the error's extra (down)")
     else:
         L3.unit("ex+", {"ax+": 1, "ax-": -1}, note="sideways error (right)")
         L3.unit("ex-", {"ax-": 1, "ax+": -1}, note="sideways error (left)")
@@ -155,14 +179,16 @@ def _build(P, camera=False):
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
     L4 = Layer(L3.names)
     r0, cap = P["roll_ramp"], P["roll_cap"]
+    W = (lambda d: d) if camera else (lambda d: {})       # (the camera's witchspace extras; none in the interceptor)
     for s in "+-":
-        L4.unit("over" + s, {"ex" + s: 1 / r0, "cx" + s: -cap}, note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
-    absx = {"ex+": 1, "ex-": 1}
-    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
-    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
+        L4.unit("over" + s, add({"ex" + s: 1 / r0, "cx" + s: -cap}, W({"exw" + s: 1 / r0})), note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
+    absx = add({"ex+": 1, "ex-": 1}, W({"exw+": 1, "exw-": 1}))
+    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, W({"eyw+": 1, "eyw-": -1}), neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
+    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1}), neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
+    if camera: L4.passthrough("exw+", "exw-")
     if camera:
-        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), {"seen": 1}), -4.0,
-                "AND of five: in the sights, ahead, in range, cool, a target (the strafing: the laser is part of the show)")
+        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,
+                "AND of six: in the sights, ahead, in range, cool, drawn big, a target (no kills at a distance: the kill is the show's close-up)")
         L4.unit("orbit", add(sat_ref("big"), sat_ref("aligned")), -1.0, "on the target and it's drawn big: the slow roll")
     else:
         L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,
@@ -173,7 +199,7 @@ def _build(P, camera=False):
     L5 = Layer(L4.names)
     UP, OH = sat_ref("up"), sat_ref("outhold")
     for s in "+-":
-        m = {"ex" + s: 1 / r0, "over" + s: -1}      # min(|error|/ramp, cap x |clock x|)
+        m = add({"ex" + s: 1 / r0, "over" + s: -1}, W({"exw" + s: 1 / r0}))      # min(|error|/ramp, cap x |clock x|)
         # gated twice: by the side, and by being outside the nose hold: v + M(up) + M(outhold) - 2M
         L5.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold")
         L5.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -M, f"roll magnitude ({s}) if below, outside the nose hold")

@@ -6,9 +6,11 @@ applied to the other two modes, each for its own goal, written from scratch rath
 - **Optimal: the interceptor** (`elite_wsp/author_modes.py`, `build_interceptor`; 4,019 weights, 244 non-zero, 5 hidden
   layers). Its goal is points a minute. Its senses are exact (it reads the game's RAM), so it can afford things fair mode's
   pilot can't: a hard pull onto a target far off the nose, a wide roll cap.
-- **Curious: the camera** (`build_camera`; 4,359 weights, 270 non-zero). Its goal is what a viewer sees, scored by the
-  show meter (`tools/show.py`): the enemy drawn big, moving, passes, the kill seen close. It flies while the show is on
-  (`show.c`'s margin: the agent clearly on top); the interceptor flies the rest.
+- **Curious: the camera** (`build_camera`; 4,839 weights, 318 non-zero). Its goal is what a viewer sees, scored by the
+  show meter (`tools/show.py`): the enemy drawn big, moving, passes, the kill seen close. It flies every Curious fight,
+  from the first on a pulse laser (not `show.c`'s margin, which held it back until a beam laser and a thousand credits:
+  the mode is the show). Only danger hands a fight to the interceptor: the energy under 128 (under 200 in witchspace,
+  above the bail-out level), or a missile homing with no ECM.
 - **Docking** keeps the fair-mode network's weights in both modes, with one authored change for Optimal (below).
 
 Every unit is named, every constant a parameter. The weights were written, measured in the labs, read where they lost,
@@ -24,8 +26,9 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: C rules** | 21.52 ppm (372 fights, 0 deaths) | the rules the interceptor is measured against |
 | Optimal: fair mode's network, as shipped | 21.18 | |
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
-| **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
-| **Curious: the camera** | **23.8** (17 deaths) | motion 0.32, close kills 0.09: it holds the target too still, and kills from too far |
+| **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show on only while clearly on top; the meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
+| Curious: the camera, gated as the C's show is | 23.8 (17 deaths) | last night's: motion 0.32, close kills 0.09 |
+| **Curious: the camera, every fight** | **22.6** (35 deaths) | close kills 0.20, passes 0.53, motion 0.38; fights 85 s against the C's 42: it holds fire until the target is drawn 20 px, and a show fight on a pulse laser is long. Witchspace 35.9 |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
@@ -81,6 +84,15 @@ careers. Not better yet. The one place the exact senses were expected to pay (th
 
 ## The camera
 
+The camera flies every fight, so it meets what the C's show never did: witchspace on arrival, packs on a pulse laser, the
+energy running down. As first flown that way it scored 0 on every witchspace fight: its gentle stick and dead zone never
+got a Thargoid in the sights, the energy fell under the bail-out level and the agent jumped out with no kills. Written
+for it, one unit: `sharp`, on in witchspace or with the energy under 160, which switches the dead zone and the pass off,
+amplifies the error (the stick 2.5 x sharper) and brings the hard turn in from 40 degrees. Witchspace went from 0 to 35.9
+(the C: 36.5) and deaths on the test set from 37 to 19; putting the "drawn big" gate back on the laser (no kills at a
+distance: the kill is the close-up) took close kills from 0.12 to 0.20 and deaths back up to 35. Curious mode is meant
+to be watched, and a death now and then is part of it; the kill at a distance isn't.
+
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that
 speeds up as it falls behind), a pass (aim aside) as a fast closer looms, a dead zone so the target drifts instead of
@@ -114,8 +126,8 @@ first written, but on the shipped (evolved) parameters the same change is within
 draws whichever network made the last decision (`wasm_fight_net`), seven columns for these networks. Fair mode's journal on
 this build is byte-identical to the verified one. The dev page is at `/dev/` while this is on a branch.
 
-In Curious mode the camera appears only once the show is on, which in a career is after the first beam laser and a
-thousand credits: an hour or two in.
+In Curious mode the camera flies from the first fight (40 game minutes on the dev page's build: 70,410 frames the
+camera's, 50 the interceptor's). The Deadly button on the options page jumps to the film career's save at Deadly rank.
 
 ## Running it
 
@@ -125,5 +137,6 @@ cd evolve && python3 es_modes.py sets WORK             # the fight sets from WOR
 python3 es_modes.py score eff val [written|file.wsp]   # Optimal: points a minute; "C" for the rules
 python3 es_modes.py score cam val [written|file.wsp]   # Curious: the show score
 PILOTS=1 cplayer/run_sim 1500                          # a career on the mode's own pilots (CURIOUS=1 for the camera)
+CAMGATE=1                                              # the lab: the camera only while show.c's margin is on (last night's gate)
 WSPINTW=file.wsp WSPWS=file.wsp                        # other weights for the interceptor and the camera
 ```

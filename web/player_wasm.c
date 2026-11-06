@@ -51,9 +51,12 @@ __attribute__((export_name("wasm_frame"))) void wasm_frame(void) {
 __attribute__((export_name("wasm_name"))) char *wasm_name(void) { extern char g_name[8]; return g_name; }
 
 // the action worth watching at real speed: 1 in a fight, 2 in the docking's final
+// (the final first: the phase stays at "fight" from the first fight until the next launch, so a docking after a
+// fight read as a fight, and ACTION never slowed for its final: on the Solid disc, with a fight before the first
+// docking, never at all)
 __attribute__((export_name("wasm_action"))) int wasm_action(void) {
     extern int g_phase; extern int pilot_dock_final(void);
-    return g_phase == 1 ? 1 : pilot_dock_final() ? 2 : 0;
+    return pilot_dock_final() ? 2 : g_phase == 1 ? 1 : 0;
 }
 
 // the networks' senses at their last decisions, and when (the player's frame): the page runs the networks again in

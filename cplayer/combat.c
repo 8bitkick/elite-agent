@@ -334,7 +334,12 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         if (!s_cam && well_in) s_cam = 1, s_cam_since = now();
         else if (s_cam && well_out) s_cam = 0, s_cam_since = now();
     }
-    int shownet = g_curious && show_on() && wsp_on() && wsp_show_on();     // (the camera pilot: the stick, the speed, the laser)
+    // (the camera pilot: the stick, the speed, the laser. It flies every Curious fight, not the show's margin: that
+    // held it back until a beam laser and a thousand credits, and the mode is the show. Only danger hands over)
+    extern int show_danger(const ship_t *, int);
+    static int cam_gate = -1;      // (CAMGATE=1, the labs: the camera only while show.c's margin is on, the old gate, for comparison)
+    if (cam_gate < 0) cam_gate = getenv("CAMGATE") ? atoi(getenv("CAMGATE")) : 0;
+    int shownet = g_curious && wsp_on() && wsp_show_on() && (cam_gate ? show_on() : !show_danger(s, n));
     int cam = g_curious && show_on() && s_cam && !shownet;
     g_wsp_net = shownet ? 1 : !g_fair ? 2 : 0;       // (the camera; Optimal's and Curious's interceptor; fair mode's own)
     if (cam) {
@@ -506,7 +511,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
         if (s[i].slot >= 1 && s[i].slot != sh->slot && in_crosshairs(&s[i], view) && !(s[i].newb & NEWB_HOSTILE)) friendly = 1;
     int can_ = near_ && !hot && !friendly && space_view() == view && laser_power(view, sh->type) > 0 && !(sh->vis & VIS_LOOK);
     if (g_wsp_net ? can_ : show_fire(sh, dist, can_)) ks_add(keys, K_FIRE), s_rr_fire = 1, g_fire_now = 1;
-    else if (g_opp_fire && !show_on() && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);
+    else if (g_opp_fire && !show_on() && g_wsp_net != 1 && !hot && !friendly && space_view() == view && opportunity(s, n, view)) ks_add(keys, K_FIRE);   // (not the camera's fights: a kill at a distance is no show)
     {
         extern int g_steer_log;
         if (g_steer_log)

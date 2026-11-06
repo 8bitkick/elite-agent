@@ -260,6 +260,19 @@ void show_frame(const ship_t *sh, int n) {
 }
 int show_on(void) { return S.on; }
 
+// The camera pilot (wsp/MODES.md) flies every Curious fight: the mode is the show, from the first fight on a pulse
+// laser. Not the margin above, nor the laser or the purse: the one thing that hands a fight to the interceptor is
+// real danger, the energy under 128 or a missile homing on us with no ECM, the same "urgent" test as the margin's
+// (in witchspace the agent jumps out under bail_energy, 180: the handover comes above that, so the interceptor gets
+// its turn before the bail-out, as the margin's own switch-off used to give it)
+int show_danger(const ship_t *sh, int n) {
+    if (energy() < (witchspace() ? 200 : 128)) return 1;
+    if (has_ecm()) return 0;
+    for (int i = 0; i < n; i++)
+        if (sh[i].type == 1 && (sh[i].ai & 0x40) && ship_in_space(&sh[i]) && !ship_dead(&sh[i])) return 1;
+    return 0;
+}
+
 // ==== WITCHSPACE and CLOSING IN: the target's worth
 // witchspace: the target by its group: nearness times the enemies within group_d of it, so we fly at the swarm, not
 // at the best-value ship on its own out at 10,000. While a Thargoid lives, the Thargons within thg_d first (its
