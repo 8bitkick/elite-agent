@@ -101,6 +101,13 @@ The chase: a target running ahead at our speed was trailed for minutes, the lase
 units a loop. It lets the laser fire at range (OR'd with "drawn big" into the fire gate) and switches the dead zone off,
 since at range the fire cone is smaller than the dead zone and the target has to be centred to be hit. Validation 24.5 to
 27.6 (the C on the same fights: 25.5), fights at the cap 13 to 2, the average fight 90 s to 45; the test set 22.4 to 25.3.
+A chase is only a target that isn't drawn big: holding beside one at the show's distance isn't closing either, and
+sharpening the stick on that lost the whole gentle style (validation 27 to 19, reverted).
+
+Targets are ranked as Optimal ranks them (`show_value` returns the plain value when the pilots fly): the show's own
+preferences (the nearest first, runners devalued, witchspace groups) chased one ship at a distance while two others
+shot from behind. The show is in how the camera flies the target, not in which one. Test set 25.3 to 25.1, deaths 32
+to 28, fights 52 s to 48.
 
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that

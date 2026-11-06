@@ -83,6 +83,7 @@ CAMERA = dict(
     # ... and the same regime when hurt: the test set had the camera, flying every fight, killed in 37 of 317 (the
     # gated one 17): a show fight is flown while the energy lasts; under hurt_e the network fights to finish it
     hurt_e=160.0,        # energy under which it's sharp
+    chase_far=1.0,       # 1: a chase only while the target isn't drawn big (0: as first written)
     chase_close=0.15,    # closing speed (units a loop / 64: 10) under which a target ahead is a chase we don't win: shoot at range
 )
 
@@ -128,7 +129,9 @@ def _build(P, camera=False):
     L2 = Layer(L1.names)
     if camera:
         L2.passthrough("cl+", "cl-", "sharp+", "sharp-")
-        L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow")), -1.0, "a chase we don't win: ahead and not closing")
+        # (a chase: ahead, not closing, and not drawn big: holding beside a target at the show's distance isn't closing
+        # either, and sharpening the stick on that lost the whole gentle style: validation 27 -> 19)
+        L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow"), neg(sat_ref("big"), P["chase_far"])), -1.0, "a chase we don't win: ahead, not closing, not drawn big (AND: the three sum to 3 - big... - 1)")
     L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-")
     if camera:
         L2.sat_pair("hard", {"th": 1, "sharp+": P["hard_th"] - P["hard_th_ws"]}, -P["hard_th"], "far off the nose: a hard turn (from nearer the nose when sharp)")

@@ -91,7 +91,7 @@ def wfile(kind, P, d):
 
 
 def cam_env(w):
-    env = dict(os.environ, CURIOUS="1", UNDAMPED="1", DCAUSE="1", COLLOG="1")
+    env = dict(os.environ, CURIOUS="1", UNDAMPED="1", DCAUSE="1", COLLOG="1", PILOTS="1")     # (PILOTS: as the page flies it: the modes' own pilots, Optimal's target ranking)
     if w:
         env.update(WSP="1", WSPSHOW="1", WSPWS=w)
         eff = os.path.join(HERE, "eff_interceptor.wsp")

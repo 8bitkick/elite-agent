@@ -294,8 +294,9 @@ static double thg_value(const ship_t *s, double v, const ship_t *const *th, int 
     return v / 10;
 }
 double show_value(const ship_t *s, double v, const ship_t *const *th, int nt) {
-    v = thg_value(s, v, th, nt);
     if (tally() != s_kill_tally) s_kill_tally = tally(), s_last_kill = now();      // (a kill: for stall_s)
+    { extern int g_pilots; if (g_pilots) return v; }      // (the modes' own pilots: Curious ranks its targets as Optimal does; the show is in how the camera flies them)
+    v = thg_value(s, v, th, nt);
     if (g_sp.near_pref && show_on() && !witchspace() && s->type != 1) v *= 3000.0 / (dist_of(s) + 1000);
     if (g_sp.run_value && show_on() && s->type != 1 && dist_of(s) > 2000 && range_rate(s) > 0) v *= g_sp.run_value;
     if (!g_sp.ws_group || !show_on() || !witchspace() || s->type == 1) return v;
