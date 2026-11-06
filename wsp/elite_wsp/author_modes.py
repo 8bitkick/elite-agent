@@ -83,6 +83,7 @@ CAMERA = dict(
     # ... and the same regime when hurt: the test set had the camera, flying every fight, killed in 37 of 317 (the
     # gated one 17): a show fight is flown while the energy lasts; under hurt_e the network fights to finish it
     hurt_e=160.0,        # energy under which it's sharp
+    fire_near=0.2,       # range / 4096 inside which the laser is allowed whatever the size (820: a pass at 600 by a small ship was never shot, 16 px)
     chase_far=1.0,       # 1: a chase only while the target isn't drawn big (0: as first written)
     chase_close=0.15,    # closing speed (units a loop / 64: 10) under which a target ahead is a chase we don't win: shoot at range
 )
@@ -120,6 +121,7 @@ def _build(P, camera=False):
         L1.sat_pair("big", add({"rho": 1}, {"ws": P["fire_rho"] - P["fire_rho_ws"]}), -P["fire_rho"], "drawn big enough to shoot (sooner in witchspace)")
         L1.sat_pair("cl", {"close": 1}, -P["pass_close"], "closing")
         L1.sat_pair("slow", {"close": -1}, P["chase_close"], "not closing (under chase_close)")
+        L1.sat_pair("near", {"dist": -1}, P["fire_near"], "inside fire_near: a pass, whatever it's drawn")
         L1.unit("loom", {"rho": 1}, -P["pass_rho"], "looming: drawn past pass_rho")
     else:
         L1.unit("big+", {"one": 1}, note="(no size gate)")
@@ -128,7 +130,7 @@ def _build(P, camera=False):
     # ------------------------------------------------------------------ the aim point, signed, with the pass beside it
     L2 = Layer(L1.names)
     if camera:
-        L2.passthrough("cl+", "cl-", "sharp+", "sharp-")
+        L2.passthrough("cl+", "cl-", "sharp+", "sharp-", "near+", "near-")
         # (a chase: ahead, not closing, and not drawn big: holding beside a target at the show's distance isn't closing
         # either, and sharpening the stick on that lost the whole gentle style: validation 27 -> 19)
         L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow"), neg(sat_ref("big"), P["chase_far"])), -1.0, "a chase we don't win: ahead, not closing, not drawn big (AND: the three sum to 3 - big... - 1)")
@@ -185,7 +187,7 @@ def _build(P, camera=False):
     L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
     if camera:
         L3.passthrough("cl+", "cl-")
-        L3.sat_pair("shoot", add(sat_ref("big"), {"stuck": 1}), 0.0, "the laser allowed: drawn big, or a chase we don't win (shot at range rather than trailed)")
+        L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1}), 0.0, "the laser allowed: drawn big, near, or a chase we don't win (shot at range rather than trailed)")
 
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
     L4 = Layer(L3.names)

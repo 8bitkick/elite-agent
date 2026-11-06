@@ -28,7 +28,7 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
 | **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show on only while clearly on top; the meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
 | Curious: the camera, gated as the C's show is | 23.8 (17 deaths) | last night's: motion 0.32, close kills 0.09 |
-| **Curious: the camera, every fight** | **25.3** (32 deaths) | close kills 0.14, passes 0.49, motion 0.41, fights 52 s against the C's 42; witchspace 32.9. It holds fire until the target is drawn 20 px, unless the chase is lost |
+| **Curious: the camera, every fight** | **25.4** (25 deaths) | close kills 0.11, passes 0.49, motion 0.40, fights 57 s against the C's 42; witchspace 31.3. It holds fire until the target is drawn 20 px or inside 820, unless the chase is lost |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
@@ -108,6 +108,18 @@ Targets are ranked as Optimal ranks them (`show_value` returns the plain value w
 preferences (the nearest first, runners devalued, witchspace groups) chased one ship at a distance while two others
 shot from behind. The show is in how the camera flies the target, not in which one. Test set 25.3 to 25.1, deaths 32
 to 28, fights 52 s to 48.
+
+## The director's lab
+
+`evolve/director.py FIGHT...` flies a recorded fight with the camera, dumps the screen every 2 s and writes a contact
+sheet of captioned frames (the target, its distance and drawn size, the view, the laser), a timeline (view switches,
+bursts, passes, target changes) and the show meter's verdict: the fight as a viewer sees it, to judge by eye and fix
+unit by unit. What it showed first, on a four-ship pack (cur13:00207): a pass at 600 by a Fer-de-lance, 16 px, never
+shot (the gate wanted 20 px: now the laser is allowed inside 820 whatever the size, `near`); a glance into a side view
+that ended in 0.2 s (the four views' cones are only 27 degrees wide, so a ship at 100 degrees off the nose is in none:
+the camera's look now follows the ship from view to view and holds while it's near, and looks back at a ship just gone
+by); and, unfixed, the approaches from where ships spawn, 9,000 to 11,000 units of a dot closing at full speed. Test set
+25.1 to 25.4, deaths 28 to 25.
 
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that

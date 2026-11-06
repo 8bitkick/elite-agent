@@ -577,11 +577,20 @@ int show_view(int view, const ship_t *sh, int n, const ship_t *t) {
     if (!(show_on() || (g_curious && g_wsp_net == 1)) || !g_sp.glance) { G.view = 0; return view; }
     for (int i = 0; i < n; i++)         // (an incoming missile: eyes front)
         if (sh[i].type == 1 && (sh[i].ai & 0x40) && !ship_dead(&sh[i])) { G.view = 0; return view; }
+    extern int g_wsp_net;
+    int cam = g_curious && g_wsp_net == 1;      // (the camera pilot: a look back too, at a ship just gone by, at half the size, and the look follows it from one view to the next)
     if (G.view) {
         int still = 0;
         for (int i = 0; i < n; i++)
             if (ship_is_ship(&sh[i]) && ship_in_space(&sh[i]) && !ship_dead(&sh[i]) && in_view(&sh[i], G.view) && dist_of(&sh[i]) < 2 * g_sp.glance_d) still = 1;
         if (now() < G.until && still) return G.view;
+        if (cam && now() < G.until) {       // (gone from that view: the side to the rear, say. Follow it; and between the
+            for (int v = 1; v <= 3; v++)    // views' narrow cones, keep looking where it went while it's still near)
+                for (int i = 0; i < n; i++)
+                    if (ship_is_ship(&sh[i]) && ship_in_space(&sh[i]) && !ship_dead(&sh[i]) && (sh[i].newb & NEWB_HOSTILE) && seen_in(&sh[i], v) && dist_of(&sh[i]) < 2 * g_sp.glance_d) { G.view = v; return v; }
+            for (int i = 0; i < n; i++)
+                if (ship_is_ship(&sh[i]) && ship_in_space(&sh[i]) && !ship_dead(&sh[i]) && (sh[i].newb & NEWB_HOSTILE) && dist_of(&sh[i]) < g_sp.glance_d && !seen_in(&sh[i], 0)) return G.view;
+        }
         G.view = 0;
     }
     if (g_sp.follow_s && FB.state == 2 && t && t->type == FB.type && now() - FB.passed < (uint32_t) (g_sp.follow_s * 50) && view == 0) {
@@ -594,12 +603,12 @@ int show_view(int view, const ship_t *sh, int n, const ship_t *t) {
         if (!ship_is_ship(s) || !ship_in_space(s) || ship_dead(s) || !(s->newb & NEWB_HOSTILE) || s->type == 1) continue;
         double d = dist_of(s);
         if (d > g_sp.glance_d) continue;
-        int side = s->x < 0 ? 2 : 3;
-        if (s->z < -d / 2 || now() < G.next || view != 0 || size_px(s, d) < g_sp.glance_px) continue;
+        int side = s->z < -d / 2 ? 1 : s->x < 0 ? 2 : 3;
+        if ((side == 1 && !cam) || now() < G.next || view != 0 || size_px(s, d) < (cam ? g_sp.glance_px / 2 : g_sp.glance_px)) continue;
         ship_t q = ahead(s, 1.5);
         if (!in_view(s, side) && !in_view(&q, side)) continue;
-        G.view = side, G.until = now() + (uint32_t) (g_sp.glance_max * 50), G.next = now() + (uint32_t) (g_sp.glance_gap * 50);
-        status_("A look %s", side == 2 ? "left" : "right");
+        G.view = side, G.until = now() + (uint32_t) (g_sp.glance_max * 50 * (cam ? 2 : 1)), G.next = now() + (uint32_t) (g_sp.glance_gap * 50);
+        status_("A look %s", side == 1 ? "back" : side == 2 ? "left" : "right");
         return side;
     }
     return view;
