@@ -23,6 +23,14 @@ jobs:
           node-version: 22
       - name: build the site (the pinned core.wasm, its hash checked; the page)
         run: web/build_site.sh
+      - name: the dev page, at /dev/, from the wsp-modes branch (the main page publishes without it if this fails)
+        continue-on-error: true
+        run: |
+          git fetch -q --depth 1 origin wsp-modes
+          git worktree add -q /tmp/dev FETCH_HEAD
+          ln -s "$PWD/web/node_modules" /tmp/dev/web/node_modules
+          (cd /tmp/dev/web && ./build_site.sh)
+          cp -r /tmp/dev/web/_site "$PWD/web/_site/dev"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/_site
