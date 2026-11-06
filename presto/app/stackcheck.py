@@ -22,6 +22,7 @@ POINTERS = {
     'hold': ['p_hold', 'p_analogue'], 'press': ['p_tap'], 'type_text': ['p_tap'], 'note': ['p_note'],
     'logf_': ['p_log'], 'dbgf_': ['p_log'], 'status_': ['p_log'], 'keyq_step': ['key'], 'keyq_release': ['key'],
     'plan_stick': ['plan_rates', 'plan_rates_f'],
+    'analogue_out': [FIRMWARE], 'drv_fair_pump': [FIRMWARE], 'galaxy_psram': [FIRMWARE],      # (--fair: the stick and the keys through the machine's hooks)
     'bfs': [CONDS], 'wait_for': [CONDS], 'hold_until': [CONDS], 'settle': [CONDS],
     'elite_frame': [FIRMWARE], 'key': [FIRMWARE], 'p_analogue': [FIRMWARE], 'say': [FIRMWARE],
     'p_hold': [FIRMWARE], 'p_tap': [FIRMWARE], 'elite_init': [FIRMWARE], 'elite_command': [FIRMWARE],

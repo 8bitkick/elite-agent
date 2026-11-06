@@ -21,6 +21,7 @@ API_DIR=${API_DIR:-$TOP/presto/api}; OUT=$HERE/build
 CURIOUS=1; AUTO=2500; DISC=; NOFAIR=1
 for a in "$@"; do case $a in --efficient) CURIOUS=0;; --fair) NOFAIR=0;; --autostart=*) AUTO=${a#*=};; --disc=*) DISC=${a#*=};;
     --out=*) OUT=${a#*=};; *) echo "unknown: $a"; exit 1;; esac; done
+VIEWER=$((CURIOUS && NOFAIR))     # (the tap-to-swap AI viewer: the default build, Curious, only: Fair leaves no room for its screen)
 API="$API_DIR/app_api.h"
 [ -f "$API" ] || { echo "no $API (API_DIR: app_api.h's directory)"; exit 1; }
 mkdir -p "$OUT"
@@ -32,16 +33,16 @@ KB=$(sed -n 's/^#define APP_RAM_MAX (\([0-9]*\) \* 1024).*/\1/p' "$API")
 [ -n "$OFF" ] && [ -n "$RAM_TOP" ] && [ -n "$KB" ] || { echo "$API: no APP_SLOT_OFFSET / APP_RAM_TOP / APP_RAM_MAX"; exit 1; }
 CPU="-mcpu=cortex-m33 -mthumb -march=armv8-m.main+fp+dsp -mfloat-abi=softfp"
 CFLAGS="$CPU -O2 -fwrapv -g -ffunction-sections -fdata-sections -fno-common -Wall -Wno-unused-function -fcallgraph-info=su
-  -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DNO_FAIR=$NOFAIR -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
+  -DAPP_LOADED=1 -DPLAYER_CURIOUS=$CURIOUS -DNO_FAIR=$NOFAIR -DGALAXY_PSRAM=$((1-NOFAIR)) -DAI_VIEWER=$VIEWER -DELITE_AUTOSTART=$AUTO -DELITE_VERSION=\"$VERSION\"
   -DELITE_DISC=\"$(basename "${DISC:-}")\" -include $HERE/app_libc.h -I$TOP/cplayer -I$API_DIR"
 OBJS=
-for f in "$TOP"/presto/elite_presto.c "$TOP"/presto/viewer.c "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
+for f in "$TOP"/presto/elite_presto.c $([ "$VIEWER" = 1 ] && echo "$TOP"/presto/viewer.c) "$TOP"/presto/elite_splash.c "$HERE"/app_libc.c \
          "$TOP"/cplayer/{keyq,agent,cfly,combat,docked,drv,elite_ver,fair,flight,galaxy,pilot,ships,show,wsp_pilot,wsp_dock}.c; do
     o="$OUT/$(basename "${f%.c}").o"
-    [ "$o" -nt "$f" ] && [ -f "${o%.o}.ci" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
+    [ "$o" -nt "$f" ] && [ -f "${o%.o}.ci" ] && [ "$o" -nt "$API" ] && [ "$o" -nt "$0" ] && [ "$(cat "$OUT/.flags" 2>/dev/null)" = "$NOFAIR$CURIOUS" ] || arm-none-eabi-gcc $CFLAGS -c "$f" -o "$o"
     OBJS="$OBJS $o"
 done
-echo "$NOFAIR" > "$OUT/.flags"
+echo "$NOFAIR$CURIOUS" > "$OUT/.flags"
 # the SDK's maths: compiled with its headers (a stub for the two a configured build would make)
 WRAP=
 if [ -n "$PICO_SDK_PATH" ]; then

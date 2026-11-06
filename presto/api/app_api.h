@@ -75,6 +75,10 @@ struct app_api {
     uint32_t (*view_taps)(void);        // taps since boot, each a swap
     uint32_t (*view_edges)(void);       // the touch line's falling edges since boot: finger or not
     uint32_t (*view_errors)(void);      // and the times the touch panel didn't answer
+    // Added later: memory in the PSRAM, for tables it reads rarely: slower than the SRAM on a cache miss, and
+    // never for the screen. It lasts until the next boot and can't be freed; not zeroed; NULL when there's no more,
+    // or on a machine without it (the Model B).
+    void *(*psram_alloc)(uint32_t size);
 };
 
 // What the app gives the firmware: at the start of the slot (or compiled in).

@@ -107,7 +107,11 @@ static void system_data(const uint8_t s[6], int num, sys_t *sy)
     system_name(s, sy->name);
 }
 
+#if GALAXY_PSRAM       // (the Presto's plugin with fair mode: its SRAM is full; these are for planning, rarely read in flight)
+static sys_t *cache;
+#else
 static sys_t cache[256];
+#endif
 static int cache_galaxy = -1;
 
 const sys_t *galaxy_systems(int galaxy)
@@ -228,7 +232,12 @@ static int nearest_reach(int galaxy, int x, int y)
     }
     return best < 0 ? 999 : distance_qq8(x, y, sys[best].x, sys[best].y);
 }
-static uint8_t s_jmax[8][256], s_jmax_ok[8], s_trap[8][32];      // (the longest is 65; a trap a bit a system)
+#if GALAXY_PSRAM
+static uint8_t (*s_jmax)[256];
+#else
+static uint8_t s_jmax[8][256];
+#endif
+static uint8_t s_jmax_ok[8], s_trap[8][32];      // (the longest is 65; a trap a bit a system)
 int jump_max(int galaxy, int num)
 {
     if (!g_safe_jumps) return 70;
@@ -527,7 +536,17 @@ int plan_trip_seen(int galaxy, int x, int y, int here_economy, int qq26, const u
 // route: Dijkstra over hops, popping in (cost, num) order
 // ---------------------------------------------------------------------------
 
+#if GALAXY_PSRAM
+static double *r_best;
+// (rebuilt when wanted, guarded by cache_galaxy, s_jmax_ok and r_seen: their contents needn't start at zero)
+int galaxy_psram(void *(*alloc)(uint32_t))
+{
+    cache = alloc(sizeof(sys_t) * 256); s_jmax = alloc(8 * 256); r_best = alloc(sizeof(double) * 256);
+    return cache && s_jmax && r_best;
+}
+#else
 static double r_best[256];
+#endif
 static int16_t r_prev[256];
 static uint8_t r_seen[256], r_done[256];
 

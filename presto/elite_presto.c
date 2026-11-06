@@ -206,7 +206,9 @@ static uint32_t stack_low(void)
 }
 
 #if !ELITE_HOOKS
+#if AI_VIEWER
 #include "viewer.h"
+#endif
 #endif
 static bool elite_init(const struct app_api *api)
 {
@@ -230,7 +232,16 @@ static bool elite_init(const struct app_api *api)
     s_tot.boots = 1;
     s_resets_seen = io->resets;
     stack_paint();
-#if !ELITE_HOOKS
+#if GALAXY_PSRAM
+    {   // (--fair: the planning tables in the PSRAM, or the SRAM doesn't hold it all)
+        extern int galaxy_psram(void *(*alloc)(uint32_t));
+        if (api->size < offsetof(struct app_api, psram_alloc) + sizeof api->psram_alloc || !api->psram_alloc || !galaxy_psram(api->psram_alloc)) {
+            say("PLAYER fair mode needs newer firmware (v0.5 or later): no PSRAM for the planning tables");
+            return false;
+        }
+    }
+#endif
+#if !ELITE_HOOKS && AI_VIEWER
     if (!viewer_init(api)) say("PLAYER no AI viewer on the panel: an older firmware, or no RAM for it");
 #endif
     return true;
@@ -238,7 +249,9 @@ static bool elite_init(const struct app_api *api)
 
 #if !ELITE_HOOKS
 // (the log's i-th line kept, oldest first)
+#if AI_VIEWER
 static const char *view_log(int i) { int base = s_logn > LOGN ? s_logn - LOGN : 0; return s_log[(base + i) % LOGN]; }
+#endif
 static void hms(char *out, size_t n, uint32_t frames);
 #endif
 static void elite_frame(const struct machine_hook_io *io)
@@ -266,7 +279,7 @@ static void elite_frame(const struct machine_hook_io *io)
             memcpy(g_load_name, s_tot.name, sizeof g_load_name - 1), g_load_name[sizeof g_load_name - 1] = 0;
         }
     }
-#if !ELITE_HOOKS
+#if !ELITE_HOOKS && AI_VIEWER
     if (viewer_due()) {         // (tapped to: read only, and at this top level, not on the player's stack)
         char t[16];
         hms(t, sizeof t, s_tot.car.frames);
@@ -394,7 +407,7 @@ static bool elite_command(const char *cmd, char *reply, uint32_t reply_size)
     } else if (!strcmp(a, "save")) {
         save_totals();
         snprintf(reply, reply_size, "AGENT totals saved");
-#if !ELITE_HOOKS
+#if !ELITE_HOOKS && AI_VIEWER
     } else if (!strcmp(a, "view")) {
         viewer_status(reply, (int) reply_size);
     } else if (!strncmp(a, "view ", 5)) {      // (the same swap as a tap on the panel)
