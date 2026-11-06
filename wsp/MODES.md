@@ -28,7 +28,7 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
 | **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show on only while clearly on top; the meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
 | Curious: the camera, gated as the C's show is | 23.8 (17 deaths) | last night's: motion 0.32, close kills 0.09 |
-| **Curious: the camera, every fight** | **25.4** (25 deaths) | close kills 0.11, passes 0.49, motion 0.40, fights 57 s against the C's 42; witchspace 31.3. It holds fire until the target is drawn 20 px or inside 820, unless the chase is lost |
+| **Curious: the camera, every fight** | **25.2** (27 deaths) | close kills 0.08, passes 0.46, motion 0.41, fights 40 s against the C's 42. It holds fire until the target is drawn 20 px or inside 820, unless the chase is lost; the viewer's meter (below) -44 on this set |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
@@ -148,6 +148,7 @@ nothing, passes, looks out of a side or rear view, deaths. `fun_set.py val` runs
 |---|---:|---:|---:|---:|---:|---:|---:|
 | the camera | -38 | 27 s | 2.0 s | 3.8 s | 21.6 s | 1.0 s | 11.7 s |
 | C rules + show.c | -53 | 41 s | 1.2 s | 9.4 s | 30.1 s | 2.7 s | 15.7 s |
+| the camera, the 317 test fights | -44 | 39 s | 3.3 s | 5.5 s | 30.4 s | 2.1 s | 14.3 s |
 
 Both are mostly dot: ships spawn 9,000 to 11,000 out and the approach at full speed is 20 s of a speck, then each pass
 sends the target astern and the turn back (full pitch, stopped) is 10 s of empty sky. The pilot can't shorten physics,
