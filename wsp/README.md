@@ -1,5 +1,7 @@
 # Fair mode's pilots: two AI-authored custom models
 
+> The other two modes' own pilots, written the same way: [MODES.md](MODES.md).
+
 ![A Deadly-rank fight flown by the first version of the network, its units lit beside the game](../docs/img/weight-space.gif)
 
 Fair mode (`FAIR=1`) flies its dogfights and its dockings with two small neural networks, and the player sees only
