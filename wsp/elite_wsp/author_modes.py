@@ -67,7 +67,7 @@ CAMERA = dict(
     fire_r=1.6,
     fire_range=4.0,
     hot=0.9,
-    fire_rho=1.3,        # hold fire until it's drawn this big (angular radius x 16): a Cobra inside ~1,000, 20 px (measured: 2.5 and 3.0 left fights unfinished)
+    fire_rho=4.0,        # hold fire until it's drawn this big (angular radius x 16): 64 px. Fired at 20 px the beam laser ended most fights on the first approach (with the brake, 1.3 -> 4: close-up 4.3 s a fight to 6.0, longest dull stretch 17 -> 14 s)
     fire_rho_ws=0.6,     # in witchspace, sooner
     v_th=0.1,
     rho_hold=3.0,        # hold the range where it's drawn this big (48 px for a Cobra: ~430 units; measured best of 1.6, 2.2, 3.0)
@@ -83,10 +83,14 @@ CAMERA = dict(
     # ... and the same regime when hurt: the test set had the camera, flying every fight, killed in 37 of 317 (the
     # gated one 17): a show fight is flown while the energy lasts; under hurt_e the network fights to finish it
     hurt_e=160.0,        # energy under which it's sharp
-    fire_near=0.2,       # range / 4096 inside which the laser is allowed whatever the size (820: a pass at 600 by a small ship was never shot, 16 px)
+    fire_near=0.1,       # range / 4096 inside which the laser is allowed whatever the size (410: a small ship going by close)
+    form_rho=1.3,        # formation: drawn this big (20 px) and no longer growing, it won't get bigger: shoot (held for 64 px, a Cobra sat at 24 px unshot for 55 s)
+    form_close=0.1,      # (closing under this, units a loop / 64)
     chase_far=1.0,       # 1: a chase only while the target isn't drawn big (0: as first written)
     chase_gain=4.0,      # the error x this on a chase (measured: 2.5 and 4 level on the show meter, 4 ends the chase soonest: fights 42 s to 28): the aim held on the small cone at range (1: none)
-    chase_close=0.15,    # closing speed (units a loop / 64: 10) under which a target ahead is a chase we don't win: shoot at range
+    brake_v0=20.0,       # the brake: the speed where the closing rate is what the range asks for
+    brake_kd=0.8,        # the closing rate the range asks for (units a loop / 64, a range unit of 4096): 25 units a loop at 2,000
+    chase_close=-0.1,    # closing speed (units a loop / 64: opening at 6) under which a target ahead is a chase we don't win: shoot at range. (From +0.15 with the brake on, every braked approach counted as lost: on screen 6 s a fight -> 15 s)
 )
 
 
@@ -113,6 +117,9 @@ def _build(P, camera=False):
     L1.sat_pair("aligned", {"th": -1}, P["v_th"], "within v_th of the nose: fly, don't turn")
     if camera:
         L1.unit("gap", {"rho": -1}, P["rho_hold"], "how far short of the hold size it's drawn")
+        # the brake: crossing at full speed puts 4,800 units between us by the time the 5 s turn is done. The speed that
+        # keeps the closing rate to what the range asks for, so a pass is slow and the fight stays near
+        L1.unit("vd", {"dist": 64 * P["brake_kd"], "close": -64.0}, P["brake_v0"], "the speed the brake allows")
     else:
         for b in ["near", "mid", "far"]:
             L1.sat_pair("d" + b, {"dist": 1}, -P["r_" + b], f"range past r_{b}")
@@ -122,6 +129,8 @@ def _build(P, camera=False):
         L1.sat_pair("big", add({"rho": 1}, {"ws": P["fire_rho"] - P["fire_rho_ws"]}), -P["fire_rho"], "drawn big enough to shoot (sooner in witchspace)")
         L1.sat_pair("cl", {"close": 1}, -P["pass_close"], "closing")
         L1.sat_pair("slow", {"close": -1}, P["chase_close"], "not closing (under chase_close)")
+        L1.sat_pair("fbig", {"rho": 1}, -P["form_rho"], "big enough for a shot from formation")
+        L1.sat_pair("fslow", {"close": -1}, P["form_close"], "no longer growing")
         L1.sat_pair("near", {"dist": -1}, P["fire_near"], "inside fire_near: a pass, whatever it's drawn")
         L1.unit("loom", {"rho": 1}, -P["pass_rho"], "looming: drawn past pass_rho")
     else:
@@ -132,6 +141,7 @@ def _build(P, camera=False):
     L2 = Layer(L1.names)
     if camera:
         L2.passthrough("cl+", "cl-", "sharp+", "sharp-", "near+", "near-")
+        L2.unit("formed", add(sat_ref("fbig"), sat_ref("fslow")), -1.0, "formation: drawn big and no longer growing")
         # (a chase: ahead, not closing, and not drawn big: holding beside a target at the show's distance isn't closing
         # either, and sharpening the stick on that lost the whole gentle style: validation 27 -> 19)
         L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow"), neg(sat_ref("big"), P["chase_far"])), -1.0, "a chase we don't win: ahead, not closing, not drawn big (AND: the three sum to 3 - big... - 1)")
@@ -144,6 +154,7 @@ def _build(P, camera=False):
                    "ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "aligned+", "aligned-", "big+", "big-", "th")
     if camera:
         L2.unit("band", {"gap": P["v_k"]}, P["v_base"], "the speed by how big it's drawn: v_base at the hold size, more the smaller")
+        L2.unit("bover", {"gap": P["v_k"], "vd": -1, "sharp+": -200.0}, P["v_base"], "how far that's over what the brake allows (no brake when sharp)")
     else:
         vc, vn, vm, vf = P["v_close"], P["v_near"], P["v_mid"], P["v_far"]
         L2.unit("band", add(sat_ref("dnear", vn - vc), sat_ref("dmid", vm - vn), sat_ref("dfar", vf - vm)), vc, "the speed by range band")
@@ -159,8 +170,13 @@ def _build(P, camera=False):
 
     # ------------------------------------------------------------------ the error, past the dead zone; the bits' ANDs
     L3 = Layer(L2.names)
-    L3.passthrough("cx+", "cx-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "ay+", "ay-", "band", "aligned+", "aligned-")
-    L3.unit("bandover", {"band": 1}, -40.0, "the band past 40 (the game's top speed)")
+    if camera:
+        L3.passthrough("cx+", "cx-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "ay+", "ay-", "aligned+", "aligned-")
+        L3.unit("band", {"band": 1, "bover": -1}, note="the speed: the lesser of size's and the brake's")
+        L3.unit("bandover", {"band": 1, "bover": -1}, -40.0, "the band past 40 (the game's top speed)")
+    else:
+        L3.passthrough("cx+", "cx-", "wy+", "wy-", "wx+", "wx-", "up+", "up-", "ay+", "ay-", "band", "aligned+", "aligned-")
+        L3.unit("bandover", {"band": 1}, -40.0, "the band past 40 (the game's top speed)")
     if camera:
         dz = P["dead"]
         # a pass pushes the aim the other way from where the target is: x - px on its side
@@ -195,7 +211,7 @@ def _build(P, camera=False):
     L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
     if camera:
         L3.passthrough("cl+", "cl-")
-        L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1}), 0.0, "the laser allowed: drawn big, near, or a chase we don't win (shot at range rather than trailed)")
+        L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1, "formed": 1}), 0.0, "the laser allowed: drawn big, near, in formation, or a chase we don't win (shot at range rather than trailed)")
 
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
     L4 = Layer(L3.names)

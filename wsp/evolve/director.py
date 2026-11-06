@@ -25,7 +25,7 @@ SHIPS = {1: "missile", 2: "Coriolis", 3: "escape pod", 4: "alloys", 5: "canister
          19: "Krait", 20: "Adder", 21: "Gecko", 22: "Cobra I", 23: "Worm", 24: "Cobra III", 25: "Asp II", 26: "Python", 27: "Fer-de-lance",
          28: "Moray", 29: "Thargoid", 30: "Thargon", 31: "Constrictor", 32: "Cougar", 33: "Dodo"}
 VIEWS = {0: "front", 1: "REAR", 2: "LEFT", 3: "RIGHT"}
-RR = re.compile(r"RR (\d+) (\d+) b(\d) d(-?\d+) rr(-?\d+) s(\d+) be(-?\d+) al(-?\d+) cm(-?\d+) cb(-?\d+) jx(-?\d+) jy(-?\d+) v(\d) sh(-?\d) ws(\d) m(-?\d+) p(\d) w(\d) r(\d) fb(\d) ty(\d+) off(\d+) tt(\d+) td(\d+) px(\d+) tz(\d) f(\d) ta(\S+)")
+RR = re.compile(r"RR (\d+) (\d+) b(\d) d(-?\d+) rr(-?\d+) s(\d+) be(-?\d+) al(-?\d+) cm(-?\d+) cb(-?\d+) jx(-?\d+) jy(-?\d+) v(\d) sh(-?\d) ws(\d) m(-?\d+) p(\d) w(\d) r(\d) fb(\d) ty(\d+) off(\d+) tt(\d+) td(\d+) px(\d+) tz(\d) f(\d) ta(\S+) iv(\d) vp(\d+)")
 
 
 def fight_path(f):
@@ -58,7 +58,7 @@ def parse_rr(lines):
         if not m: continue
         g = m.groups()
         rows.append(dict(now=int(g[0]), behind=int(g[2]), nd=int(g[3]), speed=int(g[5]), view=int(g[12]), show=int(g[13]), ws=int(g[14]),
-                         mode=int(g[15]), fb=int(g[19]), ty=int(g[20]), off=int(g[21]), tt=int(g[22]), td=int(g[23]), px=int(g[24]), tz=int(g[25]), fire=int(g[26])))
+                         mode=int(g[15]), fb=int(g[19]), ty=int(g[20]), off=int(g[21]), tt=int(g[22]), td=int(g[23]), px=int(g[24]), tz=int(g[25]), fire=int(g[26]), ta=float(g[27]), iv=int(g[28]), vp=int(g[29])))
     return rows
 
 

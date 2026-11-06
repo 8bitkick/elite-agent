@@ -1,9 +1,9 @@
 """The viewer's meter: what a fight is like to watch, from the lab's per-frame log (RRLOG), in seconds.
 
 The show meter (tools/show.py) scores parts a fight should have. This one counts what the viewer sat through:
-  closeup    the target drawn 24 px or more in the view shown
-  action     the target 10-24 px, or the laser on a target of 10 px or more
-  dot        the target under 10 px and nothing else: a dot, or a turn with the target behind
+  closeup    a hostile drawn 24 px or more in the picture of the view shown
+  action     the biggest one in the picture 10-24 px
+  dot        the rest: nothing over 10 px in the picture, however near the fight is (a turn with it behind)
   dotfire    the laser on a target under 10 px: "firing at dots"
   empty      no target
   longest    the longest run of dot + empty, seconds
@@ -26,10 +26,11 @@ def measure(rows, died=0, kills_close=0):
     passes = 0
     last = None
     for r in rows:
-        px, fire, tt, tz = r["px"], r["fire"], r["tt"], r["tz"]
+        fire, tt, tz = r["fire"], r["tt"], r["tz"]
+        px = r["vp"]       # (what's in the picture, target or not: a pass behind us counted as a close-up until this)
         if not tt: empty += 1; run += 1
         elif px >= 24: closeup += 1; run = 0
-        elif px >= 10 or (fire and px >= 10): action += 1; run = 0
+        elif px >= 10: action += 1; run = 0
         else:
             dot += 1; run += 1
             if fire: dotfire += 1

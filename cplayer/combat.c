@@ -781,11 +781,12 @@ PT_THREAD(engage(float seconds)) {
                 for (int i = 0; i < nt; i++) { if (th[i]->z >= 0) behind = 0; double d = dist_of(th[i]); if (d < nd) nd = d; }
                 double rr = last_d >= 0 && nd < 1e8 ? nd - last_d : 0;
                 last_d = nd < 1e8 ? nd : -1;
-                extern int g_show_toyspd, show_fb_state(void);
+                extern int g_show_toyspd, show_fb_state(void), show_in_view(const ship_t *, int); extern double show_px_in_view(const ship_t *, int);
+                double vpx = 0; for (int i = 0; i < nt; i++) { double q = show_px_in_view(th[i], space_view()); if (q > vpx) vpx = q; }
                 const shiptype_t *tty = t ? ship_type(t->type) : NULL;
                 double td = t ? dist_of(t) : 0, tpx = t ? 256 * (tty && tty->area ? sqrt((double) tty->area) : 80) / (td + 1) : 0;
-                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d be%d al%d cm%d cb%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f", now(), mcnt(), behind, nd, rr, speed(), (R(A_BETA) & 0x80) ? -(R(A_BETA) & 0x7F) : R(A_BETA), (int) IO->ram[0x47], s_rr_cam, s_rr_cb, jstx() - 128,      /* (ALP1, the Master's roll rate) */
-                      jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0);
+                dbgf_("RR %u %d b%d d%.0f rr%.0f s%d be%d al%d cm%d cb%d jx%d jy%d v%d sh%d ws%d m%d p%d w%d r%d fb%d ty%d off%.0f tt%d td%.0f px%.0f tz%d f%d ta%.1f iv%d vp%.0f", now(), mcnt(), behind, nd, rr, speed(), (R(A_BETA) & 0x80) ? -(R(A_BETA) & 0x7F) : R(A_BETA), (int) IO->ram[0x47], s_rr_cam, s_rr_cb, jstx() - 128,      /* (ALP1, the Master's roll rate) */
+                      jsty() - 128, space_view(), show_on(), witchspace(), g_en_mode, s_rr_plan, s_rr_weave, s_rr_rear, show_fb_state(), g_show_toyspd, off, t ? t->type : 0, td, tpx, t ? t->z > 0 : 0, s_rr_fire, t ? acos(fmax(-1.0, fmin(1.0, (space_view() == 1 ? -t->z : t->z) / (td + 1)))) * 180 / M_PI : 180.0, t ? show_in_view(t, space_view()) : 0, vpx);
                 if (t) dbgf_("RT %d n%.4f,%.4f,%.4f r%.4f,%.4f,%.4f s%.4f,%.4f,%.4f ro%d pi%d sp%d", mcnt(), t->nosev[0], t->nosev[1], t->nosev[2],
                              t->roofv[0], t->roofv[1], t->roofv[2], t->sidev[0], t->sidev[1], t->sidev[2], t->roll, t->pitch, t->speed);   // (the target's heading: cfly's model of its arc)
                 s_rr_fire = 0;

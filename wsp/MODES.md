@@ -205,3 +205,28 @@ PILOTS=1 cplayer/run_sim 1500                          # a career on the mode's 
 CAMGATE=1                                              # the lab: the camera only while show.c's margin is on (last night's gate)
 WSPINTW=file.wsp WSPWS=file.wsp                        # other weights for the interceptor and the camera
 ```
+
+## Staying in the picture
+
+Traces of the fights (the lab's per-frame log, now with what's in the picture: `iv`, `vp`) showed two faults. The look
+ran on timers and on "any ship still in that view", so it could stay on the rear view with the target ahead, and the
+laser fires from the view shown. And every pass ran the same cycle: across at full speed, 4,800 units apart by the end
+of a 5 s turn, back in from there. Half a fight was that.
+
+- **The view** (`show_view`, the camera only): the target's own view while it's drawn 10 px; off every picture and not
+  ahead, the biggest hostile from 16 px; between the views' narrow cones, the last view for 0.6 s, then the front.
+- **The brake** (`vd`, `bover`): the speed that keeps the closing rate to what the range asks for, off when sharp.
+- **Later fire**: at 64 px or inside 410, not 20 px or inside 820, since the beam laser was ending fights on the first
+  approach; a target opening at 6 units a loop, not closing under 10, is the lost chase.
+- **Formation** (`formed`): 20 px and no longer growing, shoot. Held for 64 px, a Cobra sat at 24 px unshot for 55 s.
+  This one costs meter points (close-up 8.3 to 4.8 s): the meter doesn't count an unshot ship as dull. Kept on judgement.
+
+The meter now counts what's in the picture; before, a big ship behind us counted as a close-up.
+
+| test set, 317 fights, this meter | fight | close-up | action | dots | deaths |
+|---|---:|---:|---:|---:|---:|
+| C rules | 37 s | 0.6 s | 5.5 s | 31.4 s | 14 |
+| Camera with the new view, no brake, old fire and chase | 37 s | 3.0 s | 4.5 s | 29.9 s | 26 |
+| **Camera, all of it** | **52 s** | **4.8 s** | **9.6 s** | **37.1 s** | **30** |
+
+On screen 16% of a fight to 28%. Dots are still most of it, the long stretches at range between contacts.

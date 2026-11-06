@@ -64,9 +64,6 @@ __attribute__((export_name("wasm_action"))) int wasm_action(void) {
 extern float g_wsp_last_f[], g_dock_last_f[]; extern uint32_t g_wsp_last_frame, g_dock_last_frame;
 __attribute__((export_name("wasm_fight_senses"))) float *wasm_fight_senses(void) { return g_wsp_last_f; }
 __attribute__((export_name("wasm_fight_when"))) uint32_t wasm_fight_when(void) { return g_wsp_last_frame; }
-// the target's drawn size at the last decision, pixels (the rho sense x 16): the page's adaptive speed in Curious mode
-// runs the dots at speed and the close-ups at real time
-__attribute__((export_name("wasm_fight_px"))) float wasm_fight_px(void) { return g_wsp_last_f[8] * 16.0f; }
 // which dogfight network made the last decision: 0 fair mode's, 1 the camera (Curious, the show on), 2 the interceptor
 extern int g_wsp_last_net;
 __attribute__((export_name("wasm_fight_net"))) int wasm_fight_net(void) { return g_wsp_last_net; }
