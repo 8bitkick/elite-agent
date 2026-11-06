@@ -83,6 +83,7 @@ CAMERA = dict(
     # ... and the same regime when hurt: the test set had the camera, flying every fight, killed in 37 of 317 (the
     # gated one 17): a show fight is flown while the energy lasts; under hurt_e the network fights to finish it
     hurt_e=160.0,        # energy under which it's sharp
+    chase_close=0.15,    # closing speed (units a loop / 64: 10) under which a target ahead is a chase we don't win: shoot at range
 )
 
 
@@ -117,6 +118,7 @@ def _build(P, camera=False):
     if camera:
         L1.sat_pair("big", add({"rho": 1}, {"ws": P["fire_rho"] - P["fire_rho_ws"]}), -P["fire_rho"], "drawn big enough to shoot (sooner in witchspace)")
         L1.sat_pair("cl", {"close": 1}, -P["pass_close"], "closing")
+        L1.sat_pair("slow", {"close": -1}, P["chase_close"], "not closing (under chase_close)")
         L1.unit("loom", {"rho": 1}, -P["pass_rho"], "looming: drawn past pass_rho")
     else:
         L1.unit("big+", {"one": 1}, note="(no size gate)")
@@ -124,7 +126,9 @@ def _build(P, camera=False):
 
     # ------------------------------------------------------------------ the aim point, signed, with the pass beside it
     L2 = Layer(L1.names)
-    if camera: L2.passthrough("cl+", "cl-", "sharp+", "sharp-")
+    if camera:
+        L2.passthrough("cl+", "cl-", "sharp+", "sharp-")
+        L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow")), -1.0, "a chase we don't win: ahead and not closing")
     L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-")
     if camera:
         L2.sat_pair("hard", {"th": 1, "sharp+": P["hard_th"] - P["hard_th_ws"]}, -P["hard_th"], "far off the nose: a hard turn (from nearer the nose when sharp)")
@@ -154,10 +158,12 @@ def _build(P, camera=False):
     if camera:
         dz = P["dead"]
         # a pass pushes the aim the other way from where the target is: x - px on its side
-        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1, "sharp+": dz}, -dz, "sideways error past the dead zone (right; no dead zone when sharp)")
-        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1, "sharp+": dz}, -dz, "sideways error past the dead zone (left)")
-        L3.unit("ey+", {"ay+": 1, "ay-": -1, "sharp+": dz}, -dz, "error past the dead zone (up)")
-        L3.unit("ey-", {"ay-": 1, "ay+": -1, "sharp+": dz}, -dz, "error past the dead zone (down)")
+        # (no dead zone when sharp, nor on a chase: at range the fire cone is smaller than the dead zone, and the target
+        # has to be centred to be shot)
+        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1, "sharp+": dz, "stuck": dz}, -dz, "sideways error past the dead zone (right; none when sharp or on a chase)")
+        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1, "sharp+": dz, "stuck": dz}, -dz, "sideways error past the dead zone (left)")
+        L3.unit("ey+", {"ay+": 1, "ay-": -1, "sharp+": dz, "stuck": dz}, -dz, "error past the dead zone (up)")
+        L3.unit("ey-", {"ay-": 1, "ay+": -1, "sharp+": dz, "stuck": dz}, -dz, "error past the dead zone (down)")
         # sharp: the error again, x (ws_gain - 1), gated: added to the error below it sharpens the stick
         kw = P["ws_gain"] - 1
         L3.unit("exw+", {"ax+": kw, "ax-": -kw, "sharp+": M}, -M, "sharp: the sideways error's extra (right)")
@@ -174,7 +180,9 @@ def _build(P, camera=False):
     L3.unit("h_dn", add({"cy-": 1, "cy+": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0)), -2.0, "far off, below: push down hard")
     L3.sat_pair("fin", {"conev": 1, "th": -math.pi}, 0.0, "the nose inside the fire cone (the target itself: the laser hits where the nose points now)", S=20000.0)
     L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
-    if camera: L3.passthrough("cl+", "cl-")
+    if camera:
+        L3.passthrough("cl+", "cl-")
+        L3.sat_pair("shoot", add(sat_ref("big"), {"stuck": 1}), 0.0, "the laser allowed: drawn big, or a chase we don't win (shot at range rather than trailed)")
 
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
     L4 = Layer(L3.names)
@@ -187,8 +195,8 @@ def _build(P, camera=False):
     L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1}), neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
     if camera: L4.passthrough("exw+", "exw-")
     if camera:
-        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,
-                "AND of six: in the sights, ahead, in range, cool, drawn big, a target (no kills at a distance: the kill is the show's close-up)")
+        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("shoot"), {"seen": 1}), -5.0,
+                "AND of six: in the sights, ahead, in range, cool, drawn big or a chase, a target (no kills at a distance, unless the chase is lost)")
         L4.unit("orbit", add(sat_ref("big"), sat_ref("aligned")), -1.0, "on the target and it's drawn big: the slow roll")
     else:
         L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,

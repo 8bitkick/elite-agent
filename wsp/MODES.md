@@ -28,7 +28,7 @@ Held-out sets, each fight in its own process (`evolve/es_modes.py`). Points a mi
 | **Optimal: the interceptor** | **20.85** (0 deaths) | witchspace 21.5, packs 13.1, small fights 11.8 |
 | **Curious: C rules + show.c** | show score 26.9 (317 fights, 19 deaths) | the show on only while clearly on top; the meter's parts: screen 0.10, motion 0.46, close kills 0.15 |
 | Curious: the camera, gated as the C's show is | 23.8 (17 deaths) | last night's: motion 0.32, close kills 0.09 |
-| **Curious: the camera, every fight** | **22.4** (34 deaths) | close kills 0.19, passes 0.53, motion 0.38; fights 85 s against the C's 42: it holds fire until the target is drawn 20 px, and a show fight on a pulse laser is long. Witchspace 34.2 |
+| **Curious: the camera, every fight** | **25.3** (32 deaths) | close kills 0.14, passes 0.49, motion 0.41, fights 52 s against the C's 42; witchspace 32.9. It holds fire until the target is drawn 20 px, unless the chase is lost |
 
 Docking (`evolve/es_dock.py`'s cost: seconds to dock, a timeout or a death added, plus the look: reversals, crawling, swings):
 
@@ -95,6 +95,12 @@ to be watched, and a death now and then is part of it; the kill at a distance is
 view at a pass (`show_view`) now runs whenever the camera flies, not only while the margin's show is on: it's
 presentation, and the network's senses don't depend on the view (validation 23.5 to 24.5). The rear laser works as
 before: the senses are mirrored into the rear view when the target is behind.
+
+The chase: a target running ahead at our speed was trailed for minutes, the laser held for a close-up that never came
+(13 of 55 validation fights at the lab's 240 s cap). One unit, `stuck`: the target ahead and the closing speed under 10
+units a loop. It lets the laser fire at range (OR'd with "drawn big" into the fire gate) and switches the dead zone off,
+since at range the fire cone is smaller than the dead zone and the target has to be centred to be hit. Validation 24.5 to
+27.6 (the C on the same fights: 25.5), fights at the cap 13 to 2, the average fight 90 s to 45; the test set 22.4 to 25.3.
 
 The show meter wants the enemy drawn big, moving across the frame, passes, kills seen close, and no empty screen. Written
 for that: a hold at the size where the target is drawn 35 pixels across, speed by how big it is drawn (a follow that
