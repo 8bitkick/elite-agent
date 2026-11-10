@@ -10,7 +10,13 @@ const V = typeof ASSET_V === "string" ? ASSET_V : "dev";
 const Q = new URLSearchParams(location.search);
 const ROM_BASE = "https://raw.githubusercontent.com/scarybeasts/beebjit/db16aaf09df1fa0fd7ea686bc8d09b13f5674a42/roms/mos3.20/";
 const ROMS = ["mos", "dfs", "viewsht", "edit", "basic4", "adfs", "view", "terminal"];
+// the 6502 Second Processor's client ROM (2 KB, at &F800 while it boots), from Matt Godbolt's jsbeeb, pinned
+const TUBE_ROM = "https://raw.githubusercontent.com/mattgodbolt/jsbeeb/4a83d430a15035570d17c36ccd1403c4499aabcb/public/roms/tube/6502Tube.rom";
 const GAMES = {
+    // (this fork's game: Solid Elite on a BBC Master with a 6502 Second Processor, the whole game on the parasite)
+    tube: { name: "Tube", tube: true,
+        credit: "Solid Elite for the 6502 Second Processor by Eben Upton, after Mark Moxon's source and Ian Bell and David Braben", skew: 13,
+        disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-6502-second-processor/d52896e35acad6165a13cc913fea685b189b95a7/solid-elite-tube.ssd" },
     // (both flown to Elite on this core.wasm, whole careers matching in a browser and in Node: web/STARTS.md)
     flicker: { name: "Wireframe",     // 16.45 game hours
         credit: "Flicker-free Elite by Mark Moxon, after Ian Bell and David Braben", skew: 13,
@@ -21,14 +27,15 @@ const GAMES = {
 };
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
 const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "6cb32dd0b7d9c8762bf67d5d2c7a3e6a2179799f0ccf38a0d0fe20946bb375fa" };
-const GAME = GAMES[Q.get("game")] ? Q.get("game") : "flicker";
+const DEFAULT_GAME = "tube", DEFAULT_MODE = "curious";      // (this fork: Solid Elite on the Tube, in Curious mode)
+const GAME = GAMES[Q.get("game")] ? Q.get("game") : DEFAULT_GAME;
 // the mode (?mode=): Optimal (reads the game's RAM; its own interceptor network flies the fights), Fair (only what a player can
 // see; the two AI pilot models), Curious (explores; the camera network flies the fights while the show is on)
 const PMODES = { optimal: { n: 0, name: "Optimal" }, fair: { n: 1, name: "Fair" }, curious: { n: 2, name: "Curious" } };
-const MODE = PMODES[Q.get("mode")] ? Q.get("mode") : "fair";
+const MODE = PMODES[Q.get("mode")] ? Q.get("mode") : DEFAULT_MODE;
 // the last save, kept in this browser: the commander block (the same for both games, at its own address in each) and the career's
 // counters. A reload or a change of game carries on from it. ?fresh, ?skew or ?check: a fresh career, the save left alone
-const COMMANDER = "BITKICK", SAVE_KEY = "elite-agent-save1", A_TP = { flicker: 0x1234, solid: 0x0C34 };
+const COMMANDER = "BITKICK", SAVE_KEY = "elite-agent-tube-save1", A_TP = { flicker: 0x1234, solid: 0x0C34, tube: 0x0C34 };
 const KEEP = !(Q.has("fresh") || Q.has("skew") || Q.has("check"));
 let saved = null;
 try { saved = KEEP ? JSON.parse(localStorage.getItem(SAVE_KEY) || "null") : null; } catch {}
@@ -143,9 +150,9 @@ async function sha256(text) {
 
 async function main() {
     for (const id of ["chapter", "load", "save", "p-chapter", "p-load", "p-save"]) { const e = $(id); if (e) e.style.display = "none"; }
-    const by = `Emulated by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a> (GPL-3.0) in WebAssembly · <a href="https://github.com/8bitkick/elite-agent/tree/main/web">source</a>`;
-    const elite = GAME === "solid" ? `Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon's source` : `flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master">Mark Moxon</a>`;
-    for (const id of ["credit", "p-credit"]) { const c = $(id); if (c) c.innerHTML = `<b>Acornsoft Elite</b>, BBC Master · Elite © Ian Bell and David Braben · ${elite}<br>${by}`; }
+    const by = `Emulated by <a href="https://github.com/kieranhj/esp32-beeb">Kieran Connell's Master core</a> (GPL-3.0) in WebAssembly${GAMES[GAME].tube ? `, with a 6502 Second Processor (after <a href="https://github.com/mattgodbolt/jsbeeb">jsbeeb</a>'s Tube)` : ""} · agent: <a href="https://github.com/8bitkick/elite-agent">8bitkick/elite-agent</a>`;
+    const elite = GAME === "tube" ? `Solid Elite for the 6502 Second Processor by <a href="https://github.com/ebenupton/solid-elite-6502-second-processor">Eben Upton</a>, after Mark Moxon's source` : GAME === "solid" ? `Solid Elite by <a href="https://github.com/ebenupton/solid-elite-bbc-master">Eben Upton</a>, after Mark Moxon's source` : `flicker-free disc from <a href="https://github.com/markmoxon/elite-source-code-bbc-master">Mark Moxon</a>`;
+    for (const id of ["credit", "p-credit"]) { const c = $(id); if (c) c.innerHTML = `<b>Acornsoft Elite</b>, BBC Master${GAMES[GAME].tube ? " with a 6502 Second Processor" : ""} · Elite © Ian Bell and David Braben · ${elite}<br>${by}`; }
     const NOTE = {
         optimal: "Optimal mode: the agent reads the game's RAM. Its fights are flown by the interceptor, a network written for points a minute; the docking by the docking network.",
         fair: "Fair mode: the agent sees only what a player can see on the screen. Fights and docking are flown by two AI models, dogfights 8 KB, docking 1.5 KB, written after MIT CSAIL's Sparks of Weight-Space Programming.",
@@ -157,7 +164,7 @@ async function main() {
         box.innerHTML = "";
         for (const [k, m] of Object.entries(PMODES)) {
             const q = new URLSearchParams(location.search);
-            if (k === "fair") q.delete("mode"); else q.set("mode", k);
+            if (k === DEFAULT_MODE) q.delete("mode"); else q.set("mode", k);
             q.delete("skew");
             const a = document.createElement("a");
             a.textContent = m.name; a.href = "?" + q.toString(); a.className = k === MODE ? "on" : "";
@@ -169,9 +176,9 @@ async function main() {
         box.innerHTML = "";
         for (const [k, g] of Object.entries(GAMES)) {
             const q = new URLSearchParams(location.search);
-            if (k === "flicker") q.delete("game"); else q.set("game", k);
+            if (k === DEFAULT_GAME) q.delete("game"); else q.set("game", k);
             q.delete("skew");
-            if (MODE !== "fair") q.set("mode", MODE);
+            if (MODE !== DEFAULT_MODE) q.set("mode", MODE);
             const a = document.createElement("a");
             a.textContent = box.closest("#p-nav") && k === "flicker" ? "Wire" : g.name; a.href = "?" + q.toString(); a.className = k === GAME ? "on" : "";
             box.appendChild(a);
@@ -183,9 +190,10 @@ async function main() {
     who.style.cssText = "color:var(--dim);font-size:14px;text-align:center;line-height:1.4";
     card.appendChild(who);
     loading(0.05, "Loading the machine, its ROMs and Elite's disc…");
-    const [panelData, galaxies, wasm, disc, ...roms] = await Promise.all([
+    const [panelData, galaxies, wasm, disc, tubeRom, ...roms] = await Promise.all([
         fetch(`panel.json?v=${V}`).then((r) => r.json()), fetch(`galaxies.json?v=${V}`).then((r) => r.json()),
         bytes(`core.wasm?v=${V}`, "the machine"), bytes(Q.get("disc") || GAMES[GAME].disc, "Elite's disc"),
+        GAMES[GAME].tube ? bytes(Q.get("tuberom") || TUBE_ROM, "the Second Processor's ROM") : null,
         ...ROMS.map((n) => bytes(`${Q.get("roms") || ROM_BASE}${n}.rom`, `ROM ${n}`)),
     ]);
     const gh = new Image(); gh.src = "gh.png";
@@ -233,6 +241,7 @@ async function main() {
     };
     const startDisc = RESUMED ? addFile(disc, COMMANDER, "E", Uint8Array.from(atob(saved.data), (c) => c.charCodeAt(0))) : disc;
     const core = await Core.create(wasm, roms, startDisc, {
+        tubeRom,
         log: (level, line) => {
             if (level !== 0) return;
             const f = core.frameNo;
@@ -256,7 +265,7 @@ async function main() {
             else if (e.event === "rank" && e.rank === "Elite" && !s.elite) { s.elite = f; flash(`ELITE after ${(f / 180000).toFixed(2)} game hours`, 0); }
         },
     });
-    loading(0.5, "Booting the BBC Master and loading Elite…");
+    loading(0.5, GAMES[GAME].tube ? "Booting the BBC Master and its Second Processor, loading Elite…" : "Booting the BBC Master and loading Elite…");
     await new Promise((r) => setTimeout(r, 30));
     core.name = COMMANDER;
     if (!core.start(SKEW, PMODES[MODE].n)) throw new Error("no Elite the player knows on this disc");
@@ -380,7 +389,7 @@ async function main() {
     const reset = () => {
         if (!confirm("Start again from Jameson at Lave? This career's save will be lost.")) return;
         try { localStorage.removeItem(SAVE_KEY); } catch {}
-        const q = new URLSearchParams(); if (GAME !== "flicker") q.set("game", GAME); if (MODE !== "fair") q.set("mode", MODE);
+        const q = new URLSearchParams(); if (GAME !== DEFAULT_GAME) q.set("game", GAME); if (MODE !== DEFAULT_MODE) q.set("mode", MODE);
         location.search = q.toString() ? "?" + q.toString() : "";
     };
     for (const id of ["reset", "p-reset"]) { const b = $(id); if (b) b.onclick = reset; }
@@ -393,7 +402,7 @@ async function main() {
         const jump = { frame: 1901411, data: btoa(String.fromCharCode(...block)), game: GAME,
             career: { tally: 2598.05, cash: 18147.3, system: "Orqulela", visits: [[2, 77, 242]], kills: 2598, stars: 0, docks: 0, deaths: 0 } };
         try { localStorage.setItem(SAVE_KEY, JSON.stringify(jump)); } catch { alert("this browser keeps no save"); return; }
-        const q = new URLSearchParams(); if (GAME !== "flicker") q.set("game", GAME); if (MODE !== "fair") q.set("mode", MODE);
+        const q = new URLSearchParams(); if (GAME !== DEFAULT_GAME) q.set("game", GAME); if (MODE !== DEFAULT_MODE) q.set("mode", MODE);
         const to = q.toString() ? "?" + q.toString() : ""; if (location.search === to) location.reload(); else location.search = to;
     };
     for (const id of ["deadly", "p-deadly"]) { const b = $(id); if (b) b.onclick = deadly; }

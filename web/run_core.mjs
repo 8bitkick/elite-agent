@@ -1,5 +1,5 @@
 // core.wasm headless: a career, to Elite or for MINUTES of game time.
-//   ROMS=dir DISC=file.ssd [SKEW=13] [MODE=fair] [DRAW=0] [SHOT=frame:file.rgba] node web/run_core.mjs MINUTES [journal.jsonl]
+//   ROMS=dir DISC=file.ssd [TUBEROM=6502Tube.rom] [SKEW=13] [MODE=fair] [DRAW=0] [SHOT=frame:file.rgba] node web/run_core.mjs MINUTES [journal.jsonl]
 // DRAW=n draws every nth frame through the renderer (a test that drawing changes nothing). Prints the journal's hash.
 import { createHash } from "node:crypto";
 import { createWriteStream, readFileSync, writeFileSync } from "node:fs";
@@ -14,6 +14,7 @@ const hash = createHash("sha256"), journal = jpath ? createWriteStream(jpath) : 
 let elite = 0, deaths = 0;
 const stamp = () => (core.frameNo / 3000).toFixed(1).padStart(7);
 const core = await Core.create(readFileSync(process.env.WASM || here + "core.wasm"), roms, readFileSync(process.env.DISC), {
+    tubeRom: process.env.TUBEROM ? readFileSync(process.env.TUBEROM) : null,     // (a 6502 Second Processor: Solid Elite's Tube disc)
     log: (lv, line) => { if (lv === 0) { console.log(stamp(), line); if (/died|escape pod/.test(line)) deaths++; } },
     note: (json) => {
         const l = `{"frame": ${core.frameNo}, "e": ${json}}\n`;
