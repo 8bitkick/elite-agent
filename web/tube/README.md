@@ -1,8 +1,8 @@
 # Solid Elite on the 6502 Second Processor
 
-This fork's page flies Eben Upton's [Solid Elite for the 6502 Second Processor](https://github.com/ebenupton/solid-elite-6502-second-processor)
-(its disc at d52896e) in Curious mode, on Kieran Connell's Master core with a 6502 Second Processor attached to its Tube.
-The page's defaults are `?game=tube&mode=curious`; the Wireframe and Solid (Master) games and the other modes are still there.
+`?game=tube` on the page flies Eben Upton's [Solid Elite for the 6502 Second Processor](https://github.com/ebenupton/solid-elite-6502-second-processor)
+(its disc at d52896e) on Kieran Connell's Master core with a 6502 Second Processor attached to its Tube. It works in every
+mode (`?game=tube&mode=curious` to explore); the page's default is still the Wireframe game in Fair mode.
 
 ## What was added
 
@@ -10,7 +10,7 @@ The page's defaults are `?game=tube&mode=curious`; the Wireframe and Solid (Mast
   `tube.js` (with its two-byte register 3 fixed: jsbeeb indexes the wrong array there), and a 65C02 with a flat 64K, the core's
   own `cpu6502.c` compiled a second time under other names. The client ROM (2 KB, at &F800 until the first read of &FEF8) is
   jsbeeb's `6502Tube.rom`, which the page fetches from jsbeeb's repository at a pinned commit.
-- **The host side** ([kc-beeb-tube.patch](kc-beeb-tube.patch), applied to a copy of the core by [build.sh](build.sh)): the
+- **The host side** ([kc-beeb-tube.patch](kc-beeb-tube.patch), applied to a copy of the core by [web/build.sh](../build.sh)): the
   ULA at &FEE0-&FEFF in SHEILA, its interrupt in the host's IRQ level, and `machine_run()` running the host and the parasite
   in slices of 8 host cycles, the parasite at 4 MHz (the Master's internal 65C102). With no parasite attached the core is as
   it was: a 10-minute Fair career on the flicker-free disc gives the same journal as the upstream core.wasm.
@@ -31,12 +31,16 @@ The page's defaults are `?game=tube&mode=curious`; the Wireframe and Solid (Mast
 
 ```sh
 scripts/fetch-emulator.sh                    # the emulator's source and the Master's ROMs
-WASI_SDK=/path/to/wasi-sdk web/tube/build.sh # web/core.wasm (github.com/WebAssembly/wasi-sdk/releases; wasi-sdk 34 here)
-shasum -a 256 web/core.wasm > web/core.wasm.sha256
-web/build_site.sh                            # web/_site: upload its contents as they are
+web/build.sh                                 # web/core.dev.wasm (the system's clang and wasi-libc, or WASI_SDK=<dir>)
+cp web/core.dev.wasm web/core.wasm && shasum -a 256 web/core.wasm > web/core.wasm.sha256    # to pin it
+web/build_site.sh                            # web/_site
 ```
 
 Headless: `ROMS=rp2350-bbc-micro/roms/mos3.20 DISC=solid-elite-tube.ssd TUBEROM=6502Tube.rom MODE=curious node web/run_core.mjs 20`
-(about 25 times real time). [native_run.c](native_run.c) is the same machine and player built natively, for debugging.
+(10-15 times real time). [native_run.c](native_run.c) is the same machine and player built natively, for debugging.
 
 Licences: the Tube ULA follows jsbeeb (GPL-3.0), as the core is GPL-3.0; the page as a whole is offered under the GPL.
+
+The pinned core.wasm was built with wasi-sdk 34. Built with Ubuntu 24.04's clang 18 and wasi-libc the binary differs, but it
+flies the same careers: the same journals after 10 game minutes for the flicker-free disc (src/main.js's `flicker_13`) and
+for this disc (`tube_13`, Fair mode).

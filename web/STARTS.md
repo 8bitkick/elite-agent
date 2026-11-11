@@ -13,6 +13,7 @@ emulator counts emulated cycles and the agent has its own random numbers. Neithe
 | URL parameter | What it does |
 |---|---|
 | `?game=solid` | Eben Upton's Solid Elite (the default is Mark Moxon's flicker-free, wireframe Elite) |
+| `?game=tube` | Eben Upton's Solid Elite for the 6502 Second Processor, on a Master with a Second Processor on its Tube (web/tube/) |
 | `?skew=N` | another career: `N` frames more on the title screen |
 | `?check=F` | write the journal's hash at frame `F` to the JS console (the default is 30,000: 10 game minutes) |
 
