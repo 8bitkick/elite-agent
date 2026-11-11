@@ -90,6 +90,10 @@ CAMERA = dict(
     chase_gain=4.0,      # the error x this on a chase (measured: 2.5 and 4 level on the show meter, 4 ends the chase soonest: fights 42 s to 28): the aim held on the small cone at range (1: none)
     brake_v0=20.0,       # the brake: the speed where the closing rate is what the range asks for
     brake_kd=0.8,        # the closing rate the range asks for (units a loop / 64, a range unit of 4096): 25 units a loop at 2,000
+    chase_flat=37.0,     # a chase lost flat out too: at this speed or more (the top is 40) ...
+    chase_t=15.0,        # ... and closing too slowly to reach the hold size in this many seconds (16 game loops a second). A
+                         # Cobra running at nearly our top speed was trailed at 1,300 for 4 minutes, closing 2 units a loop:
+                         # never opening, so never a lost chase by chase_close, and never drawn big
     chase_close=-0.1,    # closing speed (units a loop / 64: opening at 6) under which a target ahead is a chase we don't win: shoot at range. (From +0.15 with the brake on, every braked approach counted as lost: on screen 6 s a fight -> 15 s)
 )
 
@@ -129,6 +133,9 @@ def _build(P, camera=False):
         L1.sat_pair("big", add({"rho": 1}, {"ws": P["fire_rho"] - P["fire_rho_ws"]}), -P["fire_rho"], "drawn big enough to shoot (sooner in witchspace)")
         L1.sat_pair("cl", {"close": 1}, -P["pass_close"], "closing")
         L1.sat_pair("slow", {"close": -1}, P["chase_close"], "not closing (under chase_close)")
+        L1.sat_pair("flat", {"own": 1}, -P["chase_flat"] / 64, "flat out (chase_flat or more)")
+        # (closing under the range over chase_t seconds: close (units a loop / 64) < dist (/ 4096) x 4096 / (16 chase_t 64))
+        L1.sat_pair("crawl", {"close": -1, "dist": 4096 / (16 * P["chase_t"] * 64)}, 0.0, "closing too slowly to get there in chase_t")
         L1.sat_pair("fbig", {"rho": 1}, -P["form_rho"], "big enough for a shot from formation")
         L1.sat_pair("fslow", {"close": -1}, P["form_close"], "no longer growing")
         L1.sat_pair("near", {"dist": -1}, P["fire_near"], "inside fire_near: a pass, whatever it's drawn")
@@ -145,6 +152,9 @@ def _build(P, camera=False):
         # (a chase: ahead, not closing, and not drawn big: holding beside a target at the show's distance isn't closing
         # either, and sharpening the stick on that lost the whole gentle style: validation 27 -> 19)
         L2.unit("stuck", add(sat_ref("ahead"), sat_ref("slow"), neg(sat_ref("big"), P["chase_far"])), -1.0, "a chase we don't win: ahead, not closing, not drawn big (AND: the three sum to 3 - big... - 1)")
+        # (the other lost chase: flat out and crawling in. Off whenever stuck is on (slow), so the two never add)
+        L2.unit("stuckf", add(sat_ref("ahead"), sat_ref("flat"), sat_ref("crawl"), neg(sat_ref("slow")), neg(sat_ref("big"))), -2.0,
+                "a chase we don't win flat out: ahead, flat out, crawling in, not opening (that's stuck), not drawn big")
     L2.passthrough("cx+", "cx-", "cy+", "cy-", "wy+", "wy-", "wx+", "wx-", "up+", "up-")
     if camera:
         L2.sat_pair("hard", {"th": 1, "sharp+": P["hard_th"] - P["hard_th_ws"]}, -P["hard_th"], "far off the nose: a hard turn (from nearer the nose when sharp)")
@@ -182,10 +192,10 @@ def _build(P, camera=False):
         # a pass pushes the aim the other way from where the target is: x - px on its side
         # (no dead zone when sharp, nor on a chase: at range the fire cone is smaller than the dead zone, and the target
         # has to be centred to be shot)
-        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1, "sharp+": dz, "stuck": dz}, -dz, "sideways error past the dead zone (right; none when sharp or on a chase)")
-        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1, "sharp+": dz, "stuck": dz}, -dz, "sideways error past the dead zone (left)")
-        L3.unit("ey+", {"ay+": 1, "ay-": -1, "sharp+": dz, "stuck": dz}, -dz, "error past the dead zone (up)")
-        L3.unit("ey-", {"ay-": 1, "ay+": -1, "sharp+": dz, "stuck": dz}, -dz, "error past the dead zone (down)")
+        L3.unit("ex+", {"ax+": 1, "ax-": -1, "px+": -1, "px-": 1, "sharp+": dz, "stuck": dz, "stuckf": dz}, -dz, "sideways error past the dead zone (right; none when sharp or on a chase)")
+        L3.unit("ex-", {"ax-": 1, "ax+": -1, "px-": -1, "px+": 1, "sharp+": dz, "stuck": dz, "stuckf": dz}, -dz, "sideways error past the dead zone (left)")
+        L3.unit("ey+", {"ay+": 1, "ay-": -1, "sharp+": dz, "stuck": dz, "stuckf": dz}, -dz, "error past the dead zone (up)")
+        L3.unit("ey-", {"ay-": 1, "ay+": -1, "sharp+": dz, "stuck": dz, "stuckf": dz}, -dz, "error past the dead zone (down)")
         # sharp: the error again, x (ws_gain - 1), gated: added to the error below it sharpens the stick
         kw = P["ws_gain"] - 1
         L3.unit("exw+", {"ax+": kw, "ax-": -kw, "sharp+": M}, -M, "sharp: the sideways error's extra (right)")
@@ -195,10 +205,10 @@ def _build(P, camera=False):
         # a chase: the same extra, gated by stuck (its own units: gated by both in one, the two gates would add a
         # constant to the error when both were on). A shot at range needs the aim held on a small cone
         kc = P["chase_gain"] - 1
-        L3.unit("exc+", {"ax+": kc, "ax-": -kc, "stuck": M}, -M, "a chase: the sideways error's extra (right)")
-        L3.unit("exc-", {"ax-": kc, "ax+": -kc, "stuck": M}, -M, "a chase: the sideways error's extra (left)")
-        L3.unit("eyc+", {"ay+": kc, "ay-": -kc, "stuck": M}, -M, "a chase: the error's extra (up)")
-        L3.unit("eyc-", {"ay-": kc, "ay+": -kc, "stuck": M}, -M, "a chase: the error's extra (down)")
+        L3.unit("exc+", {"ax+": kc, "ax-": -kc, "stuck": M, "stuckf": M}, -M, "a chase: the sideways error's extra (right)")
+        L3.unit("exc-", {"ax-": kc, "ax+": -kc, "stuck": M, "stuckf": M}, -M, "a chase: the sideways error's extra (left)")
+        L3.unit("eyc+", {"ay+": kc, "ay-": -kc, "stuck": M, "stuckf": M}, -M, "a chase: the error's extra (up)")
+        L3.unit("eyc-", {"ay-": kc, "ay+": -kc, "stuck": M, "stuckf": M}, -M, "a chase: the error's extra (down)")
     else:
         L3.unit("ex+", {"ax+": 1, "ax-": -1}, note="sideways error (right)")
         L3.unit("ex-", {"ax-": 1, "ax+": -1}, note="sideways error (left)")
@@ -211,7 +221,7 @@ def _build(P, camera=False):
     L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
     if camera:
         L3.passthrough("cl+", "cl-")
-        L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1, "formed": 1}), 0.0, "the laser allowed: drawn big, near, in formation, or a chase we don't win (shot at range rather than trailed)")
+        L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1, "stuckf": 1, "formed": 1}), 0.0, "the laser allowed: drawn big, near, in formation, or a chase we don't win (shot at range rather than trailed)")
 
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
     L4 = Layer(L3.names)
