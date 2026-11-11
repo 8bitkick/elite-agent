@@ -49,6 +49,29 @@ static const elite_ver_t SOLID = {
     .ni = 37, .save_cmp = 73, .title_type = {0, 0}, .kills_by_type = 1, .joy_fire_key = 1,
 };
 
+// Solid Elite for the 6502 Second Processor (github.com/ebenupton/solid-elite-6502-second-processor, d52896e): the
+// whole game on the parasite, a 65C02 with a flat 64K, at the Master port's addresses, which is what the player is
+// given as its RAM; the host only draws. WP as Solid Elite's; UP (COMC on) at &2800 and NA% in the resident code.
+// Addresses from its parasite's symbols (tube/build/psyms.txt). The frame layer's borrowed zero page is put back by
+// the machine (web/tube/tube.c keeps the game's copy, f_zsv, in the view it gives the player), so not held here.
+static const elite_ver_t TUBE = {
+    .id = EV_TUBE, .name = "Solid Elite for the 6502 Second Processor (Eben Upton's Tube port of SNG47)",
+    .A_ALTIT = 0x0C21, .A_ASH = 0x00D6, .A_AVL = 0x0C69, .A_BOMB = 0x0C5E, .A_BST = 0x0C5D, .A_CABTMP = 0x0874,
+    .A_CASH = 0x0C3D, .A_COMC = 0x2800, .A_CRGO = 0x0C4A, .A_DAMP = 0x2816, .A_DELTA = 0x0075, .A_DKCMP = 0x0C60,
+    .A_ECM = 0x0C5C, .A_ECMA = 0x0046, .A_ENERGY = 0x00D7, .A_ENGY = 0x0C5F, .A_ESCP = 0x0C62, .A_FIST = 0x0C68,
+    .A_FRIN = 0x0841, .A_FSH = 0x00D5, .A_GCNT = 0x0C43, .A_GHYP = 0x0C61, .A_GNTMP = 0x0879, .A_JSTX = 0x00C1,
+    .A_JSTY = 0x00C2, .A_JUNK = 0x0870, .A_K_PC = 0x0400, .A_LASCT = 0x0878, .A_LASER = 0x0C44, .A_LASX = 0x0C1E,
+    .A_MANY = 0x084E, .A_MCNT = 0x0084, .A_MJ = 0x0873, .A_MSAR = 0x0876, .A_MSTG = 0x005B, .A_NA_PC = 0x2F6B,
+    .A_NAME = 0x0C2C, .A_NOMSL = 0x0C67, .A_PATG = 0x2818, .A_QQ0 = 0x0C35, .A_QQ1 = 0x0C36, .A_QQ10 = 0x00E2,
+    .A_QQ11 = 0x0081, .A_QQ12 = 0x0087, .A_QQ14 = 0x0C41, .A_QQ20 = 0x0C4B, .A_QQ22 = 0x0044, .A_QQ24 = 0x0C92,
+    .A_QQ25 = 0x0C93, .A_QQ26 = 0x0C7A, .A_QQ28 = 0x0C94, .A_QQ29 = 0x0C95, .A_QQ8 = 0x00DF, .A_QQ9 = 0x00E1,
+    .A_SSPR = 0x0850, .A_SVC = 0x0C7D, .A_TALLY = 0x0C7B, .A_TALLYL = 0x0C66, .A_TP = 0x0C34, .A_VIEW = 0x0877,
+    .A_de = 0x087D, .A_distaway = 0x0C29, .A_tek = 0x0C97,
+    .A_JSTK = 0x281C, .A_JSTE = 0x281B, .A_JSTGY = 0x281A, .A_DJD = 0x2817, .A_ECMP = 0x0872, .A_BETA = 0x0042,
+    .A_XC = 0x0010, .A_YC = 0x0012, .A_RAND = 0x0002, .A_TYPE = 0x0085,
+    .ni = 37, .save_cmp = 73, .title_type = {0, 0}, .kills_by_type = 1, .joy_fire_key = 1,
+};
+
 // (the disc version keeps its workspace in zero page, page 3 and K% at &0900; it loads its docked code
 // (T.CODE) and flight code (D.CODE) over each other at &11E3, and none of these addresses is in them)
 static const elite_ver_t DISC = {
@@ -88,6 +111,12 @@ static int is_solid(const uint8_t *ram)
     // pass) and the main flight loop at &3000, in the hot pass (SNG47's &4000 is Solid Elite's screen)
     return fnv(ram + 0x1E24, 256) == 0x54FECC20u && fnv(ram + 0x3000, 256) == 0x6CD52F11u;
 }
+static int is_tube(const uint8_t *ram)
+{
+    // the parasite's resident code (PCODE, loaded at &1400 over the Tube, in order): &7E00, near the end of what the player sees, and the page of
+    // the main loop (MLOOP, &5148)
+    return fnv(ram + 0x7E00, 256) == 0x83ECC2C1u && fnv(ram + 0x5100, 256) == 0xCD182595u;
+}
 static int is_disc(const uint8_t *ram)
 {
     // WORDS (the text tokens, at &0400), and whichever of the docked code (T.CODE at &11E3: &3000)
@@ -102,6 +131,7 @@ int elite_detect(int model, const uint8_t *ram)
     if (!ram) return EV_NONE;
     if ((model == EV_MODEL_MASTER_128 || model == EV_MODEL_UNKNOWN) && is_master(ram)) g_ev = MASTER;
     else if ((model == EV_MODEL_MASTER_128 || model == EV_MODEL_UNKNOWN) && is_solid(ram)) g_ev = SOLID;
+    else if ((model == EV_MODEL_MASTER_128 || model == EV_MODEL_UNKNOWN) && is_tube(ram)) g_ev = TUBE;
     else if ((model == EV_MODEL_BBC_B || model == EV_MODEL_UNKNOWN) && is_disc(ram)) g_ev = DISC;
     return g_ev.id;
 }
@@ -114,7 +144,7 @@ void elite_forget(void) { memset(&g_ev, 0, sizeof g_ev); g_zp_held = 0; g_view_l
 void elite_zp_frame(const uint8_t *ram)
 {
     static uint8_t view, since;
-    if (g_ev.id != EV_SOLID) { g_zp_held = 0; g_view_latch = -1; return; }
+    if (g_ev.id != EV_SOLID && g_ev.id != EV_TUBE) { g_zp_held = 0; g_view_latch = -1; return; }
     // (the briefings, BRIEF, PAUSE and PAS1, draw their Constrictor as one of the renderer's frames, with QQ11 0
     // while it's recorded and drawn and the view put back after (its LL9B): caught then, the player saw no
     // briefing and waited for the status screen. So a 0 within 75 frames of a 13 or a 1, with the briefing's
@@ -125,6 +155,7 @@ void elite_zp_frame(const uint8_t *ram)
     else if (q == 0 && view && ram[g_ev.A_FRIN] == 31 && ++since <= 75) ;
     else view = 0;
     g_view_latch = q == 0 && view ? view : -1;
+    if (g_ev.id == EV_TUBE) { g_zp_held = 0; return; }     // (the machine gives the game's zero page: TUBE above)
     // (&F4 always matches ROMSEL: the frame layer is bank 6, the rasteriser bank 5 or &85 (ANDY over 5);
     // the game is bank 4, or 7 for its cold pass (the docked screens, the launch, hyperspace, the title).
     // Bank 7 is also the beach ball's meridian window, which the frame pages in to draw the planet (&10-&27

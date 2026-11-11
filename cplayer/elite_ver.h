@@ -8,7 +8,7 @@
 #pragma once
 #include <stdint.h>
 
-enum { EV_NONE = 0, EV_MASTER = 1, EV_BBC_DISC = 2, EV_SOLID = 3 };
+enum { EV_NONE = 0, EV_MASTER = 1, EV_BBC_DISC = 2, EV_SOLID = 3, EV_TUBE = 4 };
 // the machine, as the platform says (machine_hook.h's enum machine_model; 0: not said)
 enum { EV_MODEL_UNKNOWN = 0, EV_MODEL_BBC_B = 1, EV_MODEL_BBC_B_PLUS = 2, EV_MODEL_MASTER_128 = 3 };
 
@@ -33,7 +33,7 @@ typedef struct {
 
 extern elite_ver_t g_ev;        // the version being played (id EV_NONE until detected)
 
-// Looks for a known Elite in RAM (the 32 KB of main RAM) on the machine `model` (EV_MODEL_*); fills
+// Looks for a known Elite in RAM (the 32 KB of main RAM; for the Tube version, the parasite's &0000-&7FFF) on the machine `model` (EV_MODEL_*); fills
 // g_ev and returns its id, or EV_NONE (not loaded yet, half loaded, or an Elite this player doesn't
 // know: it isn't played). Once found, it stays found (elite_forget: the machine was reset).
 int elite_detect(int model, const uint8_t *ram);
@@ -45,7 +45,9 @@ void elite_zp_frame(const uint8_t *ram);
 // (the Master's table, as the build had it fixed: run_sim and lab before a machine is up)
 void elite_assume_master(void);
 // (the Master's game: SNG47 or Solid Elite, which plays the same game at other addresses)
-static inline int ev_master(void) { return g_ev.id == EV_MASTER || g_ev.id == EV_SOLID; }
+static inline int ev_master(void) { return g_ev.id == EV_MASTER || g_ev.id == EV_SOLID || g_ev.id == EV_TUBE; }
+// (Solid Elite, on the Master or on its 6502 Second Processor: the same docked screens and frame layer)
+static inline int ev_solid(void) { return g_ev.id == EV_SOLID || g_ev.id == EV_TUBE; }
 static inline int ev_disc(void) { return g_ev.id == EV_BBC_DISC; }
 // a wait that a disc load can be part of (the disc version loads its flight code at a launch, its docked
 // code at a dock or a death, a ship file at a hyperspace arrival: ~5 s each from the 8271)

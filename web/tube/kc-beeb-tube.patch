@@ -1,0 +1,78 @@
+diff -ru a/machine.c b/machine.c
+--- a/machine.c	2026-11-10 19:33:39
++++ b/machine.c	2026-11-10 19:33:54
+@@ -41,6 +41,12 @@
+ #define CRTC_API MACHINE_CODE_ATTR
+ 
+ #include "machine.h"
++// (kc-beeb-tube.patch: a 6502 Second Processor on the Tube, web/tube/tube.c)
++extern uint8_t tube_host_irq;
++extern int tube_on;
++uint8_t tube_host_read(uint16_t addr);
++void tube_host_write(uint16_t addr, uint8_t val);
++void tube_par_run(uint64_t host_cycles);
+ #include "via.c"
+ 
+ #define INLINE static inline __attribute__((always_inline))
+@@ -405,7 +411,7 @@
+ 
+ INLINE uint8_t machine_irq_level(const struct machine *m)
+ {
+-    return m->sysvia.irq | m->usrvia.irq;
++    return m->sysvia.irq | m->usrvia.irq | tube_host_irq;
+ }
+ 
+ // ---- display memory ---------------------------------------------------------
+@@ -989,6 +995,10 @@
+     case 0xfe70: case 0xfe74: case 0xfe78: case 0xfe7c:
+         ret = via_read(&m->usrvia, addr & 0xf);
+         break;
++    case 0xfee0: case 0xfee4: case 0xfee8: case 0xfeec:
++    case 0xfef0: case 0xfef4: case 0xfef8: case 0xfefc:
++        ret = tube_host_read(addr);
++        break;
+     default:
+         break;
+     }
+@@ -998,6 +1008,10 @@
+ static MACHINE_NOINLINE void sheila_write(struct machine *m, uint16_t addr, uint8_t val)
+ {
+     switch (addr & 0xfffc) {
++    case 0xfee0: case 0xfee4: case 0xfee8: case 0xfeec:
++    case 0xfef0: case 0xfef4: case 0xfef8: case 0xfefc:
++        tube_host_write(addr, val);
++        break;
+     case 0xfe00: case 0xfe04:
+         if ((addr & 1) && m->vs && (m->crtc.addr_reg & 0x1f) <= 9) {
+             vs_put(m->vs, VS_EV(VS_FRAMING, 0));
+@@ -1623,9 +1637,29 @@
+     fdc_power_on_reset(&m->fdc);
+ }
+ 
++// With a parasite on the Tube, the two in slices of TUBE_SLICE host cycles: the host, then the parasite up to the same
++// time. An IRQ the parasite raised or dropped on the host is taken up at the host's next cycle (as a late level).
++#ifndef TUBE_SLICE
++#define TUBE_SLICE 8
++#endif
+ uint64_t machine_run(struct machine *m, uint64_t until)
+ {
+-    return cpu6502_run(&m->cpu, until);
++    if (!tube_on) {
++        return cpu6502_run(&m->cpu, until);
++    }
++    uint64_t start = m->cpu.cycles;
++    while (m->cpu.cycles < until) {
++        uint64_t to = m->cpu.cycles + TUBE_SLICE;
++        cpu6502_run(&m->cpu, to < until ? to : until);
++        uint8_t before = tube_host_irq;
++        tube_par_run(m->cpu.cycles);
++        if (tube_host_irq != before) {
++            m->irq_late = 1;
++            machine_schedule(m);
++            cpu6502_set_sync_due(&m->cpu, m->sync_due);
++        }
++    }
++    return m->cpu.cycles - start;
+ }
+ 
+ int machine_queue_key(struct machine *m, uint32_t cycle, int row, int col, int down)

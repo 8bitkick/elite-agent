@@ -14,6 +14,8 @@ export function wasiShim(getMemory, write = (fd, s) => (fd === 2 ? console.error
         },
         fd_close: () => 0, fd_seek: () => ENOSYS, fd_read: () => EBADF, fd_fdstat_get: () => EBADF, fd_fdstat_set_flags: () => ENOSYS,
         fd_prestat_get: () => EBADF, fd_prestat_dir_name: () => EBADF, path_open: () => ENOSYS,
+        // (a newer wasi-libc asks for the time: always 0, so nothing can depend on it)
+        clock_time_get: (id, precision, ptr) => { new DataView(getMemory().buffer).setBigUint64(ptr, 0n, true); return 0; },
         proc_exit: (code) => { throw new Error("player exited " + code); },
     };
 }
