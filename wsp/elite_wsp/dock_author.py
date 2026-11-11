@@ -12,6 +12,7 @@ What it decides each game loop (the hands, the stick maps, stay wsp_dock.c's):
                  hysteresis), pitch onto it; the roll held to the station's spin rate (16)
   the final      lined up: the roll at the station's spin, trimmed to level the slot; the pitch onto the slot's drawn
                  centre through Elite's rotation (y - a x, a the roll), with the sideways hold
+                 Committed, it keeps hold with the slot past off_deg too (level to the end)
   the step       in the final, a ship about to pass close (col, graded by how close) and room to step (outside
                  step_r): the final's law hands over to the steering above, on the slot's sightline leant away from
                  the side the ship will pass on (the escape heading's opposite, let through up to step_k: ~10 deg).
@@ -166,6 +167,10 @@ def build(P=None):
     # stepping: col (how close the pass, 0..1) in the final outside step_r, each clipped by the others
     L2.unit("stp", add(sat_ref("dstep"), {"col": 1, "final": 1}), -2, "stepping: a close pass, in the final, outside step_r")
     L2.unit("fin_on", {"final": 1, "off10+": -1, "off10-": 1}, note="the final's law: in the final, the slot within off_deg")
+    # committed, the law keeps hold with the slot past off_deg too. Left a little off the axis (a step aside's 45 at 700),
+    # the slot slides off the nose as the range closes, 19 deg at 218: the steering took over there and rolled for it, off
+    # level at 29, and Elite's docking test (the slot level) failed: the ship lost at the slot with its shields up
+    L2.unit("fin_c", add({"commit": 1}, sat_ref("off10")), -1, "committed with the slot past off_deg: the final's law all the same")
     L2.sat_pair("lvl7", {"lvl+": -180, "lvl-": -180}, P["lvl_deg"], "the slot within lvl_deg of level", S=1.0)
     L2.sat_pair("lvl20", {"lvl+": 180, "lvl-": 180}, -P["crawl_lvl"], "the slot more than crawl_lvl off level", S=0.5)
     L2.unit("enter", add(sat_ref("alf"), sat_ref("le")), -1, "lined up out past al_final: start the final")
@@ -221,15 +226,15 @@ def build(P=None):
     HOLD = {"hold+": 1, "hold+c": -1, "hold-": -1, "hold-c": 1}
     PF = add({"dy+": P["pitch_f"], "dy-": -P["pitch_f"]}, {k: -P["a16"] * v for k, v in SDX.items()}, HOLD)
     for s, sg in HALF.items():
-        gate(L3, f"rf{s}", {k: sg * v for k, v in RM.items()}, ["fin_on"], ["stp"], 40.0, note=f"the final's roll, {s} half (not while stepping)")
-        gate(L3, f"pf{s}", {k: sg * v for k, v in PF.items()}, ["fin_on"], ["stp"], 400.0, note=f"the final's pitch, {s} half (not while stepping)")
+        gate(L3, f"rf{s}", add({k: sg * v for k, v in RM.items()}, {"fin_c": 40.0}), ["fin_on"], ["stp"], 40.0, note=f"the final's roll, {s} half (not while stepping)")
+        gate(L3, f"pf{s}", add({k: sg * v for k, v in PF.items()}, {"fin_c": 400.0}), ["fin_on"], ["stp"], 400.0, note=f"the final's pitch, {s} half (not while stepping)")
     L3.unit("crawl", add(sat_ref("d600"), sat_ref("lvl20")), -1, "inside crawl_r with the slot far from level: crawl")
     L3.unit("v_appr0", {"turn": -P["turn_g"]}, P["v_max"] - P["v_min"], "the approach's speed over v_min: by the room for the turn")
     vgate(L3, "v_final", {"v_bands": 1, "v_commit": 1}, P["f_v_in"], add({"st": 1, "final": 1}, sat_ref("le2")), -1.0, "the final's speed (from the slot's sightline opening)")
     L3.unit("v_stepo", {"v_bands": 1, "stp": 24}, P["f_v_in"] - P["v_step"] - 24, "the final's speed past v_step while stepping")
     for v in ("v_cruise", "v_swerve", "v_side"): L3.unit(v, {v: 1, v + "o": -1, v + "ng": 1}, note=v + " let through")
     L3.unit("keep", {"keep": 1, "stp": -2}, note="stay committed, unless stepping")
-    L3.unit("fin_on", {"fin_on": 1, "stp": -4}, note="the final's law, unless stepping: then the steering, on the slot leant away")
+    L3.unit("fin_on", {"fin_on": 1, "fin_c": 1, "stp": -4}, note="the final's law (committed, whatever the slot's angle), unless stepping: then the steering, on the slot leant away")
     for n in ("enter", "stay", "okp", "jump", "st", "col", "final", "side+", "side-", "le2+", "le2-", "turn"): L3.passthrough(n)
     L3.unit("ok", add({"okp": 1, "stp": -2}, sat_ref("lvl7")), -1, "all of the commit's tests, and not stepping")
 

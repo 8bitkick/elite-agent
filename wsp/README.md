@@ -187,7 +187,10 @@ from that side, the speed at 8, no commit, all in proportion to `col`. While ste
 lean's alone: the slot is dead on the nose there, and its clock (a unit vector) is whatever its last fraction of a pixel
 says; summed with a lean at 3 or 9 o'clock it flipped above and below every game loop and the roll with it, a ship on
 our line never stepped clear of. The sense is taken as the game loop turns over and held through it (Elite moves the
-ships one at a time, and read part way a pass 37 above read 7). With no close pass the outputs are the shipped
+ships one at a time, and read part way a pass 37 above read 7). Once committed the final's law keeps hold whatever the
+slot's angle (`fin_c`): left 45 off the axis at 700 by a step, the slot slid 19 degrees off the nose by 218, the steering
+took over and rolled for it, and Elite's docking test (the slot level) failed at speed 29: the ship lost at the slot
+with its shields up, in the shipped network's careers too. With no close pass the outputs are the shipped
 network's to 3e-11 over 30,000 sampled states.
 
 ## What didn't work
