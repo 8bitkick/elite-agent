@@ -2,7 +2,7 @@
 # web/build.sh: the emulator (Kieran Connell's Master core, with a 6502 Second Processor on its Tube) and the player in one
 # binary, written to core.dev.wasm. Needs a clang with the wasm32-wasi target and the emulator's source
 # (scripts/fetch-emulator.sh): the system's clang and wasi-libc, or the WASI SDK (WASI_SDK=<its directory>; the pinned
-# core.wasm was built with wasi-sdk 34). The core is copied to tube/build/kc-beeb and patched (tube/kc-beeb-tube.patch: the
+# core.wasm was built with Debian 13's clang 19). The core is copied to tube/build/kc-beeb and patched (tube/kc-beeb-tube.patch: the
 # Tube in SHEILA, its IRQ, the two processors run in slices); tube/tube.c is the ULA and the parasite. With no parasite
 # attached (every game but ?game=tube) the machine runs as the unpatched core did.
 # The page and its verified careers use the pinned core.wasm, not this. To pin a new one: cp core.dev.wasm core.wasm;

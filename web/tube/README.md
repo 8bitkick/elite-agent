@@ -41,6 +41,6 @@ Headless: `ROMS=rp2350-bbc-micro/roms/mos3.20 DISC=solid-elite-tube.ssd TUBEROM=
 
 Licences: the Tube ULA follows jsbeeb (GPL-3.0), as the core is GPL-3.0; the page as a whole is offered under the GPL.
 
-The pinned core.wasm was built with wasi-sdk 34. Built with Ubuntu 24.04's clang 18 and wasi-libc the binary differs, but it
-flies the same careers: the same journals after 10 game minutes for the flicker-free disc (src/main.js's `flicker_13`) and
-for this disc (`tube_13`, Fair mode).
+The pinned core.wasm was built with Debian 13's clang 19 and wasi-libc (on a Raspberry Pi 5). Built with wasi-sdk 34 or
+Ubuntu 24.04's clang 18 the binary differs, but it flies the same careers: the same journals after 10 game minutes for each
+game's Fair reference in src/main.js (`flicker_13`, `solid_13`, `tube_13`).
