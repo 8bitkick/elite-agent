@@ -10,8 +10,7 @@
 #include "wsp_dock.h"
 // (WSPAPP=1: the docking network flies from the hyperspace exit to docked (wsp_dock.c, wsp/elite_wsp/dock_author.py): the
 // roll and pitch rates, the speed, the jump, the final and the commit, in place of to_station_step's and dock_step's laws. The
-// C keeps the hands (the stick maps), the eye (which ship is the planet and the station), the step aside from traffic in the
-// slot, the planet's collision cone as a guard on the aim, and the fights on the way (the dogfight network))
+// C keeps the hands (the stick maps), the eye (which ship is the planet and the station, how close a ship will pass), the planet's collision cone as a guard on the aim, and the fights on the way (the dogfight network))
 static int wsp_app_on(void) {        // (fair mode's default, as the dogfight network's: WSPAPP=0 the C laws, WSPAPP=1 in Optimal mode too)
     static int v = -1;
     if (v < 0) { const char *e = getenv("WSPAPP"); v = e ? *e != '0' : -2; }
@@ -19,6 +18,22 @@ static int wsp_app_on(void) {        // (fair mode's default, as the dogfight ne
     return v == -2 ? (g_fair != 0 || g_pilots) : v;
 }
 static int s_app_up = 1, s_app_final, s_app_commit;
+// (the final's own sense of traffic: how close a ship between us and the slot will pass, flying as it flies and we
+// straight for the station (its closest approach): 1 inside 130, 0 past 260, and where it passes. Along the line to the
+// station, not the nose: at 3,000 out a 2 deg pitch moves a pass by the nose 100 units, and the step fed itself. A collision needs ~80: a Transporter passing 70
+// off hit us, aft shield 248 -> 104; one 96 off went by. The network steps aside by it (dock_author.py, the step))
+static double app_pass(const ship_t *sh, int n, const ship_t *st, double dist, double miss[3]) {
+    double best = 1e30, k = speed() / fmax(1.0, dist), o[3] = {st->x * k, st->y * k, st->z * k};      // (our velocity, at the station)
+    for (int i = 0; i < n; i++) {
+        const ship_t *q = &sh[i];
+        if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128 || q->z <= -100 || q->z >= dist + 400) continue;
+        double p[3] = {q->x, q->y, q->z}, v[3] = {q->nosev[0] * 1.5 * q->speed - o[0], q->nosev[1] * 1.5 * q->speed - o[1], q->nosev[2] * 1.5 * q->speed - o[2]};
+        double vv = v[0] * v[0] + v[1] * v[1] + v[2] * v[2], t = vv < 1e-6 ? 0 : fmax(0.0, -(p[0] * v[0] + p[1] * v[1] + p[2] * v[2]) / vv);
+        double c[3] = {p[0] + v[0] * t, p[1] + v[1] * t, p[2] + v[2] * t}, m = sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+        if (m < best) best = m, miss[0] = c[0], miss[1] = c[1], miss[2] = c[2];
+    }
+    return best >= 260 ? 0 : best <= 130 ? 1 : (260 - best) / 130;
+}
 // (WAPLOG=file: each frame's senses and outputs, a line a frame, for the film's panel)
 static void app_log(const float *f, const wsp_dock_out_t *o) {
 #if APP_LOADED
@@ -779,13 +794,13 @@ static __attribute__((noinline)) int dock_step(void)
                     vec_t P = pl ? pos_of(pl) : (vec_t){0, 0, 1};
                     wsp_dock_in_t in = {{P.x, P.y, P.z}, altitude(), 1, {S.x, S.y, S.z}, {nv.x, nv.y, nv.z}, {rvn.x, rvn.y, rvn.z},
                                         st->roll < 0 ? -1 : 1, speed(), fsh(), ash(), clear, 0, {0, 0, 0}, s_app_up, s_app_final, s_app_commit};
-                    in.col = app_threat(sh, n, in.miss);
+                    in.col = s_app_final ? app_pass(sh, n, st, dist, in.miss) : app_threat(sh, n, in.miss);
                     float f[WSPD_N];
                     s_app_out = wsp_dock_at(&in, jy, f);
                     memcpy(g_dock_last_f, f, sizeof f); g_dock_last_frame = now();
                     s_app_up = s_app_out.up; s_app_final = s_app_out.final; s_app_commit = s_app_out.commit;
                     app_log(f, &s_app_out);
-                    if (in.col && g_dock_log) dbgf_("WA swerve: miss %.0f %.0f %.0f", in.miss[0], in.miss[1], in.miss[2]);
+                    if (in.col > 0 && g_dock_log) dbgf_("WA %s: %.2f miss %.0f %.0f %.0f", s_app_final ? "step" : "swerve", in.col, in.miss[0], in.miss[1], in.miss[2]);
                     c_dk.final = s_app_out.final; c_dk.commit = s_app_out.commit;
                     c_dk.xhold = 0; c_dk.vf = 0; c_dk.arcon = 0;
                     if (g_dock_log) dbgf_("WA a %.1f b %.2f v %d final %d cm %d", s_app_out.alpha, s_app_out.beta, s_app_out.speed, c_dk.final, c_dk.commit);
@@ -794,22 +809,7 @@ static __attribute__((noinline)) int dock_step(void)
                 want = s_app_out.speed;
                 app_hands(s_app_out.alpha, s_app_out.beta, c_dk.final);
                 off = atan2(hypot(goal.x, goal.y), goal.z) * 180 / M_PI;
-                // the step aside from traffic (the final only, as the law's own)
-                if (c_dk.final && g_dk_evade_x > 0) {
-                    int threat = 0; double tx = 0;
-                    for (int i = 0; i < n; i++) {
-                        const ship_t *q = &sh[i];
-                        if (q == st || !ship_in_space(q) || ship_dead(q) || q->type >= 128) continue;
-                        vec_t p = pos_of(q);
-                        if (p.z > -100 && p.z < dist + 400 && hypot(p.x, p.y) < 450) threat = 1, tx = p.x;
-                    }
-                    c_dk.evade = threat ? (tx > 0 ? -1 : 1) : 0;
-                    if (c_dk.evade && dist > g_dk_ev_min) {
-                        vec_t aimp = vadd(goal, (vec_t){1, 0, 0}, c_dk.evade * g_dk_evade_x);
-                        steer(aimp, jx, jy, 3, 3, &keys);           // (the step aside re-aims: the law's own steering onto the offset aim)
-                        c_dk.commit = 0; if (want > g_dk_ev_spd) want = (int) g_dk_ev_spd;
-                    }
-                }
+                c_dk.evade = 0;      // (the step aside from traffic in the final is the network's own: dock_author.py, the step)
                 goto app_done;
             }
             if (!lined) {

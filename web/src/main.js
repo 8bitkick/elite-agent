@@ -26,8 +26,8 @@ const GAMES = {
         disc: "https://raw.githubusercontent.com/ebenupton/solid-elite-6502-second-processor/d52896e35acad6165a13cc913fea685b189b95a7/solid-elite-tube.ssd" },
 };
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
-const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "6cb32dd0b7d9c8762bf67d5d2c7a3e6a2179799f0ccf38a0d0fe20946bb375fa",
-    tube_13: "de535463db5ad6e7411ccff5b637c8acb527f6f2eda5647be17f7d48e884eec0" };     // (tube: from web/run_core.mjs, the pinned core.wasm)
+const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "751efde375b4e9768d2a28794e251e4189261c4529c13bc608714c7e4c3489ba",
+    tube_13: "b6aad84e203bc70ee6705cf7155badbfe0a4825fb3535391ad9ef653ad4db650" };     // (tube: from web/run_core.mjs, the pinned core.wasm)
 const DEFAULT_GAME = "flicker", DEFAULT_MODE = "fair";
 const GAME = GAMES[Q.get("game")] ? Q.get("game") : DEFAULT_GAME;
 // the mode (?mode=): Optimal (reads the game's RAM; its own interceptor network flies the fights), Fair (only what a player can

@@ -108,10 +108,10 @@ void wsp_dock_features(const wsp_dock_in_t *in, int jsty, float f[WSPD_N]) {
         f[27] = (float) (atan2(hypot(S[0], S[1]), S[2]) / M_PI);
         f[28] = (float) (atan2(hypot(slot[0], slot[1]), slot[2]) / M_PI);
     }
-    if (in->col) {
+    if (in->col > 0) {
         double m = hypot(in->miss[0], in->miss[1]), mx = m > 1 ? in->miss[0] / m : 0, my = m > 1 ? in->miss[1] / m : 1;
         double e[3] = {mx * 4000, my * 4000, 1500};
-        unit3(f + 15, e); f[18] = 1.0f;
+        unit3(f + 15, e); f[18] = (float) fmin(1.0, in->col);
     }
     f[29] = in->clear ? 1.0f : 0.0f; f[30] = (float) (in->fsh / 255.0); f[31] = (float) (in->ash / 255.0);
     f[32] = (float) ((jsty - 128) / 128.0);

@@ -12,7 +12,8 @@ typedef struct {
     double S[3], nv[3], rv[3];
     int spin;
     int own, fsh, ash, clear;
-    int col; double miss[3];    // something on a collision course (pilot's collision_ahead, not the station), its miss vector
+    double col; double miss[3]; // something on a collision course (pilot's collision_ahead, not the station), its miss vector;
+                            // in the final, how close a ship before the slot will pass, 0..1 (pilot's app_pass)
     int up, final, commit;      // the bits from the last loop
 } wsp_dock_in_t;
 

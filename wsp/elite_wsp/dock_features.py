@@ -15,7 +15,9 @@ the marks on the slot's axis are where the C law's own were.
  12 bx 13 by 14 bz     unit sightline to the side mark: k_side out from the station, c_side off the axis on our own side
                        (the way round from behind)
  15 ex 16 ey 17 ez     the escape heading from a collision course (4,000 to the side the threat misses on, 1,500 on)
- 18 col                1 on a collision course (anything but the station)
+ 18 col                1 on a collision course (anything but the station). In the final, how close a ship between us
+                       and the station will pass, flying as it flies and we straight for the station: 1 inside 130,
+                       0 past 260 (its closest approach; the escape heading then points to the side it passes on)
  19 along              our distance out along the slot's axis / 4096 (negative behind the station)
  20 lat                our distance off the axis / 4096
  21 dist               range / 4096 (to 16)
@@ -86,7 +88,7 @@ def features(P, altitude, station, S, nv, rv, spin, own, fsh, ash, clear, col, m
     if col:
         m = math.hypot(miss[0], miss[1])
         mx, my = (miss[0] / m, miss[1] / m) if m > 1 else (0.0, 1.0)
-        f[15:18] = unit([mx * 4000, my * 4000, 1500]); f[18] = 1.0
+        f[15:18] = unit([mx * 4000, my * 4000, 1500]); f[18] = min(1.0, float(col))
     f[29] = 1.0 if clear else 0.0; f[30] = fsh / 255.0; f[31] = ash / 255.0
     f[32] = (jsty - 128) / 128.0
     f[33] = 1.0 if up else 0.0; f[34] = 1.0 if final else 0.0; f[35] = 1.0 if commit else 0.0

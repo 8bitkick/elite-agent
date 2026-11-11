@@ -174,8 +174,17 @@ swing of the aim past 60 degrees. The lab: `LABDOCK=1 cplayer/lab starts.lst`, o
 `DOCKSNAP=dir run_sim`.)
 
 What it does not do yet: the C's approach circle from behind (a banked turn onto the axis), which the first version
-carried and this one replaced with the side mark and the turn-room speed rule; and the C's step aside from traffic
-leaving the slot, which the C still applies around the network's aim.
+carried and this one replaced with the side mark and the turn-room speed rule.
+
+The step aside from traffic in the final is the network's own (the `step` aim and `stp`, `dock_author.py`). It was the
+C's, applied around the network's aim: `steer()` onto a point 300 to one side of the slot whenever a ship was within 450
+of the nose line. That juddered with a ship going by: the side was picked each frame from the ship's x, so one dead ahead
+flipped it every few frames; a sideways aim sits at 3 or 9 o'clock, where the roll can't settle; and the final rolls with
+the station, so an offset held in the ship's frame went round with it. Now the sense is how close a ship will pass
+along our line to the station (`col`, 1 inside 130, 0 past 260) and on which side; while it's close and there's room
+(outside 1,500), the final's law hands over to the ordinary steering on the slot's sightline leant ~10 degrees away
+from that side, the speed at 8, no commit, all in proportion to `col`. With no close pass the outputs are the shipped
+network's to 3e-11 over 30,000 sampled states.
 
 ## What didn't work
 

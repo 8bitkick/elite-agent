@@ -12,6 +12,12 @@ What it decides each game loop (the hands, the stick maps, stay wsp_dock.c's):
                  hysteresis), pitch onto it; the roll held to the station's spin rate (16)
   the final      lined up: the roll at the station's spin, trimmed to level the slot; the pitch onto the slot's drawn
                  centre through Elite's rotation (y - a x, a the roll), with the sideways hold
+  the step       in the final, a ship about to pass close (col, graded by how close) and room to step (outside
+                 step_r): the final's law hands over to the steering above, on the slot's sightline leant away from
+                 the side the ship will pass on (the escape heading's opposite, let through up to step_k: ~10 deg).
+                 That side is fixed in space, so it's one roll and a held pitch; the final's own law rolls with the
+                 station, and an offset held in the ship's frame went round with it and moved us nowhere. The speed
+                 down to v_step, no commit; in proportion to col, so it fades in and out
   the speed      the cruise's 40 (20 low); the way round's 40; the approach's by the room left for the turn still
                  needed; the final's bands by range, 40 once committed, a crawl with the slot far from level
   the bits       the jump (the planet within jump_off of the nose), the final, the commit; the steering's above/below
@@ -42,13 +48,20 @@ PARAMS = dict(
     v_cruise=40.0, v_low=20.0, v_evade=30.0, v_side=40.0, v_min=8.0, v_max=40.0, turn_k=2.08, turn_g=19.4, room0=1800.0,
     f_v_in=4.0, f_v_near=9.0, f_v_mid=14.0, f_v_far=22.0, f_r_near=400.0, f_r_mid=1000.0, f_r_far=2500.0,
     v_commit=40.0, v_crawl=1.0, crawl_r=600.0, crawl_lvl=20.0, v_off=4.0, off8=8.0,
+    # the step aside from traffic in the final (it was the C's: steer() onto a point 300 to the side of the slot, the side
+    # picked each frame from the ship's x. A sideways aim is at 3 or 9 o'clock, where the roll can't settle: it reversed
+    # every game loop; a ship dead ahead flipped the side every few frames, the stick end to end; and any ship within
+    # 450 of the nose line set it off, coming at us or not. The judder on the final with a ship going by)
+    step_k=0.2,                            # the lean away from the pass: the escape heading's opposite let through up to this (the aim ~10 deg off the slot)
+    step_r=1500.0,                         # no step inside this (the C's DKEVMIN: too late, fly the slot)
+    v_step=8.0,                            # the speed while stepping (the C's DKEVSPD)
     # the commit
     cosa=0.985, cen_deg=4.4, lvl_deg=7.0, shf=100.0, commit_r=1800.0,
 )
 SIGHTS = {"p": ("px", "py", "pz"), "s": ("sx", "sy", "sz"), "a": ("ax", "ay", "az"), "b": ("bx", "by", "bz"), "e": ("ex", "ey", "ez")}
 HALF = {"+": 1.0, "-": -1.0}
 # the aims: each a sightline (or its opposite) and the gate that lets it through
-AIMS = {"cruise": ("p", 1), "away": ("p", -1), "swerve": ("e", 1), "slot": ("s", 1), "appr": ("a", 1), "side": ("b", 1)}
+AIMS = {"cruise": ("p", 1), "away": ("p", -1), "swerve": ("e", 1), "slot": ("s", 1), "appr": ("a", 1), "side": ("b", 1), "step": ("e", -1)}
 
 
 def gate(L, name, val, pos=(), neg_=(), M=2.0, bias=0.0, note=""):
@@ -112,6 +125,8 @@ def build(P=None):
     L1.unit("turn", {"nvo": P["turn_k"] * math.pi, "ths": 2 * P["turn_k"] * math.pi, "dist": -U / 1000}, P["room0"] / 1000, "the turn needed past the room for it (thousands)")
     for n in ("st", "col", "clear", "final", "commit", "jy"): L1.unit(n, {n: 1}, note="carried")
     L1.unit("jy-", {"jy": -1}, note="the stick, negative half")
+    L1.unit("coln", {"col": 1, "final": -1}, note="on a collision course, not in the final (there col is how close a pass, and the step's)")
+    L1.sat_pair("dstep", {"dist": 1}, -P["step_r"] * u, "outside step_r: room to step aside", S=U / 100)
 
     # ------------------------------------------------------------------ layer 2: the gates' clips, the regimes
     L2 = Layer(L1.names)
@@ -121,7 +136,8 @@ def build(P=None):
     GATES = {"cruise": (add({"st": -1, "col": -1}, neg(LOW)), 1.0),
              "away": (add(LOW, {"st": -1, "col": -1}), 0.0),
              "swerve": ({"col": 1, "final": -1}, 0.0),
-             "slot": (add(LE2, LS, {"final": 1, "st": 1, "col": -1}), -2.0),
+             "slot": (add(LE2, LS, {"final": 1, "st": 1, "coln": -1}), -2.0),
+             "step": (add(sat_ref("dstep", P["step_k"]), {"col": P["step_k"], "final": P["step_k"]}), -2.0 * P["step_k"]),
              "appr": (add({"st": 1, "final": -1, "col": -1}, neg(SIDE), neg(LE2)), 0.0),
              "side": (add(SIDE, neg(LE2), {"st": 1, "col": -1, "final": -1}), -1.0)}
     for name, (c, sign) in AIMS.items():
@@ -137,6 +153,8 @@ def build(P=None):
                 src = half_name(c, "c" + k, s, sign)
                 L2.unit(f"{name}c{k}{s}", {src: 1}, note=f"{name}: clock {k}, {s} half")
                 L2.unit(f"{name}c{k}{s}o", add({src: 1}, neg(g)), -g0, f"{name}: clock {k} {s} past its gate")
+    # stepping: col (how close the pass, 0..1) in the final outside step_r, each clipped by the others
+    L2.unit("stp", add(sat_ref("dstep"), {"col": 1, "final": 1}), -2, "stepping: a close pass, in the final, outside step_r")
     L2.unit("fin_on", {"final": 1, "off10+": -1, "off10-": 1}, note="the final's law: in the final, the slot within off_deg")
     L2.sat_pair("lvl7", {"lvl+": -180, "lvl-": -180}, P["lvl_deg"], "the slot within lvl_deg of level", S=1.0)
     L2.sat_pair("lvl20", {"lvl+": 180, "lvl-": 180}, -P["crawl_lvl"], "the slot more than crawl_lvl off level", S=0.5)
@@ -190,14 +208,17 @@ def build(P=None):
     HOLD = {"hold+": 1, "hold+c": -1, "hold-": -1, "hold-c": 1}
     PF = add({"dy+": P["pitch_f"], "dy-": -P["pitch_f"]}, {k: -P["a16"] * v for k, v in SDX.items()}, HOLD)
     for s, sg in HALF.items():
-        gate(L3, f"rf{s}", {k: sg * v for k, v in RM.items()}, ["fin_on"], [], 40.0, note=f"the final's roll, {s} half")
-        gate(L3, f"pf{s}", {k: sg * v for k, v in PF.items()}, ["fin_on"], [], 400.0, note=f"the final's pitch, {s} half")
+        gate(L3, f"rf{s}", {k: sg * v for k, v in RM.items()}, ["fin_on"], ["stp"], 40.0, note=f"the final's roll, {s} half (not while stepping)")
+        gate(L3, f"pf{s}", {k: sg * v for k, v in PF.items()}, ["fin_on"], ["stp"], 400.0, note=f"the final's pitch, {s} half (not while stepping)")
     L3.unit("crawl", add(sat_ref("d600"), sat_ref("lvl20")), -1, "inside crawl_r with the slot far from level: crawl")
     L3.unit("v_appr0", {"turn": -P["turn_g"]}, P["v_max"] - P["v_min"], "the approach's speed over v_min: by the room for the turn")
     vgate(L3, "v_final", {"v_bands": 1, "v_commit": 1}, P["f_v_in"], add({"st": 1, "final": 1}, sat_ref("le2")), -1.0, "the final's speed (from the slot's sightline opening)")
+    L3.unit("v_stepo", {"v_bands": 1, "stp": 24}, P["f_v_in"] - P["v_step"] - 24, "the final's speed past v_step while stepping")
     for v in ("v_cruise", "v_swerve", "v_side"): L3.unit(v, {v: 1, v + "o": -1, v + "ng": 1}, note=v + " let through")
-    for n in ("fin_on", "enter", "stay", "okp", "keep", "jump", "st", "col", "final", "side+", "side-", "le2+", "le2-", "turn"): L3.passthrough(n)
-    L3.unit("ok", add({"okp": 1}, sat_ref("lvl7")), -1, "all of the commit's tests")
+    L3.unit("keep", {"keep": 1, "stp": -2}, note="stay committed, unless stepping")
+    L3.unit("fin_on", {"fin_on": 1, "stp": -4}, note="the final's law, unless stepping: then the steering, on the slot leant away")
+    for n in ("enter", "stay", "okp", "jump", "st", "col", "final", "side+", "side-", "le2+", "le2-", "turn"): L3.passthrough(n)
+    L3.unit("ok", add({"okp": 1, "stp": -2}, sat_ref("lvl7")), -1, "all of the commit's tests, and not stepping")
 
     # ------------------------------------------------------------------ layer 4: the rates gated by the choice above/below, the bits
     L4 = Layer(L3.names)
@@ -217,7 +238,7 @@ def build(P=None):
     L4.unit("final_t", {"enter": 1, "stay": 1}, -1, "enter AND stay (the OR's excess)")
     L4.unit("commit_s", {"ok": 1, "keep": 1}, note="ok + keep")
     L4.unit("commit_t", {"ok": 1, "keep": 1}, -1, "ok AND keep")
-    L4.unit("v_final", {"v_final": 1, "v_finalo": -1, "v_finalng": 1, "crawl": -(P["f_v_near"] - P["v_crawl"])}, note="the final's speed, the crawl taken off")
+    L4.unit("v_final", {"v_final": 1, "v_finalo": -1, "v_finalng": 1, "crawl": -(P["f_v_near"] - P["v_crawl"]), "v_stepo": -1}, note="the final's speed, the crawl taken off, v_step at most while stepping")
     GA = add({"st": 1, "col": -1, "final": -1}, neg(sat_ref("side")), neg(sat_ref("le2")))
     vgate(L4, "v_appr", {"v_appr0": 1}, P["v_min"], GA, 0.0, "the approach's speed")
     for n in ("rf+", "rf-", "pf+", "pf-", "jump", "v_cruise", "v_swerve", "v_side"): L4.passthrough(n)
