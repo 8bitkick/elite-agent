@@ -17,7 +17,8 @@ What it decides each game loop (the hands, the stick maps, stay wsp_dock.c's):
                  the side the ship will pass on (the escape heading's opposite, let through up to step_k: ~10 deg).
                  That side is fixed in space, so it's one roll and a held pitch; the final's own law rolls with the
                  station, and an offset held in the ship's frame went round with it and moved us nowhere. The speed
-                 down to v_step, no commit; in proportion to col, so it fades in and out
+                 down to v_step, no commit; in proportion to col, so it fades in and out. The aim's clock while
+                 stepping is the lean's alone: the slot's, dead on the nose, is its sub-pixel noise at full size
   the speed      the cruise's 40 (20 low); the way round's 40; the approach's by the room left for the turn still
                  needed; the final's bands by range, 40 once committed, a crawl with the slot far from level
   the bits       the jump (the planet within jump_off of the nose), the final, the commit; the steering's above/below
@@ -55,6 +56,7 @@ PARAMS = dict(
     step_k=0.2,                            # the lean away from the pass: the escape heading's opposite let through up to this (the aim ~10 deg off the slot)
     step_r=1500.0,                         # no step inside this (the C's DKEVMIN: too late, fly the slot)
     v_step=8.0,                            # the speed while stepping (the C's DKEVSPD)
+    step_c=8.0,                            # the aim's clock is the lean's alone from this fraction of a step on (1/step_c)
     # the commit
     cosa=0.985, cen_deg=4.4, lvl_deg=7.0, shf=100.0, commit_r=1800.0,
 )
@@ -140,6 +142,11 @@ def build(P=None):
              "step": (add(sat_ref("dstep", P["step_k"]), {"col": P["step_k"], "final": P["step_k"]}), -2.0 * P["step_k"]),
              "appr": (add({"st": 1, "final": -1, "col": -1}, neg(SIDE), neg(LE2)), 0.0),
              "side": (add(SIDE, neg(LE2), {"st": 1, "col": -1, "final": -1}), -1.0)}
+    # the clock of the aim while stepping: the lean's alone, whole (its gate step_c x the step, not step_k x), and the
+    # slot's taken off through the same gate. The slot is on the nose there, its clock (a unit vector) whatever its last
+    # fraction of a pixel says: summed with a lean at 3 or 9 o'clock it flipped above/below every loop, and the roll with it
+    gc_step, gc0_step = {k: P["step_c"] * v for k, v in add(sat_ref("dstep"), {"col": 1, "final": 1}).items()}, -2.0 * P["step_c"]
+    CGATES = {"step": (gc_step, gc0_step)}
     for name, (c, sign) in AIMS.items():
         g, g0 = GATES[name]
         L2.unit(f"{name}ng", neg(g), -g0, f"{name}: how far its gate is below 0 (the clip's excess, taken back)")
@@ -148,11 +155,14 @@ def build(P=None):
                 src = half_name(c, k, s, sign)
                 L2.unit(f"{name}{k}{s}", {src: 1}, note=f"{name}: aim {k}, {s} half")
                 L2.unit(f"{name}{k}{s}o", add({src: 1}, neg(g)), -g0, f"{name}: aim {k} {s} past its gate")
+        gc, gc0 = CGATES.get(name, (g, g0))
+        if name in CGATES: L2.unit(f"{name}cng", neg(gc), -gc0, f"{name}: how far its clock's gate is below 0")
         for k in "xy":
             for s in HALF:
                 src = half_name(c, "c" + k, s, sign)
                 L2.unit(f"{name}c{k}{s}", {src: 1}, note=f"{name}: clock {k}, {s} half")
-                L2.unit(f"{name}c{k}{s}o", add({src: 1}, neg(g)), -g0, f"{name}: clock {k} {s} past its gate")
+                L2.unit(f"{name}c{k}{s}o", add({src: 1}, neg(gc)), -gc0, f"{name}: clock {k} {s} past its gate")
+                if name == "slot": L2.unit(f"unslotc{k}{s}o", add({src: 1}, neg(gc_step)), -gc0_step, f"slot: clock {k} {s} past the step's clock gate (taken off while stepping)")
     # stepping: col (how close the pass, 0..1) in the final outside step_r, each clipped by the others
     L2.unit("stp", add(sat_ref("dstep"), {"col": 1, "final": 1}), -2, "stepping: a close pass, in the final, outside step_r")
     L2.unit("fin_on", {"final": 1, "off10+": -1, "off10-": 1}, note="the final's law: in the final, the slot within off_deg")
@@ -190,8 +200,11 @@ def build(P=None):
     def thru(k, s):     # the halves let through: u - relu(u - g) + relu(-g) = min(u, max(g, 0))
         return add({f"{n}{k}{s}": 1.0 for n in AIMS}, {f"{n}{k}{s}o": -1.0 for n in AIMS}, {f"{n}ng": 1.0 for n in AIMS})
     VX = add(thru("x", "+"), neg(thru("x", "-"))); VY = add(thru("y", "+"), neg(thru("y", "-"))); VZ = add(thru("z", "+"), neg(thru("z", "-")))
-    CX = add(thru("cx", "+"), neg(thru("cx", "-"))); CY = add(thru("cy", "+"), neg(thru("cy", "-")))
-    ABSX = add(thru("x", "+"), thru("x", "-")); ABSY = add(thru("y", "+"), thru("y", "-")); ABSCX = add(thru("cx", "+"), thru("cx", "-"))
+    def cthru(k, s):    # the clock's: each aim's through its clock gate, the slot's less what the step's clock gate lets through
+        return add({f"{n}{k}{s}": 1.0 for n in AIMS}, {f"{n}{k}{s}o": -1.0 for n in AIMS}, {(f"{n}cng" if n in CGATES else f"{n}ng"): 1.0 for n in AIMS},
+                   {f"slot{k}{s}": -1.0, f"unslot{k}{s}o": 1.0, "stepcng": -1.0})
+    CX = add(cthru("cx", "+"), neg(cthru("cx", "-"))); CY = add(cthru("cy", "+"), neg(cthru("cy", "-")))
+    ABSX = add(thru("x", "+"), thru("x", "-")); ABSY = add(thru("y", "+"), thru("y", "-")); ABSCX = add(cthru("cx", "+"), cthru("cx", "-"))
     r0, cap = P["roll_ramp"], P["roll_cap"]
     for s, sg in HALF.items():
         L3.unit(f"rx{s}", {k: sg * v / r0 for k, v in VX.items()}, note=f"aim x / roll_ramp, {s} half")

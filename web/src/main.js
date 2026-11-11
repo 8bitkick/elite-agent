@@ -27,7 +27,7 @@ const GAMES = {
 };
 // the journal's sha256 after 10 game minutes, from native run_sim (NAME=BITKICK, this skew): a visitor's machine checks itself
 const REFERENCE = { flicker_13: "af1bfe517346f1266c2f84469cac0425c81cc2756b9617601126b9d215d7ac56", solid_13: "751efde375b4e9768d2a28794e251e4189261c4529c13bc608714c7e4c3489ba",
-    tube_13: "b6aad84e203bc70ee6705cf7155badbfe0a4825fb3535391ad9ef653ad4db650" };     // (tube: from web/run_core.mjs, the pinned core.wasm)
+    tube_13: "7673371343bb59c819bc94150825a6e08fe3cc9e37f98a75582fa412bdc631ea" };     // (tube: from web/run_core.mjs, the pinned core.wasm)
 const DEFAULT_GAME = "flicker", DEFAULT_MODE = "fair";
 const GAME = GAMES[Q.get("game")] ? Q.get("game") : DEFAULT_GAME;
 // the mode (?mode=): Optimal (reads the game's RAM; its own interceptor network flies the fights), Fair (only what a player can

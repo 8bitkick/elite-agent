@@ -30,6 +30,7 @@ const NOTE = {
     "LINE-UP": "Nearly on the axis: the aim slides from the mark onto the slot itself.",
     FINAL: "Rolling with the station, the slot trimmed level and pitched onto the nose.",
     SWERVE: "A collision course: the escape heading, out to the side it will miss on.",
+    "STEP ASIDE": "A ship will pass close on the way in: slowly, the slot held off to the far side of it.",
 };
 // what each input says, and each column does (the panel's hover notes)
 export const INPUT_NOTE = {
@@ -281,10 +282,11 @@ export class Panel {
     dockPhase(f, A) {
         if (!f || !A) return "CRUISE";
         const out = A[A.length - 1], D = this.d.dock;
+        const [, li, rows] = D.cols[2], st = rows.find((c) => c[1] === "step aside");
+        if (st && A[li][st[0]] > 0.25) return "STEP ASIDE";
         if (f[18] > 0.5 && out[5] < 0.5) return "SWERVE";
         if (f[5] < 0.5) return "CRUISE";
         if (out[5] > 0.5) return "FINAL";
-        const [, li, rows] = D.cols[2];
         let best = 0, bv = -1e9;
         for (let r = 0; r < 6; r++) { const c = rows[r], v = A[li][c[2]] - A[li][c[0]] + A[li][c[3]]; if (v > bv) { bv = v; best = r; } }
         return ["CRUISE", "CRUISE", "SWERVE", "LINE-UP", "APPROACH", "ROUND"][best];

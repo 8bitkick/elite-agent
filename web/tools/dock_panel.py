@@ -24,16 +24,16 @@ TESTS = [('side+', 'go round'), ('le2+', 'nearly lined'), ('le+', 'lined up'), (
          ('al0+', 'in front'), ('low+', 'low'), ('pjump+', 'planet ahead'), ('off10+', 'slot off 10°'), ('off8+', 'slot off 8°'),
          ('d400+', 'past 400'), ('d1000+', 'past 1000'), ('d2500+', 'past 2500'), ('d600+', 'inside 600'), ('d1800+', 'inside 1800'),
          ('fade+', 'hold on'), ('sq+', 'square'), ('cen+', 'centred'), ('fsh+', 'shield up'), ('trim+', 'trim +'), ('trim-', 'trim -'),
-         ('sdx_a', 'spin·x'), ('turn', 'turn needed')]
-AIMS = [('cruise', 'aim: planet'), ('away', 'aim: away'), ('swerve', 'aim: escape'), ('slot', 'aim: slot'), ('appr', 'aim: mark'), ('side', 'aim: round')]
-REGIME = [(a + 'z+o', lab) for a, lab in AIMS] + [('fin_on', 'final law'), ('lvl7+', 'level'), ('lvl20+', 'far off lvl'), ('enter', 'enter final'),
+         ('sdx_a', 'spin·x'), ('turn', 'turn needed'), ('dstep+', 'past 1500')]
+AIMS = [('cruise', 'aim: planet'), ('away', 'aim: away'), ('swerve', 'aim: escape'), ('slot', 'aim: slot'), ('appr', 'aim: mark'), ('side', 'aim: round'), ('step', 'aim: step')]
+REGIME = [(a + 'z+o', lab) for a, lab in AIMS] + [('stp', 'step aside'), ('fin_on', 'final law'), ('lvl7+', 'level'), ('lvl20+', 'far off lvl'), ('enter', 'enter final'),
           ('stay', 'stay final'), ('okp', 'commit tests'), ('keep', 'keep commit'), ('jump', 'jump'), ('v_cruise', 'v cruise'), ('v_swerve', 'v swerve'),
           ('v_side', 'v round'), ('turn', 'turn room'), ('v_bands', 'v by range'), ('v_commit', 'v commit'), ('hold+', 'hold +'), ('hold-', 'hold -'),
           ('le2+', 'nearly lined')]
 AIM = [('rx+', 'aim right'), ('rx-', 'aim left'), ('over+', 'past cap r'), ('over-', 'past cap l'), ('cy+', 'clock up'), ('cy-', 'clock down'),
        ('abscx', '|clock x|'), ('p_up', 'pitch up'), ('p_dn', 'pitch down'), ('up+', 'above'), ('back+', 'behind us'), ('live+', 'off the nose'),
        ('rf+', 'roll match +'), ('rf-', 'roll match -'), ('pf+', 'final pitch +'), ('pf-', 'final pitch -'), ('crawl', 'crawl'),
-       ('v_appr0', 'v approach'), ('v_final', 'v final'), ('ok', 'commit ok'), ('v_cruise', 'v cruise'), ('v_side', 'v round'), ('fin_on', 'final law')]
+       ('v_appr0', 'v approach'), ('v_final', 'v final'), ('ok', 'commit ok'), ('v_cruise', 'v cruise'), ('v_side', 'v round'), ('fin_on', 'final law'), ('v_stepo', 'v step')]
 RATES = [('roll_up+', 'roll r above'), ('roll_up-', 'roll l above'), ('roll_dn+', 'roll r below'), ('roll_dn-', 'roll l below'),
          ('roll_up+c', 'roll capped'), ('p_up', 'pitch up'), ('p_dn', 'pitch down'), ('b_up', 'pull up hard'), ('b_dn', 'push dn hard'),
          ('rf+', 'roll match +'), ('rf-', 'roll match -'), ('pf+', 'final pitch +'), ('pf-', 'final pitch -'), ('final_s', 'final'),

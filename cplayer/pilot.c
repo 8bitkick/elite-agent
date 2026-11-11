@@ -794,7 +794,15 @@ static __attribute__((noinline)) int dock_step(void)
                     vec_t P = pl ? pos_of(pl) : (vec_t){0, 0, 1};
                     wsp_dock_in_t in = {{P.x, P.y, P.z}, altitude(), 1, {S.x, S.y, S.z}, {nv.x, nv.y, nv.z}, {rvn.x, rvn.y, rvn.z},
                                         st->roll < 0 ? -1 : 1, speed(), fsh(), ash(), clear, 0, {0, 0, 0}, s_app_up, s_app_final, s_app_commit};
-                    in.col = s_app_final ? app_pass(sh, n, st, dist, in.miss) : app_threat(sh, n, in.miss);
+                    if (s_app_final) {
+                        // (taken as the game loop turns over, and held through it: Elite moves the ships one at a time, and
+                        // read part way the station has had our pitch and the ship not: at 1,800 out a pass 37 above read
+                        // 7, then -3, for two frames of each loop, and the lean went with it. The counter can sit still:
+                        // then every 8 frames)
+                        static int mc = -1; static uint32_t at; static double col, miss[3];
+                        if (R(A_MCNT) != mc || now() - at >= 8 || now() < at) col = app_pass(sh, n, st, dist, miss), mc = R(A_MCNT), at = now();
+                        in.col = col; memcpy(in.miss, miss, sizeof miss);
+                    } else in.col = app_threat(sh, n, in.miss);
                     float f[WSPD_N];
                     s_app_out = wsp_dock_at(&in, jy, f);
                     memcpy(g_dock_last_f, f, sizeof f); g_dock_last_frame = now();

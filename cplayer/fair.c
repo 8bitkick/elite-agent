@@ -610,8 +610,10 @@ static void perceive_update(void) {
         o.energy = (uint8_t) (e < 1 ? 1 : e > 255 ? 255 : e);
         int hostile = ws || t->cue || t->prov || (t->ident && hostile_type(t->type)) ||
                       (t->ident && t->type == 16 && R(A_FIST) >= 50);
-        // (the police, and the Transporter that counts as police: only when they fire at us, or we are fugitives)
-        if (g_fair_sz && t->ident && (t->type == 16 || t->type == 10)) hostile = ws || t->cue_fire || R(A_FIST) >= 50;
+        // (the police, and the Transporter that counts as police: only when they fire at us, or we are fugitives. The
+        // Transporter not even then: it stays a bystander with us wanted, and one shot by the station turns the station
+        // on us: no docking, the ship lost in the slot)
+        if (g_fair_sz && t->ident && (t->type == 16 || t->type == 10)) hostile = ws || t->cue_fire || (t->type == 16 && R(A_FIST) >= 50);
         if (t->type == 1) hostile = 0, o.ai = t->ours ? 0 : 0x40;
         if (is_junk_cls(t->cls) && !t->ident) hostile = 0;
         o.newb = (uint8_t) ((hostile ? NEWB_HOSTILE : 0) | (t->ident && (t->type == 16 || t->type == 10) ? NEWB_COP : 0) | (s->newb & 0x80));
