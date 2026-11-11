@@ -322,6 +322,10 @@ int main(int argc, char **argv) {
         { extern int g_lab_undamped; if (g_lab_undamped) beeb_ram(B)[A_DAMP] = 0xFF; }
         { extern int g_joystick; if (g_joystick) beeb_ram(B)[A_JSTK] = 0xFF; }     // (joystick mode, as a career would have it)
         if (getenv("REARMIL") && beeb_ram(B)[A_LASER + 1]) beeb_ram(B)[A_LASER + 1] = 0x97;     // (test: a military laser at the rear in place of what is there)
+        if (getenv("STOCK")) {      // (test: the ship as bought, a pulse laser at the front and nothing else fitted)
+            uint8_t *m = beeb_ram(B);
+            m[A_LASER] = 0x0F, m[A_LASER + 1] = m[A_LASER + 2] = m[A_LASER + 3] = 0, m[A_ECM] = m[A_ENGY] = m[A_BOMB] = m[A_ESCP] = 0;
+        }
         if (getenv("NODJD")) beeb_ram(B)[A_DJD] = 0xFF;     // (test: no auto-recentre: the opposite key steps back)
         for (int c = 0; c < 128; c++) beeb_key(B, c, 0);
         memset(&io, 0, sizeof io);
