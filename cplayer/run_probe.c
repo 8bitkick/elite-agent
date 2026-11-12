@@ -138,6 +138,11 @@ static long json_num(const char *j, const char *key) {
 // ---- the probe (Pi1MHz docs/dev/ramprobe.md: HTTP routes)
 
 static double s_stopped;        // seconds the BBC has spent stopped for us, which is no game time
+static double s_read_at;        // when the last peek's stop ended: the RAM the player sees is from then
+// timings, summed over the passes since the last report: the peek's stop, fetching its data, the
+// player, the poke's stop, and the game time from the read to the keys being written
+static double s_t_peek, s_t_data, s_t_player, s_t_poke, s_t_lat, s_t_peek_max;
+static int s_n_lat;
 static char s_st[2048];
 
 typedef struct { uint16_t at, n; } range_t;
@@ -162,7 +167,11 @@ static int peek(const range_t *r, int nr, uint8_t *out, char *err, size_t errn) 
     char q[1024], path[1200];
     ranges_param(q, sizeof q, r, nr);
     snprintf(path, sizeof path, "/bbc/peek?ranges=%s&rung=1&wait=1", q);
+    double t0 = now_s();
     if (act(path, err, errn)) return -1;
+    s_read_at = now_s();
+    s_t_peek += s_read_at - t0;
+    if (s_read_at - t0 > s_t_peek_max) s_t_peek_max = s_read_at - t0;
     int total = 0;
     for (int i = 0; i < nr; i++) total += r[i].n;
     static char hex[8200];
@@ -176,6 +185,7 @@ static int peek(const range_t *r, int nr, uint8_t *out, char *err, size_t errn) 
             out[off + i] = (uint8_t) v;
         }
     }
+    s_t_data += now_s() - s_read_at;
     return 0;
 }
 
@@ -390,7 +400,9 @@ int main(int argc, char **argv) {
         // the game's time: the wall's, less the stops
         uint32_t game = (uint32_t) ((now_s() - t0 - s_stopped) * 50);
         while (io.frame < game) io.taps_done += (uint32_t) keyq_step(io.frame, key), io.frame++;
+        double tp = now_s();
         player_frame();
+        s_t_player += now_s() - tp;
 
         // write: the patch where a fresh DKS4 has been loaded (each launch and dock loads the code
         // again), the held keys into its list, and typed characters into the OS's buffer
@@ -457,16 +469,27 @@ int main(int argc, char **argv) {
             s_ntyped = 0;      // (what didn't fit is dropped: Elite flushes the buffer before it reads a line)
         }
         if (nw) {
+            double tw = now_s();
+            s_t_lat += tw - s_read_at, s_n_lat++;
             if (poke(w, nw, data, err, sizeof err)) fprintf(stderr, "poke: %s\n", err);
             else pokes++;
+            s_t_poke += now_s() - tw;
         }
 
         double t = now_s();
-        if (t - last_report > 60) {
+        if (t - last_report > (getenv("PROBEREPORT") ? atof(getenv("PROBEREPORT")) : 60)) {
             last_report = t;
             printf("%7.1f probe: %u passes, %.1f a game second; stopped %.0f%% of the time; %u pokes, %u errors, %d too many keys\n",
                    io.frame / 3000.0, passes, passes / ((t - t0 - s_stopped) > 0 ? (t - t0 - s_stopped) : 1),
                    100 * s_stopped / (t - t0), pokes, errors, s_toomany);
+            static uint32_t passes_was, pokes_was;
+            uint32_t np = passes - passes_was, nk = pokes - pokes_was;
+            if (np && nk)
+                printf("        a pass: peek's stop %.1f ms (longest %.0f), its data %.1f ms, the player %.2f ms; a poke's stop %.1f ms; "
+                       "read to keys written %.1f ms of game time\n",
+                       1e3 * s_t_peek / np, 1e3 * s_t_peek_max, 1e3 * s_t_data / np, 1e3 * s_t_player / np, 1e3 * s_t_poke / nk, 1e3 * s_t_lat / s_n_lat);
+            passes_was = passes, pokes_was = pokes;
+            s_t_peek = s_t_data = s_t_player = s_t_poke = s_t_lat = s_t_peek_max = 0, s_n_lat = 0;
             fflush(stdout);
         }
         // at most one pass a frame

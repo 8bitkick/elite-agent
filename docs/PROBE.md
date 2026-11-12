@@ -65,6 +65,8 @@ board (beeb-remote's `tests/beebjit`):
 | Time the BBC is stopped | 41% (the game runs at 59% of its speed) |
 | Pokes | only when the held keys change, a key types a character, or a code load needs the patch |
 | Errors | 0 |
+| A pass | the peek's stop 14 ms (longest 28, over a launch's disc load), fetching its data 2.4 ms, the player 0.01 ms, a poke's stop 1.7 ms |
+| Latency the probe adds | 2-3 ms of game time from the RAM read to the keys written, on top of `keyq`'s 2 frames, which every platform has |
 
 Over WiFi to a real Pi1MHz each request takes longer (the probe's notes: 2.3 ms for `GET /bbc`, 4 ms
 for a stop and go), so expect the game to run slower again. The game itself doesn't notice: it's
@@ -104,4 +106,5 @@ curl -X POST 'localhost:8091/sim/type?text=X%25%3D23%3ACALL%20%26FC88%0D'      #
 BOOT=1 cplayer/run_probe 127.0.0.1:8091 30 journal.jsonl
 ```
 
-`PROBELOG=1` also prints each lot of characters put in the OS's buffer.
+`PROBELOG=1` also prints each lot of characters put in the OS's buffer; `PROBEREPORT=10` reports the
+timings every 10 seconds instead of every 60.
