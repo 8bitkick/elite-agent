@@ -204,6 +204,18 @@ witchspace) with aim, targeting and death-cause measures, from `~/work/corpus` a
 `tools/compare.py` compares two runs fight by fight; `tools/career_summary.py` gives a line per
 career; `tools/climb_best.py` draws the chart above from career journals.
 
+## On a real BBC Micro
+
+`cplayer/run_probe` plays disc Elite on a physical Model B from another computer, over the network,
+through the [Pi1MHz](https://github.com/dp111/Pi1MHz) RAM probe: it reads the game's RAM and writes the
+keys down with the probe's stops, with no ROM and no keyboard rig ([`docs/PROBE.md`](docs/PROBE.md)).
+
+```sh
+cplayer/build_probe.sh
+# on the BBC, at BASIC's prompt with the Elite disc in drive 0:  X%=23:CALL &FC88
+BOOT=1 cplayer/run_probe pi1mhz.local 60 journal.jsonl
+```
+
 ## On the Presto
 
 The plugin: `presto/app/build.sh` (`--efficient` for Optimal; Curious by default; fair mode only with

@@ -21,6 +21,7 @@ cplayer/oracle2d
 cplayer/lab
 cplayer/lab_*
 cplayer/run_sim*
+cplayer/run_probe
 !cplayer/run_sim.c
 cplayer/oracle*
 cplayer/mpc
