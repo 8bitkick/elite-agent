@@ -213,10 +213,6 @@ PT_THREAD(hyperspace(const sys_t *dest)) {
             const ship_t *t[1];
             int n = see_ships(sh);
             fightable = threats(sh, n, 60000, t, 1) && !(energy() < g_bail_energy && !hyperspace_count());
-            // (and outgunned, without a military laser: it turned on them through the countdown and hit nothing.
-            // 60 witchspace arrivals in the ship as bought, the lab's STOCK: fighting, 0 kills and 23 damage;
-            // running, 0 kills and 18. Fair kills Thargons that way, 21 in the 60, and fights on)
-            if (laser(0) != 0x97) fightable = 0;
         }
         if (witchspace() && g_bail_energy && g_ws_fight && !(g_ws_shield && fsh() * 2 < ash()) && fightable) {
             g_phase = 4;

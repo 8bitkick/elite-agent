@@ -22,18 +22,19 @@ how fast it is closing; and our own state, and the stick under the hand. No cons
  20 age              seconds since the target was last measured, to 4 (0 in efficient mode)
  21 rsd              the range's uncertainty x 4 (1.0 = a 25% range error; 0 in efficient mode)
  22 vsd              the motion estimate's uncertainty / 16 units a loop (0 in efficient mode)
+ 23 arm              our front laser's power / 32 (the damage a hit: pulse and beam 0.47, military 0.72)
 """
 import math
 import numpy as np
 
 NAMES = ["ux", "uy", "uz", "wx", "wy", "th", "cx", "cy", "rho", "dist", "close", "own", "hot", "energy", "ws",
-         "jx", "jy", "seen", "one", "hseen", "age", "rsd", "vsd"]
+         "jx", "jy", "seen", "one", "hseen", "age", "rsd", "vsd", "arm"]
 N = len(NAMES)
 IDX = {n: i for i, n in enumerate(NAMES)}
 
 
 def features(x, y, z, vx, vy, vz, own, r, laser_temp=0, energy=255, witchspace=0, jstx=128, jsty=128,
-             heading_seen=1, age=0.0, range_sd=0.0, vel_sd=0.0):
+             heading_seen=1, age=0.0, range_sd=0.0, vel_sd=0.0, laser=0x97):
     f = np.zeros(N, dtype=np.float32)
     d = max(1.0, math.sqrt(x * x + y * y + z * z))
     ux, uy, uz = x / d, y / d, z / d
@@ -46,7 +47,8 @@ def features(x, y, z, vx, vy, vz, own, r, laser_temp=0, energy=255, witchspace=0
             ux / h if h > 1e-6 else 0.0, uy / h if h > 1e-6 else 1.0,
             r / d * 16, min(d / 4096, 8), -rd / 64, abs(own) / 64, laser_temp / 255, energy / 255,
             1.0 if witchspace else 0.0, (jstx - 128) / 128, (jsty - 128) / 128, 1.0, 1.0,
-            1.0 if heading_seen else 0.0, min(age / 50, 4.0), min(range_sd * 4, 4.0), min(vel_sd / 16, 4.0)]
+            1.0 if heading_seen else 0.0, min(age / 50, 4.0), min(range_sd * 4, 4.0), min(vel_sd / 16, 4.0),
+            (laser & 0x7F) / 32]
     return f
 
 

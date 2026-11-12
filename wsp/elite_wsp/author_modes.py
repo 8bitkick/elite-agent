@@ -94,6 +94,18 @@ CAMERA = dict(
     chase_t=15.0,        # ... and closing too slowly to reach the hold size in this many seconds (16 game loops a second). A
                          # Cobra running at nearly our top speed was trailed at 1,300 for 4 minutes, closing 2 units a loop:
                          # never opening, so never a lost chase by chase_close, and never drawn big
+    # outgunned: in witchspace with a laser under arm_min's power (the arm sense: pulse and beam 0.47, military 0.72),
+    # three Thargoids at 240 energy each are out of reach. As first written the camera turned on them through the
+    # bail-out's countdown and hit nothing (the lab's 60 witchspace arrivals in the ship as bought: 0 kills, 23 damage).
+    # Then the fight is put behind us: the aim's law, the pass and the slow roll off, the nose pitched away from the
+    # target until it's nearly astern, flat out, the laser held. The lab's witchspace arrivals in the ship as bought, damage
+    # a start (60 | 179 held out): turning on them 23.4 | 17.8, this 20.9 | 17.5 (the C bail-out's run 18.4 | 16.4); no deaths
+    arm_min=0.6,
+    flee_gain=8.0,       # the pitch away (the hard turn's rate)
+    flee_th=0.9,         # off angle / pi under which it's still to be put behind (abeam, 0.5: 81 | 28 damage, they caught us
+                         # flying straight; 0.75: 19.2 on the held-out set)
+    flee_roll=20.0,      # once it's behind: a steady roll and pitch, a corkscrew (abeam, it took 81 to 26-30)
+    flee_pitch=4.0,
     chase_close=-0.1,    # closing speed (units a loop / 64: opening at 6) under which a target ahead is a chase we don't win: shoot at range. (From +0.15 with the brake on, every braked approach counted as lost: on screen 6 s a fight -> 15 s)
 )
 
@@ -112,6 +124,8 @@ def _build(P, camera=False):
     if camera:
         # sharp: witchspace, or hurt (energy under hurt_e: 10 a unit of the sense, so it's fully on 25 energy under)
         L1.sat_pair("sharp", {"ws": 10.0, "energy": -10.0}, 10.0 * P["hurt_e"] / 255, "witchspace or hurt: fight to finish it (ws weighted to win over full energy)")
+        L1.sat_pair("outg", {"ws": 1.0, "arm": -1.0}, P["arm_min"] - 1.0, "outgunned: witchspace and a laser under arm_min")
+        L1.sat_pair("fore", {"th": -1}, P["flee_th"], "outgunned's: not yet behind (off angle under flee_th)")
     else:
         L1.sat_pair("hard", {"th": 1}, -P["hard_th"], "far off the nose: a hard turn")
     L1.sat_pair("ahead", {"uz": 1}, 0.0, "target ahead")
@@ -147,7 +161,7 @@ def _build(P, camera=False):
     # ------------------------------------------------------------------ the aim point, signed, with the pass beside it
     L2 = Layer(L1.names)
     if camera:
-        L2.passthrough("cl+", "cl-", "sharp+", "sharp-", "near+", "near-")
+        L2.passthrough("cl+", "cl-", "sharp+", "sharp-", "near+", "near-", "outg+", "outg-", "fore+", "fore-")
         L2.unit("formed", add(sat_ref("fbig"), sat_ref("fslow")), -1.0, "formation: drawn big and no longer growing")
         # (a chase: ahead, not closing, and not drawn big: holding beside a target at the show's distance isn't closing
         # either, and sharpening the stick on that lost the whole gentle style: validation 27 -> 19)
@@ -215,12 +229,17 @@ def _build(P, camera=False):
         L3.unit("ey+", {"ay+": 1, "ay-": -1}, note="error (up)")
         L3.unit("ey-", {"ay-": 1, "ay+": -1}, note="error (down)")
     cc = P["hard_cone"]
-    L3.unit("h_up", add({"cy+": 1, "cy-": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0)), -2.0, "far off, above: pull up hard")
-    L3.unit("h_dn", add({"cy-": 1, "cy+": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0)), -2.0, "far off, below: push down hard")
+    OG = (lambda k: {"outg+": -k, "outg-": k}) if camera else (lambda k: {})       # (the camera's outgunned: off)
+    L3.unit("h_up", add({"cy+": 1, "cy-": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0), OG(2 * M)), -2.0, "far off, above: pull up hard")
+    L3.unit("h_dn", add({"cy-": 1, "cy+": -1, "cx+": -cc, "cx-": -cc}, sat_ref("hard", 2.0), OG(2 * M)), -2.0, "far off, below: push down hard")
     L3.sat_pair("fin", {"conev": 1, "th": -math.pi}, 0.0, "the nose inside the fire cone (the target itself: the laser hits where the nose points now)", S=20000.0)
     L3.passthrough("ahead+", "ahead-", "inrange+", "inrange-", "cool+", "cool-", "seen", "big+", "big-", "outhold+", "outhold-")
     if camera:
-        L3.passthrough("cl+", "cl-")
+        L3.passthrough("cl+", "cl-", "outg+", "outg-")
+        # outgunned: pitch away from it while it's ahead, on the side it's on (AND of three: outgunned, ahead, the side)
+        L3.unit("f_dn", add(sat_ref("outg"), sat_ref("fore"), sat_ref("up")), -2.0, "outgunned, it's ahead and above: push the nose down, away")
+        L3.unit("f_up", add(sat_ref("outg"), sat_ref("fore"), neg(sat_ref("up"))), -1.0, "outgunned, it's ahead and below: pull the nose up, away")
+        L3.unit("f_cork", add(sat_ref("outg"), neg(sat_ref("fore"))), 0.0, "outgunned and it's behind: the corkscrew")
         L3.sat_pair("shoot", add(sat_ref("big"), sat_ref("near"), {"stuck": 1, "stuckf": 1, "formed": 1}), 0.0, "the laser allowed: drawn big, near, in formation, or a chase we don't win (shot at range rather than trailed)")
 
     # ------------------------------------------------------------------ the roll on the side chosen, pitch, fire
@@ -230,17 +249,18 @@ def _build(P, camera=False):
     for s in "+-":
         L4.unit("over" + s, add({"ex" + s: 1 / r0, "cx" + s: -cap}, W({"exw" + s: 1 / r0, "exc" + s: 1 / r0})), note=f"how far the sideways error / roll_ramp exceeds the clock cap ({s})")
     absx = add({"ex+": 1, "ex-": 1}, W({"exw+": 1, "exw-": 1, "exc+": 1, "exc-": 1}))
-    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, W({"eyw+": 1, "eyw-": -1, "eyc+": 1, "eyc-": -1}), neg(absx, P["pitch_cone"])), note="pitch up onto the aim, easing as the sideways error grows")
-    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1, "eyc-": 1, "eyc+": -1}), neg(absx, P["pitch_cone"])), note="pitch down onto the aim")
+    L4.unit("p_up", add({"ey+": 1, "ey-": -1}, W({"eyw+": 1, "eyw-": -1, "eyc+": 1, "eyc-": -1}), neg(absx, P["pitch_cone"]), OG(4 * M)), note="pitch up onto the aim, easing as the sideways error grows")
+    L4.unit("p_dn", add({"ey-": 1, "ey+": -1}, W({"eyw-": 1, "eyw+": -1, "eyc-": 1, "eyc+": -1}), neg(absx, P["pitch_cone"]), OG(4 * M)), note="pitch down onto the aim")
     if camera: L4.passthrough("exw+", "exw-", "exc+", "exc-")
     if camera:
-        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("shoot"), {"seen": 1}), -5.0,
-                "AND of six: in the sights, ahead, in range, cool, drawn big or a chase, a target (no kills at a distance, unless the chase is lost)")
-        L4.unit("orbit", add(sat_ref("big"), sat_ref("aligned")), -1.0, "on the target and it's drawn big: the slow roll")
+        L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("shoot"), {"seen": 1}, OG(6.0)), -5.0,
+                "AND of six: in the sights, ahead, in range, cool, drawn big or a chase, a target (no kills at a distance, unless the chase is lost; not outgunned)")
+        L4.unit("orbit", add(sat_ref("big"), sat_ref("aligned"), OG(2.0)), -1.0, "on the target and it's drawn big: the slow roll (not outgunned)")
+        L4.passthrough("f_up", "f_dn", "f_cork", "outg+", "outg-")
     else:
         L4.unit("fire", add(sat_ref("fin"), sat_ref("ahead"), sat_ref("inrange"), sat_ref("cool"), sat_ref("big"), {"seen": 1}), -5.0,
                 "AND of six: in the sights, ahead, in range, cool, big enough, a target")
-    L4.unit("spd", add({"band": 1, "bandover": -1}, {k: 40 * v for k, v in sat_ref("aligned").items()}), -40.0 + P["v_turn"], "the speed: min(band, 40) if aligned, else v_turn (stop to turn)")
+    L4.unit("spd", add({"band": 1, "bandover": -1}, {k: 40 * v for k, v in sat_ref("aligned").items()}, OG(-80.0)), -40.0 + P["v_turn"], "the speed: min(band, 40) if aligned, else v_turn (stop to turn); flat out when outgunned")
     L4.passthrough("ex+", "ex-", "up+", "up-", "h_up", "h_dn", "wy+", "wy-", "wx+", "wx-", "outhold+", "outhold-")
 
     L5 = Layer(L4.names)
@@ -248,17 +268,19 @@ def _build(P, camera=False):
     for s in "+-":
         m = add({"ex" + s: 1 / r0, "over" + s: -1}, W({"exw" + s: 1 / r0, "exc" + s: 1 / r0}))      # min(|error|/ramp, cap x |clock x|)
         # gated twice: by the side, and by being outside the nose hold: v + M(up) + M(outhold) - 2M
-        L5.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold")
-        L5.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}), -M, f"roll magnitude ({s}) if below, outside the nose hold")
+        OGL = {"outg+": -4 * M, "outg-": 4 * M} if camera else {}
+        L5.unit("roll_up" + s, add(m, {k: M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}, OGL), -2 * M, f"roll magnitude ({s}) if above, outside the nose hold (not outgunned)")
+        L5.unit("roll_dn" + s, add(m, {k: -M * v for k, v in UP.items()}, {k: M * v for k, v in OH.items()}, OGL), -M, f"roll magnitude ({s}) if below, outside the nose hold (not outgunned)")
     L5.passthrough("p_up", "p_dn", "h_up", "h_dn", "wy+", "wy-", "wx+", "wx-", "fire", "spd")
-    if camera: L5.passthrough("orbit")
+    if camera: L5.passthrough("orbit", "f_up", "f_dn", "f_cork")
 
     OUT = Layer(L5.names, relu=False)
     g = P["roll_gain"]; fr = P.get("ff_roll", 0.0) * 256; fp = P.get("ff_pitch", 0.0) * 256
     OUT.unit("alpha", add({"roll_up+": -g, "roll_up-": g, "roll_dn+": g, "roll_dn-": -g, "wx+": -fr, "wx-": fr},
-                          {"orbit": P["orbit"]} if camera else {}), note="roll rate")
-    OUT.unit("beta", {"p_up": P["pitch_gain"], "p_dn": -P["pitch_gain"], "h_up": P["hard_gain"], "h_dn": -P["hard_gain"], "wy+": fp, "wy-": -fp},
-             note="pitch rate, + nose up, with the feed-forward")
+                          {"orbit": P["orbit"], "f_cork": P["flee_roll"]} if camera else {}), note="roll rate")
+    OUT.unit("beta", add({"p_up": P["pitch_gain"], "p_dn": -P["pitch_gain"], "h_up": P["hard_gain"], "h_dn": -P["hard_gain"], "wy+": fp, "wy-": -fp},
+                         {"f_up": P["flee_gain"], "f_dn": -P["flee_gain"], "f_cork": P["flee_pitch"]} if camera else {}),
+             note="pitch rate, + nose up, with the feed-forward (and the camera's pitch away when outgunned)")
     OUT.unit("fire", {"fire": 1.0}, note="press the laser when > 0.5")
     OUT.unit("speed", {"spd": 1.0}, note="the speed")
     return [L1, L2, L3, L4, L5, OUT]

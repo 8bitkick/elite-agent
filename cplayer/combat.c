@@ -359,6 +359,7 @@ static double combat_keys(const ship_t *s, int n, const ship_t *sh, keyset_t *ke
                        1, 0, 0, 0};
         { const fair_conf_t *fc = fair_confidence(sh->slot);      // (fair mode: what the tracker knows about its own estimate)
           if (fc) wi.heading_seen = fc->heading_seen, wi.age = fc->age, wi.range_sd = fc->range_sd, wi.vel_sd = fc->vel_sd; }
+        wi.laser = laser(0);
         int decided;
         float *wf = g_wsp_last_f;           // (the senses, kept for the web page's panel; off the Presto app's stack)
         s_wsp = wsp_pilot_at(&wi, IO->frame, &decided, wf);

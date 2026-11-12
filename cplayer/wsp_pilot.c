@@ -116,6 +116,7 @@ void wsp_features(const wsp_in_t *in, float f[WSP_NF]) {
     f[20] = (float) fmin(in->age / 50.0, 4.0);            // seconds stale, to 4
     f[21] = (float) fmin(in->range_sd * 4, 4.0);          // 1.0 = a 25% range error
     f[22] = (float) fmin(in->vel_sd / 16, 4.0);           // 1.0 = 16 units a loop (a Sidewinder's top speed is 55)
+    f[23] = (in->laser & 0x7F) / 32.0f;                   // our laser's power: pulse and beam 0.47, military 0.72
 }
 
 static int jstx_for(double alpha) {

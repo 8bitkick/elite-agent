@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 
-#define WSP_NF 23       // features (wsp/elite_wsp/features.py has the same list)
+#define WSP_NF 24       // features (wsp/elite_wsp/features.py has the same list)
 
 typedef struct {
     double x, y, z;         // the target in ship space, as the view sees it (mirrored for the rear view)
@@ -16,6 +16,7 @@ typedef struct {
     double age;             // frames since the target was last measured
     double range_sd;        // the range's uncertainty as a fraction of the range
     double vel_sd;          // the motion estimate's uncertainty, game units a loop
+    int laser;              // our front laser's byte (its power, the damage a hit, in bits 0-6)
 } wsp_in_t;
 
 typedef struct { uint8_t jstx, jsty, fire, speed; float alpha, beta; } wsp_out_t;

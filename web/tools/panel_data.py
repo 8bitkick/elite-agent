@@ -11,6 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(REPO, "wsp"))
 from elite_wsp.net import Net
+from elite_wsp.features import NAMES as FEATS
 from elite_wsp import dock_author as DA, dock_features as DF
 sys.path.insert(0, HERE)
 import dock_panel as DP
@@ -28,17 +29,17 @@ def scales(layers, X):
 SHOW = {'ux': 'aim right', 'uy': 'aim up', 'uz': 'aim ahead', 'wx': 'drift x', 'wy': 'drift y', 'th': 'off nose', 'cx': 'clock x',
         'cy': 'clock y', 'rho': 'size', 'dist': 'range', 'close': 'closing', 'own': 'our speed', 'hot': 'laser heat', 'energy': 'energy',
         'ws': 'witchspace', 'jx': 'stick x', 'jy': 'stick y', 'seen': 'target', 'one': 'bias', 'hseen': 'hdg seen', 'age': 'age',
-        'rsd': 'range ±', 'vsd': 'motion ±'}
+        'rsd': 'range ±', 'vsd': 'motion ±', 'arm': 'laser power'}
 
 def read_fight_log(path):
     F = []
     for line in open(path):
         a = line.split("|")[0].split()
-        if len(a) == 25 and a[0] == "D": F.append([float(x) for x in a[2:]])
+        if len(a) == 2 + len(FEATS) and a[0] == "D": F.append([float(x) for x in a[2:]])
     return np.array(F[:: max(1, len(F) // 4000)], np.float32)
 
 def fight_net(net, F):
-    """a dogfight-type network (23 senses, 4 outputs, any number of layers) as the panel draws it"""
+    """a dogfight-type network (24 senses, 4 outputs, any number of layers) as the panel draws it"""
     flayers = [(net.W[i], net.b[i], i < net.n - 1) for i in range(net.n)]
     return dict(layers=dense([(W, b) for W, b, _ in flayers]),
                 cols=[["INPUTS", [SHOW[str(x)] for x in net.features]]] + [[f"LAYER {i + 1}", [str(x) for x in net.names[i]]] for i in range(net.n - 1)]
@@ -58,11 +59,11 @@ def main(fight_log, dock_log, out):
     SHOW = {'ux': 'aim right', 'uy': 'aim up', 'uz': 'aim ahead', 'wx': 'drift x', 'wy': 'drift y', 'th': 'off nose', 'cx': 'clock x',
             'cy': 'clock y', 'rho': 'size', 'dist': 'range', 'close': 'closing', 'own': 'our speed', 'hot': 'laser heat', 'energy': 'energy',
             'ws': 'witchspace', 'jx': 'stick x', 'jy': 'stick y', 'seen': 'target', 'one': 'bias', 'hseen': 'hdg seen', 'age': 'age',
-            'rsd': 'range ±', 'vsd': 'motion ±'}
+            'rsd': 'range ±', 'vsd': 'motion ±', 'arm': 'laser power'}
     F = []
     for line in open(fight_log):
         a = line.split("|")[0].split()
-        if len(a) == 25 and a[0] == "D": F.append([float(x) for x in a[2:]])
+        if len(a) == 2 + len(FEATS) and a[0] == "D": F.append([float(x) for x in a[2:]])
     F = np.array(F[:: max(1, len(F) // 4000)], np.float32)
     flayers = [(net.W[i], net.b[i], i < net.n - 1) for i in range(net.n)]
     fight = fight_net(net, F)
